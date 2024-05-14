@@ -4,7 +4,7 @@ use super::WindowManager;
 
 pub trait EventManager<E: 'static> {
     /// Handles window events in a WindowManager. Return `false` to prevent default behavior of the
-    /// WindowManager. Default behavior is closing the window and toggling fullscreen on F11
+    /// WindowManager. Default behavior is closing and resizing the window and toggling fullscreen on F11
     fn window_event(
         &mut self,
         window_manager: &mut WindowManager<E>,
