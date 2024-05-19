@@ -3,7 +3,7 @@ use image::imageops::{resize, FilterType};
 use winit::{event_loop::ActiveEventLoop, window::{CustomCursor, CustomCursorSource, Icon, WindowAttributes}};
 
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct WindowDescriptor {
     attributes: WindowAttributes,
     cursor_path: Option<&'static str>,

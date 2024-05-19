@@ -12,6 +12,7 @@ env_logger = "0.10"
 log = "0.4"
 wgpu = "0.19.4"
 futures = "0.3.30"
+bytemuck = { version = "1.16.0", features = ["derive"] }
 
 [build-dependencies]
 fs_extra = "1.2"
