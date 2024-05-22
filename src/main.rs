@@ -4,9 +4,9 @@ use std::{
 };
 
 use placeholder::app::{
-    ApplicationEvent, EventManager, ManagerApplication, ShaderDescriptor, Vertex as Vert,
-    WindowDescriptor, WindowManager,
+    ApplicationEvent, EventManager, ManagerApplication, WindowDescriptor, WindowManager,
 };
+use placeholder::graphics::{ShaderDescriptor, Vertex as Vert};
 use repr_trait::C;
 use winit::window::{WindowAttributes, WindowId};
 
