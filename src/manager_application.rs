@@ -3,11 +3,10 @@ use std::fmt::Debug;
 use std::fs;
 use wgpu::rwh::{HasRawDisplayHandle, HasRawWindowHandle};
 use wgpu::util::DeviceExt;
-use winit::event_loop::EventLoopClosed;
 use winit::{
     application::ApplicationHandler,
     event::{ElementState, KeyEvent, WindowEvent},
-    event_loop::{ActiveEventLoop, ControlFlow, EventLoop, EventLoopProxy},
+    event_loop::{ActiveEventLoop, ControlFlow, EventLoop},
     keyboard::{KeyCode, PhysicalKey},
     window::{Fullscreen, Window, WindowId},
 };
@@ -18,75 +17,10 @@ pub use window_descriptor::WindowDescriptor;
 mod event_manager;
 pub use event_manager::EventManager;
 
-pub struct WindowManager<E: 'static> {
-    windows: Vec<Window>,
-    event_loop: Option<EventLoopProxy<E>>,
-}
-impl<E: 'static> WindowManager<E> {
-    pub fn send_event(&self, event: E) -> Result<(), EventLoopClosed<E>> {
-        self.event_loop.as_ref().unwrap().send_event(event)
-    }
-}
-impl<E: 'static> Default for WindowManager<E> {
-    fn default() -> Self {
-        Self {
-            windows: Vec::new(),
-            event_loop: None,
-        }
-    }
-}
+mod window_manager;
+pub use window_manager::WindowManager;
 
-#[repr(C)]
-#[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct Vertex {
-    position: [f32; 3],
-    color: [f32; 3],
-}
-impl Vertex {
-    fn describe() -> wgpu::VertexBufferLayout<'static> {
-        wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<Vertex>() as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &[
-                wgpu::VertexAttribute {
-                    offset: 0,
-                    format: wgpu::VertexFormat::Float32x3,
-                    shader_location: 0,
-                },
-                wgpu::VertexAttribute {
-                    offset: std::mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
-                    format: wgpu::VertexFormat::Float32x3,
-                    shader_location: 1,
-                },
-            ],
-        }
-    }
-}
-const VERTICES: &[Vertex] = &[
-    Vertex {
-        position: [-0.0868241, 0.49240386, 0.0],
-        color: [0.5, 0.0, 0.5],
-    },
-    Vertex {
-        position: [-0.49513406, 0.06958647, 0.0],
-        color: [0.5, 0.0, 0.5],
-    },
-    Vertex {
-        position: [-0.21918549, -0.44939706, 0.0],
-        color: [0.5, 0.0, 0.5],
-    },
-    Vertex {
-        position: [0.35966998, -0.3473291, 0.0],
-        color: [0.5, 0.0, 0.5],
-    },
-    Vertex {
-        position: [0.44147372, 0.2347359, 0.0],
-        color: [0.5, 0.0, 0.5],
-    },
-];
-const INDICES: &[u16] = &[0, 1, 4, 1, 2, 4, 2, 3, 4];
-
-trait WindowSurface: Debug {
+trait WindowSurface<I: Index, V: Vertex>: Debug {
     fn surface<'a, 'b: 'a>(&'b self) -> &'a wgpu::Surface<'a>;
     fn size(&self) -> &winit::dpi::PhysicalSize<u32>;
     fn size_mut(&mut self) -> &mut winit::dpi::PhysicalSize<u32>;
@@ -105,13 +39,14 @@ trait WindowSurface: Debug {
     fn update(
         &mut self,
         device: &wgpu::Device,
-        vertices: Option<&[Vertex]>,
-        indices: Option<&[u16]>,
+        queue: &wgpu::Queue,
+        vertices: Option<&[V]>,
+        indices: Option<&[I]>,
     );
     fn render(&mut self, device: &wgpu::Device, queue: &wgpu::Queue);
 }
-struct Surface<'a> {
-    surface: wgpu::Surface<'a>,
+struct Surface<'a, I: Index, V: Vertex> {
+    wgpu_surface: wgpu::Surface<'a>,
     size: winit::dpi::PhysicalSize<u32>,
     config: wgpu::SurfaceConfiguration,
     render_pipeline: wgpu::RenderPipeline,
@@ -119,8 +54,9 @@ struct Surface<'a> {
     index_buffer: wgpu::Buffer,
     num_vertices: u32,
     num_indices: u32,
+    _phantom: std::marker::PhantomData<(I, V)>,
 }
-impl Debug for Surface<'_> {
+impl<I: Index, V: Vertex> Debug for Surface<'_, I, V> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Surface")
             .field("size", &self.size)
@@ -128,9 +64,9 @@ impl Debug for Surface<'_> {
             .finish()
     }
 }
-impl<'a> WindowSurface for Surface<'a> {
+impl<'a, I: Index, V: Vertex> WindowSurface<I, V> for Surface<'a, I, V> {
     fn surface<'b, 'c: 'b>(&'c self) -> &'b wgpu::Surface<'b> {
-        &self.surface
+        &self.wgpu_surface
     }
 
     fn size_mut(&mut self) -> &mut winit::dpi::PhysicalSize<u32> {
@@ -152,25 +88,22 @@ impl<'a> WindowSurface for Surface<'a> {
     fn update(
         &mut self,
         device: &wgpu::Device,
-        vertices: Option<&[Vertex]>,
-        indices: Option<&[u16]>,
+        queue: &wgpu::Queue,
+        vertices: Option<&[V]>,
+        indices: Option<&[I]>,
     ) {
         if let Some(indices) = indices {
             if self.num_indices < indices.len() as u32 {
                 let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                     label: Some("Index Buffer"),
                     contents: bytemuck::cast_slice(indices),
-                    usage: wgpu::BufferUsages::INDEX,
+                    usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
                 });
                 self.index_buffer = index_buffer;
                 self.num_indices = indices.len() as u32;
             } else {
                 let indices = bytemuck::cast_slice(indices);
-                let mut view = self
-                    .index_buffer
-                    .slice(..indices.len() as u64)
-                    .get_mapped_range_mut();
-                view.copy_from_slice(indices);
+                queue.write_buffer(&self.index_buffer, 0, indices);
             }
         }
         if let Some(vertices) = vertices {
@@ -178,17 +111,13 @@ impl<'a> WindowSurface for Surface<'a> {
                 let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                     label: Some("Vertex Buffer"),
                     contents: bytemuck::cast_slice(vertices),
-                    usage: wgpu::BufferUsages::VERTEX,
+                    usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
                 });
                 self.vertex_buffer = vertex_buffer;
                 self.num_vertices = vertices.len() as u32;
             } else {
                 let vertices = bytemuck::cast_slice(vertices);
-                let mut view = self
-                    .vertex_buffer
-                    .slice(..vertices.len() as u64)
-                    .get_mapped_range_mut();
-                view.copy_from_slice(vertices);
+                queue.write_buffer(&self.vertex_buffer, 0, vertices);
             }
         }
     }
@@ -220,7 +149,7 @@ impl<'a> WindowSurface for Surface<'a> {
 
             render_pass.set_pipeline(&self.render_pipeline);
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-            render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+            render_pass.set_index_buffer(self.index_buffer.slice(..), I::index_format());
             render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
         }
 
@@ -234,14 +163,32 @@ pub struct ShaderDescriptor {
     pub vertex_shader: &'static str,
     pub fragment_shader: &'static str,
 }
-pub struct GraphicsProvider {
+pub trait Vertex:
+    Debug + Clone + Copy + bytemuck::Pod + bytemuck::Zeroable + repr_trait::C
+{
+    fn describe_buffer_layout() -> wgpu::VertexBufferLayout<'static>;
+}
+pub trait Index: Debug + Clone + Copy + bytemuck::Pod + bytemuck::Zeroable {
+    fn index_format() -> wgpu::IndexFormat;
+}
+impl Index for u16 {
+    fn index_format() -> wgpu::IndexFormat {
+        wgpu::IndexFormat::Uint16
+    }
+}
+impl Index for u32 {
+    fn index_format() -> wgpu::IndexFormat {
+        wgpu::IndexFormat::Uint32
+    }
+}
+pub struct GraphicsProvider<I: Index, V: Vertex> {
     instance: wgpu::Instance,
     adapter: Option<wgpu::Adapter>,
     device: Option<wgpu::Device>,
     queue: Option<wgpu::Queue>,
-    surfaces: Vec<(WindowId, Box<dyn WindowSurface>)>,
+    surfaces: Vec<(WindowId, Box<dyn WindowSurface<I, V>>)>,
 }
-impl GraphicsProvider {
+impl<I: Index, V: Vertex> GraphicsProvider<I, V> {
     fn new() -> Self {
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: wgpu::Backends::PRIMARY,
@@ -348,7 +295,7 @@ impl GraphicsProvider {
                     vertex: wgpu::VertexState {
                         module: &shader,
                         entry_point: shader_descriptor.vertex_shader,
-                        buffers: &[Vertex::describe()],
+                        buffers: &[V::describe_buffer_layout()],
                     },
                     fragment: Some(wgpu::FragmentState {
                         module: &shader,
@@ -382,26 +329,26 @@ impl GraphicsProvider {
                 .as_ref()
                 .unwrap()
                 .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("Vertex Buffer"),
-                    contents: bytemuck::cast_slice(VERTICES),
-                    usage: wgpu::BufferUsages::VERTEX,
+                    label: Some(&format!("Vertex Buffer {:?}", window.id())),
+                    contents: &[],
+                    usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
                 });
         let index_buffer =
             self.device
                 .as_ref()
                 .unwrap()
                 .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("Index Buffer"),
-                    contents: bytemuck::cast_slice(&INDICES),
-                    usage: wgpu::BufferUsages::INDEX,
+                    label: Some(&format!("Index Buffer {:?}", window.id())),
+                    contents: &[],
+                    usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
                 });
-        let num_vertices = VERTICES.len() as u32;
-        let num_indices = INDICES.len() as u32;
+        let num_vertices = 0;
+        let num_indices = 0;
 
         self.surfaces.push((
             window.id(),
             Box::new(Surface {
-                surface,
+                wgpu_surface: surface,
                 size,
                 config,
                 render_pipeline,
@@ -409,6 +356,7 @@ impl GraphicsProvider {
                 index_buffer,
                 num_vertices,
                 num_indices,
+                _phantom: std::marker::PhantomData,
             }),
         ));
     }
@@ -429,15 +377,10 @@ impl GraphicsProvider {
         }
     }
 
-    fn update_buffers(
-        &mut self,
-        id: &WindowId,
-        vertices: Option<&[Vertex]>,
-        indices: Option<&[u16]>,
-    ) {
+    fn update_buffers(&mut self, id: &WindowId, vertices: Option<&[V]>, indices: Option<&[I]>) {
         if let Some((_, surface)) = self.surfaces.iter_mut().find(|(i, _)| i == id) {
-            if let Some(device) = &self.device {
-                surface.update(device, vertices, indices)
+            if let (Some(device), Some(queue)) = (&self.device, &self.queue) {
+                surface.update(device, queue, vertices, indices)
             }
         }
     }
@@ -447,14 +390,19 @@ impl GraphicsProvider {
     }
 }
 
-pub struct ManagerApplication<E: ApplicationEvent + 'static, M: EventManager<E>> {
+pub struct ManagerApplication<
+    E: ApplicationEvent<I, V> + 'static,
+    M: EventManager<E>,
+    I: Index,
+    V: Vertex,
+> {
     event_manager: M,
     window_manager: WindowManager<E>,
-    graphics_provider: GraphicsProvider,
+    graphics_provider: GraphicsProvider<I, V>,
 }
 
-impl<'a, E: ApplicationEvent + 'static, M: EventManager<E>> ApplicationHandler<E>
-    for ManagerApplication<E, M>
+impl<'a, E: ApplicationEvent<I, V> + 'static, M: EventManager<E>, I: Index, V: Vertex>
+    ApplicationHandler<E> for ManagerApplication<E, M, I, V>
 {
     fn resumed(&mut self, _active_loop: &ActiveEventLoop) {
         self.window_manager.send_event(E::app_resumed()).unwrap();
@@ -467,11 +415,11 @@ impl<'a, E: ApplicationEvent + 'static, M: EventManager<E>> ApplicationHandler<E
         {
             match event {
                 WindowEvent::CloseRequested => {
-                    if self.window_manager.windows.len() == 1 {
+                    if self.window_manager.amount_windows() == 1 {
                         event_loop.exit();
                     } else {
                         self.graphics_provider.remove_window(&id);
-                        self.window_manager.windows.retain(|w| w.id() != id);
+                        self.window_manager.remove_window(&id);
                     }
                 }
                 WindowEvent::Resized(size) => self.graphics_provider.resize_window(&id, &size),
@@ -481,9 +429,7 @@ impl<'a, E: ApplicationEvent + 'static, M: EventManager<E>> ApplicationHandler<E
                 WindowEvent::RedrawRequested => {
                     self.graphics_provider.render_window(&id);
                     self.window_manager
-                        .windows
-                        .iter()
-                        .find(|w| w.id() == id)
+                        .get_window(&id)
                         .unwrap()
                         .request_redraw();
                 }
@@ -496,12 +442,7 @@ impl<'a, E: ApplicationEvent + 'static, M: EventManager<E>> ApplicationHandler<E
                         },
                     ..
                 } => {
-                    let window = self
-                        .window_manager
-                        .windows
-                        .iter()
-                        .find(|w| w.id() == id)
-                        .unwrap();
+                    let window = self.window_manager.get_window(&id).unwrap();
                     match window.fullscreen() {
                         Some(Fullscreen::Borderless(_)) => {
                             window.set_fullscreen(None);
@@ -518,14 +459,14 @@ impl<'a, E: ApplicationEvent + 'static, M: EventManager<E>> ApplicationHandler<E
 
     fn user_event(&mut self, event_loop: &ActiveEventLoop, event: E) {
         match event.is_request_new_window() {
-            Some((window_descriptor, shader_descriptor)) => {
-                self.create_window(window_descriptor, shader_descriptor, event_loop)
+            Some((window_descriptor, shader_descriptor, name)) => {
+                self.create_window(window_descriptor, shader_descriptor, event_loop, name)
             }
             None => {}
         };
         match event.is_render_update() {
             Some((_, None, None)) | None => {}
-            Some((id, vertices, indices)) => {
+            Some((id, indices, vertices)) => {
                 self.graphics_provider.update_buffers(id, vertices, indices)
             }
         }
@@ -534,7 +475,9 @@ impl<'a, E: ApplicationEvent + 'static, M: EventManager<E>> ApplicationHandler<E
     }
 }
 
-impl<'a, E: ApplicationEvent + 'static, M: EventManager<E>> ManagerApplication<E, M> {
+impl<'a, E: ApplicationEvent<I, V> + 'static, M: EventManager<E>, I: Index, V: Vertex>
+    ManagerApplication<E, M, I, V>
+{
     pub fn new(event_manager: M) -> Self {
         Self {
             event_manager,
@@ -548,28 +491,25 @@ impl<'a, E: ApplicationEvent + 'static, M: EventManager<E>> ManagerApplication<E
         descriptor: &WindowDescriptor,
         shader_descriptor: &ShaderDescriptor,
         active_loop: &ActiveEventLoop,
+        name: &str,
     ) {
         let window = active_loop
             .create_window(descriptor.get_attributes(active_loop))
             .unwrap();
         self.window_manager
-            .event_loop
-            .as_ref()
-            .expect("Created a window without having an EventLoopProxy to send events")
-            .send_event(E::new_window(&window.id()))
+            .send_event(E::new_window(&window.id(), name))
             .unwrap();
-        self.window_manager.windows.push(window);
-        self.graphics_provider.init_window(
-            &self.window_manager.windows.last().unwrap(),
-            shader_descriptor,
-        );
+        self.graphics_provider
+            .init_window(&window, shader_descriptor);
+        // window.request_redraw();
+        self.window_manager.add_window(window);
     }
 
     pub fn run(&mut self) {
         env_logger::init();
         let event_loop = EventLoop::<E>::with_user_event().build().unwrap();
         let event_loop_proxy = event_loop.create_proxy();
-        self.window_manager.event_loop = Some(event_loop_proxy);
+        self.window_manager.set_event_loop(event_loop_proxy);
 
         event_loop.set_control_flow(ControlFlow::Poll);
 
@@ -577,11 +517,11 @@ impl<'a, E: ApplicationEvent + 'static, M: EventManager<E>> ManagerApplication<E
     }
 }
 
-pub trait ApplicationEvent: Debug {
+pub trait ApplicationEvent<I: Index, V: Vertex>: Debug {
     fn app_resumed() -> Self;
-    fn new_window(id: &WindowId) -> Self;
-    fn is_request_new_window<'a>(&'a self) -> Option<(&'a WindowDescriptor, &'a ShaderDescriptor)>;
-    fn is_render_update<'a>(
+    fn new_window(id: &WindowId, name: &str) -> Self;
+    fn is_request_new_window<'a>(
         &'a self,
-    ) -> Option<(&'a WindowId, Option<&'a [Vertex]>, Option<&'a [u16]>)>;
+    ) -> Option<(&'a WindowDescriptor, &'a ShaderDescriptor, &'a str)>;
+    fn is_render_update<'a>(&'a self) -> Option<(&'a WindowId, Option<&'a [I]>, Option<&'a [V]>)>;
 }

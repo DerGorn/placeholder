@@ -1547,6 +1547,7 @@ dependencies = [
  "futures",
  "image",
  "log",
+ "repr-trait",
  "wgpu",
  "winit",
 ]
@@ -1831,6 +1832,25 @@ name = "renderdoc-sys"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "19b30a45b0cd0bcca8037f3d0dc3421eaf95327a17cad11964fb8179b4fc4832"
+
+[[package]]
+name = "repr-trait"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1fbb00d09cd285bbcc2e3d62fb4df303136ab0f02827e1e958fa8ded91d99108"
+dependencies = [
+ "repr-trait-derive",
+]
+
+[[package]]
+name = "repr-trait-derive"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8512d52df656782c3ba2efa23ad296564a2d7b58ee8d74e9f502542b95dffdbb"
+dependencies = [
+ "quote",
+ "syn 1.0.109",
+]
 
 [[package]]
 name = "rgb"
