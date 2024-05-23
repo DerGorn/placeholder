@@ -1548,6 +1548,7 @@ dependencies = [
  "image",
  "log",
  "repr-trait",
+ "threed",
  "wgpu",
  "winit",
 ]
@@ -2115,6 +2116,10 @@ dependencies = [
  "quote",
  "syn 2.0.62",
 ]
+
+[[package]]
+name = "threed"
+version = "0.1.0"
 
 [[package]]
 name = "tiff"

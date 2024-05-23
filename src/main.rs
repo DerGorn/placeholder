@@ -8,11 +8,17 @@ use placeholder::app::{
 };
 use placeholder::graphics::{ShaderDescriptor, Vertex as Vert};
 use repr_trait::C;
-use winit::window::{WindowAttributes, WindowId};
+use threed::Vector;
+use winit::{
+    dpi::PhysicalSize,
+    event::{KeyEvent, WindowEvent},
+    keyboard::{KeyCode, PhysicalKey},
+    window::{WindowAttributes, WindowId},
+};
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable, repr_trait::C)]
-pub struct Vertex {
+struct Vertex {
     position: [f32; 3],
     color: [f32; 3],
 }
@@ -36,38 +42,69 @@ impl Vert for Vertex {
         }
     }
 }
-const VERTICES: &[Vertex] = &[
-    Vertex {
-        position: [-0.0868241, 0.49240386, 0.0],
-        color: [0.5, 0.0, 0.5],
-    },
-    Vertex {
-        position: [-0.49513406, 0.06958647, 0.0],
-        color: [0.5, 0.0, 0.5],
-    },
-    Vertex {
-        position: [-0.21918549, -0.44939706, 0.0],
-        color: [0.5, 0.0, 0.5],
-    },
-    Vertex {
-        position: [0.35966998, -0.3473291, 0.0],
-        color: [0.5, 0.0, 0.5],
-    },
-    Vertex {
-        position: [0.44147372, 0.2347359, 0.0],
-        color: [0.5, 0.0, 0.5],
-    },
-];
-const MAIN_INDICES: &[u16] = &[0, 1, 4, 1, 2, 4];
-const SECOND_INDICES: &[u16] = &[1, 2, 4, 2, 3, 4];
+
+struct Square {
+    width: u16,
+    position: Vector<f32>,
+    color: [f32; 3],
+}
+impl Square {
+    fn render(&self, vertices: &mut Vec<Vertex>, indices: &mut Vec<u16>, size: &PhysicalSize<u32>) {
+        let x = self.position.x;
+        let y = self.position.y;
+        let z = self.position.z;
+        let color = self.color;
+        let x_offset = self.width as f32 / (2.0 * size.width as f32);
+        let y_offset = self.width as f32 / (2.0 * size.height as f32);
+        let new_vertices = [
+            Vertex {
+                position: [x - x_offset, y + y_offset, z],
+                color,
+            },
+            Vertex {
+                position: [x + x_offset, y + y_offset, z],
+                color,
+            },
+            Vertex {
+                position: [x + x_offset, y - y_offset, z],
+                color,
+            },
+            Vertex {
+                position: [x - x_offset, y - y_offset, z],
+                color,
+            },
+        ];
+        let new_indices = [0, 1, 2, 0, 2, 3];
+        vertices.extend_from_slice(&new_vertices);
+        indices.extend_from_slice(&new_indices);
+    }
+
+    fn handle_key_input(&mut self, input: &KeyEvent) {
+        if input.state == winit::event::ElementState::Pressed {
+            match input.physical_key {
+                PhysicalKey::Code(KeyCode::KeyW) => self.position.y += 0.01,
+                PhysicalKey::Code(KeyCode::KeyA) => self.position.x -= 0.01,
+                PhysicalKey::Code(KeyCode::KeyS) => self.position.y -= 0.01,
+                PhysicalKey::Code(KeyCode::KeyD) => self.position.x += 0.01,
+                _ => {}
+            }
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq)]
 struct WindowName(String);
+impl WindowName {
+    fn as_str<'a>(&'a self) -> &'a str {
+        self.0.as_str()
+    }
+}
 impl From<&str> for WindowName {
     fn from(value: &str) -> Self {
         Self(value.to_string())
     }
 }
+
 #[derive(Debug)]
 enum Event {
     Timer(Duration),
@@ -121,9 +158,14 @@ impl ApplicationEvent<u16, Vertex> for Event {
         Self::NewWindow(id.clone(), name.into())
     }
 }
+
+const MAIN_WINDOW: &str = "Main";
+
 struct EventHandler {
     default_window: WindowDescriptor,
     window_ids: Vec<(WindowName, WindowId)>,
+    window_sizes: Vec<(WindowId, PhysicalSize<u32>)>,
+    entities: Vec<(WindowId, Square)>,
     target_fps: u8,
 }
 impl EventHandler {
@@ -131,6 +173,8 @@ impl EventHandler {
         Self {
             default_window,
             window_ids: Vec::new(),
+            window_sizes: Vec::new(),
+            entities: Vec::new(),
             target_fps,
         }
     }
@@ -147,13 +191,29 @@ impl EventManager<Event> for EventHandler {
         &mut self,
         _window_manager: &mut WindowManager<Event>,
         _event_loop: &winit::event_loop::ActiveEventLoop,
-        _id: &winit::window::WindowId,
-        _event: &winit::event::WindowEvent,
+        id: &winit::window::WindowId,
+        event: &winit::event::WindowEvent,
     ) -> bool
     where
         Self: Sized,
     {
-        // todo!()
+        match event {
+            WindowEvent::Resized(size) => {
+                let window_size = self.window_sizes.iter_mut().find(|(i, _)| i == id);
+                if let Some((_, s)) = window_size {
+                    *s = *size
+                } else {
+                    self.window_sizes.push((id.clone(), *size));
+                }
+            }
+            WindowEvent::KeyboardInput { event, .. } => {
+                self.entities
+                    .iter_mut()
+                    .filter(|(i, _)| i == id)
+                    .for_each(|(_, entity)| entity.handle_key_input(event));
+            }
+            _ => {}
+        }
         true
     }
 
@@ -177,16 +237,10 @@ impl EventManager<Event> for EventHandler {
                     .send_event(Event::RequestNewWindow(
                         descriptor.clone(),
                         shader_descriptor.clone(),
-                        "Main".into(),
+                        MAIN_WINDOW.into(),
                     ))
                     .unwrap();
-                window_manager
-                    .send_event(Event::RequestNewWindow(
-                        descriptor,
-                        shader_descriptor,
-                        "Secondary".into(),
-                    ))
-                    .unwrap();
+
                 let ns_per_frame = 1e9 / (self.target_fps as f64);
                 let frame_duration = Duration::from_nanos(ns_per_frame as u64);
                 let timer_event_loop = window_manager.create_event_loop_proxy();
@@ -202,24 +256,38 @@ impl EventManager<Event> for EventHandler {
                     }
                 });
             }
-            Event::NewWindow(id, name) => self.window_ids.push((name.clone(), id.clone())),
-            Event::Timer(delta_t) => {
-                if let Some(main_id) = self.get_window_id("Main".into()) {
-                    window_manager
-                        .send_event(Event::RenderUpdate(
-                            main_id.clone(),
-                            VERTICES.to_vec(),
-                            MAIN_INDICES.to_vec(),
-                        ))
-                        .unwrap();
+            Event::NewWindow(id, name) => {
+                self.window_ids.push((name.clone(), id.clone()));
+                if name.as_str() == MAIN_WINDOW {
+                    self.entities.push((
+                        id.clone(),
+                        Square {
+                            width: 100,
+                            position: Vector::new(0.0, 0.0, 0.0),
+                            color: [0.0, 0.0, 1.0],
+                        },
+                    ));
                 }
-                if let Some(second_id) = self.get_window_id("Secondary".into()) {
+            }
+            Event::Timer(_delta_t) => {
+                for (_name, id) in &self.window_ids {
+                    let size = self
+                        .window_sizes
+                        .iter()
+                        .find(|(i, _)| i == id)
+                        .map(|(_, s)| *s)
+                        .or_else(|| Some(PhysicalSize::new(1, 1)))
+                        .unwrap();
+                    let mut vertices = Vec::new();
+                    let mut indices = Vec::new();
+                    for (target_id, square) in &self.entities {
+                        if target_id != id {
+                            continue;
+                        }
+                        square.render(&mut vertices, &mut indices, &size);
+                    }
                     window_manager
-                        .send_event(Event::RenderUpdate(
-                            second_id.clone(),
-                            VERTICES.to_vec(),
-                            SECOND_INDICES.to_vec(),
-                        ))
+                        .send_event(Event::RenderUpdate(*id, vertices, indices))
                         .unwrap();
                 }
             }
