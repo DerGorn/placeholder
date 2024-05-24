@@ -1,6 +1,6 @@
+use super::{texture::TextureProvider, Index, ShaderDescriptor, Vertex};
+use std::{fmt::Debug, fs};
 use wgpu::util::DeviceExt;
-use std::fmt::Debug;
-use super::{Index, Vertex};
 
 pub trait WindowSurface<I: Index, V: Vertex>: Debug {
     fn surface<'a, 'b: 'a>(&'b self) -> &'a wgpu::Surface<'a>;
@@ -25,18 +25,29 @@ pub trait WindowSurface<I: Index, V: Vertex>: Debug {
         vertices: Option<&[V]>,
         indices: Option<&[I]>,
     );
-    fn render(&mut self, device: &wgpu::Device, queue: &wgpu::Queue);
+    fn create_render_pipeline(
+        &mut self,
+        device: &wgpu::Device,
+        bind_group_layout: &wgpu::BindGroupLayout,
+    );
+    fn render(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        texture_provider: &TextureProvider,
+    );
 }
 
 pub struct Surface<'a, I: Index, V: Vertex> {
     pub wgpu_surface: wgpu::Surface<'a>,
     pub size: winit::dpi::PhysicalSize<u32>,
     pub config: wgpu::SurfaceConfiguration,
-    pub render_pipeline: wgpu::RenderPipeline,
     pub vertex_buffer: wgpu::Buffer,
     pub index_buffer: wgpu::Buffer,
     pub num_vertices: u32,
     pub num_indices: u32,
+    pub shader_descriptor: ShaderDescriptor,
+    pub render_pipeline: Option<wgpu::RenderPipeline>,
     pub _phantom: std::marker::PhantomData<(I, V)>,
 }
 impl<I: Index, V: Vertex> Debug for Surface<'_, I, V> {
@@ -105,7 +116,72 @@ impl<'a, I: Index, V: Vertex> WindowSurface<I, V> for Surface<'a, I, V> {
         }
     }
 
-    fn render(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) {
+    fn create_render_pipeline(
+        &mut self,
+        device: &wgpu::Device,
+        bind_group_layout: &wgpu::BindGroupLayout,
+    ) {
+        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some(&format!("Shader Module {:?}", self.shader_descriptor.file)),
+            source: wgpu::ShaderSource::Wgsl(
+                fs::read_to_string(self.shader_descriptor.file)
+                    .expect(&format!(
+                        "Could not load '{}'\n",
+                        self.shader_descriptor.file
+                    ))
+                    .into(),
+            ),
+        });
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("Pipeline Layout"),
+            bind_group_layouts: &[bind_group_layout],
+            push_constant_ranges: &[],
+        });
+        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("Render Pipeline"),
+            layout: Some(&pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: self.shader_descriptor.vertex_shader,
+                buffers: &[V::describe_buffer_layout()],
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &shader,
+                entry_point: self.shader_descriptor.fragment_shader,
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: self.config.format,
+                    blend: Some(wgpu::BlendState::REPLACE),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                strip_index_format: None,
+                front_face: wgpu::FrontFace::Ccw,
+                // cull_mode: Some(wgpu::Face::Back),
+                cull_mode: None,
+                polygon_mode: wgpu::PolygonMode::Fill,
+                unclipped_depth: false,
+                conservative: false,
+            },
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState {
+                count: 1,
+                mask: !0,
+                alpha_to_coverage_enabled: false,
+            },
+            multiview: None,
+        });
+
+        self.render_pipeline = Some(render_pipeline);
+    }
+
+    fn render(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        texture_provider: &TextureProvider,
+    ) {
         let output = self.surface().get_current_texture().unwrap();
         let view = output
             .texture
@@ -130,7 +206,12 @@ impl<'a, I: Index, V: Vertex> WindowSurface<I, V> for Surface<'a, I, V> {
                 timestamp_writes: None,
             });
 
-            render_pass.set_pipeline(&self.render_pipeline);
+            if let Some(render_pipeline) = self.render_pipeline.as_ref() {
+                render_pass.set_pipeline(render_pipeline);
+            }
+            if let Some(bind_group) = texture_provider.bind_group.as_ref() {
+                render_pass.set_bind_group(0, bind_group, &[]);
+            }
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             render_pass.set_index_buffer(self.index_buffer.slice(..), I::index_format());
             render_pass.draw_indexed(0..self.num_indices, 0, 0..1);

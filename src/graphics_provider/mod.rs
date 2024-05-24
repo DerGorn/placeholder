@@ -1,7 +1,6 @@
 #![allow(deprecated)]
-use std::fs;
-use wgpu::util::DeviceExt;
 use wgpu::rwh::{HasRawDisplayHandle, HasRawWindowHandle};
+use wgpu::util::DeviceExt;
 use winit::window::{Window, WindowId};
 
 mod buffer_primitives;
@@ -13,12 +12,16 @@ use surface::{Surface, WindowSurface};
 mod shader_descriptor;
 pub use shader_descriptor::ShaderDescriptor;
 
+mod texture;
+use texture::TextureProvider;
+
 pub struct GraphicsProvider<I: Index, V: Vertex> {
     instance: wgpu::Instance,
     adapter: Option<wgpu::Adapter>,
     device: Option<wgpu::Device>,
     queue: Option<wgpu::Queue>,
     surfaces: Vec<(WindowId, Box<dyn WindowSurface<I, V>>)>,
+    texture_provider: Option<TextureProvider>,
 }
 impl<I: Index, V: Vertex> GraphicsProvider<I, V> {
     pub fn new() -> Self {
@@ -32,6 +35,7 @@ impl<I: Index, V: Vertex> GraphicsProvider<I, V> {
             device: None,
             queue: None,
             surfaces: Vec::new(),
+            texture_provider: None,
         }
     }
 
@@ -47,13 +51,15 @@ impl<I: Index, V: Vertex> GraphicsProvider<I, V> {
 
         let (device, queue) = futures::executor::block_on(adapter.request_device(
             &wgpu::DeviceDescriptor {
-                required_features: wgpu::Features::empty(),
+                required_features: wgpu::Features::TEXTURE_BINDING_ARRAY
+                    | wgpu::Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING,
                 required_limits: wgpu::Limits::default(),
                 label: None,
             },
             None, // Trace path
         ))
         .unwrap();
+        self.texture_provider = Some(TextureProvider::new());
         self.adapter = Some(adapter);
         self.device = Some(device);
         self.queue = Some(queue);
@@ -96,67 +102,6 @@ impl<I: Index, V: Vertex> GraphicsProvider<I, V> {
             desired_maximum_frame_latency: 2,
         };
 
-        let shader =
-            self.device
-                .as_ref()
-                .unwrap()
-                .create_shader_module(wgpu::ShaderModuleDescriptor {
-                    label: Some(&format!("Shader Module {:?}", shader_descriptor.file)),
-                    source: wgpu::ShaderSource::Wgsl(
-                        fs::read_to_string(shader_descriptor.file)
-                            .expect(&format!("Could not load '{}'\n", shader_descriptor.file))
-                            .into(),
-                    ),
-                });
-        let pipeline_layout =
-            self.device
-                .as_ref()
-                .unwrap()
-                .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                    label: Some("Pipeline Layout"),
-                    bind_group_layouts: &[],
-                    push_constant_ranges: &[],
-                });
-        let render_pipeline =
-            self.device
-                .as_ref()
-                .unwrap()
-                .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                    label: Some(&format!("Render Pipeline {:?}", window.id())),
-                    layout: Some(&pipeline_layout),
-                    vertex: wgpu::VertexState {
-                        module: &shader,
-                        entry_point: shader_descriptor.vertex_shader,
-                        buffers: &[V::describe_buffer_layout()],
-                    },
-                    fragment: Some(wgpu::FragmentState {
-                        module: &shader,
-                        entry_point: shader_descriptor.fragment_shader,
-                        targets: &[Some(wgpu::ColorTargetState {
-                            format: config.format,
-                            blend: Some(wgpu::BlendState::REPLACE),
-                            write_mask: wgpu::ColorWrites::ALL,
-                        })],
-                    }),
-                    primitive: wgpu::PrimitiveState {
-                        topology: wgpu::PrimitiveTopology::TriangleList,
-                        strip_index_format: None,
-                        front_face: wgpu::FrontFace::Ccw,
-                        // cull_mode: Some(wgpu::Face::Back),
-                        cull_mode: None,
-                        polygon_mode: wgpu::PolygonMode::Fill,
-                        unclipped_depth: false,
-                        conservative: false,
-                    },
-                    depth_stencil: None,
-                    multisample: wgpu::MultisampleState {
-                        count: 1,
-                        mask: !0,
-                        alpha_to_coverage_enabled: false,
-                    },
-                    multiview: None,
-                });
-
         let vertex_buffer =
             self.device
                 .as_ref()
@@ -184,7 +129,8 @@ impl<I: Index, V: Vertex> GraphicsProvider<I, V> {
                 wgpu_surface: surface,
                 size,
                 config,
-                render_pipeline,
+                render_pipeline: None,
+                shader_descriptor: shader_descriptor.clone(),
                 vertex_buffer,
                 index_buffer,
                 num_vertices,
@@ -204,8 +150,10 @@ impl<I: Index, V: Vertex> GraphicsProvider<I, V> {
 
     pub fn render_window(&mut self, id: &WindowId) {
         if let Some((_, surface)) = self.surfaces.iter_mut().find(|(i, _)| i == id) {
-            if let (Some(device), Some(queue)) = (&self.device, &self.queue) {
-                surface.render(device, queue);
+            if let (Some(device), Some(queue), Some(texture_provider)) =
+                (&self.device, &self.queue, &self.texture_provider)
+            {
+                surface.render(device, queue, texture_provider);
             }
         }
     }
@@ -221,6 +169,24 @@ impl<I: Index, V: Vertex> GraphicsProvider<I, V> {
     pub fn remove_window(&mut self, id: &WindowId) {
         self.surfaces.retain(|(i, _)| i != id);
     }
+
+    pub fn create_texture(&mut self, path: &str, label: &str) -> Option<u32> {
+        if let (Some(device), Some(queue), Some(texture_provider)) =
+            (&self.device, &self.queue, &mut self.texture_provider)
+        {
+            if let Some(index) = texture_provider.get_texture_index(label) {
+                return Some(index);
+            }
+            let index = texture_provider.create_texture(device, queue, path, label);
+            self.surfaces.iter_mut().for_each(|(_, surface)| {
+                surface.create_render_pipeline(
+                    device,
+                    texture_provider.bind_group_layout.as_ref().unwrap(),
+                );
+            });
+            Some(index)
+        } else {
+            None
+        }
+    }
 }
-
-

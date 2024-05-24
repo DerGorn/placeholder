@@ -98,6 +98,14 @@ impl<'a, E: ApplicationEvent<I, V> + 'static, M: EventManager<E>, I: Index, V: V
                 self.graphics_provider.update_buffers(id, vertices, indices)
             }
         }
+        match event.is_request_new_texture() {
+            Some((path, label)) => {
+                let id = self.graphics_provider.create_texture(path, label);
+                self.window_manager.send_event(E::new_texture(label, id)).unwrap();
+            }
+            None => {}
+        }
+
         self.event_manager
             .user_event(&mut self.window_manager, event_loop, &event);
     }
@@ -114,7 +122,7 @@ impl<'a, E: ApplicationEvent<I, V> + 'static, M: EventManager<E>, I: Index, V: V
         }
     }
 
-    pub fn create_window(
+    fn create_window(
         &mut self,
         descriptor: &WindowDescriptor,
         shader_descriptor: &ShaderDescriptor,
@@ -148,8 +156,10 @@ impl<'a, E: ApplicationEvent<I, V> + 'static, M: EventManager<E>, I: Index, V: V
 pub trait ApplicationEvent<I: Index, V: Vertex>: Debug {
     fn app_resumed() -> Self;
     fn new_window(id: &WindowId, name: &str) -> Self;
+    fn new_texture(label: &str, id: Option<u32>) -> Self;
     fn is_request_new_window<'a>(
         &'a self,
     ) -> Option<(&'a WindowDescriptor, &'a ShaderDescriptor, &'a str)>;
     fn is_render_update<'a>(&'a self) -> Option<(&'a WindowId, Option<&'a [I]>, Option<&'a [V]>)>;
+    fn is_request_new_texture<'a>(&'a self) -> Option<(&'a str, &'a str)>;
 }

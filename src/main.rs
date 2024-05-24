@@ -20,7 +20,8 @@ use winit::{
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable, repr_trait::C)]
 struct Vertex {
     position: [f32; 3],
-    color: [f32; 3],
+    tex_coords: [f32; 2],
+    texture: u32,
 }
 impl Vert for Vertex {
     fn describe_buffer_layout() -> wgpu::VertexBufferLayout<'static> {
@@ -35,43 +36,59 @@ impl Vert for Vertex {
                 },
                 wgpu::VertexAttribute {
                     offset: std::mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
-                    format: wgpu::VertexFormat::Float32x3,
+                    format: wgpu::VertexFormat::Float32x2,
                     shader_location: 1,
+                },
+                wgpu::VertexAttribute {
+                    offset: std::mem::size_of::<[f32; 5]>() as wgpu::BufferAddress,
+                    format: wgpu::VertexFormat::Uint32,
+                    shader_location: 2,
                 },
             ],
         }
     }
 }
 
+enum PlayerDirection {
+    Neutral,
+    Up,
+    Down,
+    Left,
+    Right,
+}
 struct Square {
     width: u16,
     position: Vector<f32>,
-    color: [f32; 3],
+    texture: u32,
+    texture_coords: [f32; 8],
 }
 impl Square {
     fn render(&self, vertices: &mut Vec<Vertex>, indices: &mut Vec<u16>, size: &PhysicalSize<u32>) {
         let x = self.position.x;
         let y = self.position.y;
         let z = self.position.z;
-        let color = self.color;
         let x_offset = self.width as f32 / (2.0 * size.width as f32);
         let y_offset = self.width as f32 / (2.0 * size.height as f32);
         let new_vertices = [
             Vertex {
                 position: [x - x_offset, y + y_offset, z],
-                color,
+                tex_coords: [self.texture_coords[0], self.texture_coords[1]],
+                texture: self.texture,
             },
             Vertex {
                 position: [x + x_offset, y + y_offset, z],
-                color,
+                tex_coords: [self.texture_coords[2], self.texture_coords[3]],
+                texture: self.texture,
             },
             Vertex {
                 position: [x + x_offset, y - y_offset, z],
-                color,
+                tex_coords: [self.texture_coords[4], self.texture_coords[5]],
+                texture: self.texture,
             },
             Vertex {
                 position: [x - x_offset, y - y_offset, z],
-                color,
+                tex_coords: [self.texture_coords[6], self.texture_coords[7]],
+                texture: self.texture,
             },
         ];
         let new_indices = [0, 1, 2, 0, 2, 3];
@@ -79,15 +96,29 @@ impl Square {
         indices.extend_from_slice(&new_indices);
     }
 
-    fn handle_key_input(&mut self, input: &KeyEvent) {
+    fn handle_key_input(&mut self, input: &KeyEvent) -> PlayerDirection {
         if input.state == winit::event::ElementState::Pressed {
             match input.physical_key {
-                PhysicalKey::Code(KeyCode::KeyW) => self.position.y += 0.01,
-                PhysicalKey::Code(KeyCode::KeyA) => self.position.x -= 0.01,
-                PhysicalKey::Code(KeyCode::KeyS) => self.position.y -= 0.01,
-                PhysicalKey::Code(KeyCode::KeyD) => self.position.x += 0.01,
-                _ => {}
+                PhysicalKey::Code(KeyCode::KeyW) => {
+                    self.position.y += 0.01;
+                    PlayerDirection::Up
+                }
+                PhysicalKey::Code(KeyCode::KeyA) => {
+                    self.position.x -= 0.01;
+                    PlayerDirection::Left
+                }
+                PhysicalKey::Code(KeyCode::KeyD) => {
+                    self.position.x += 0.01;
+                    PlayerDirection::Right
+                }
+                PhysicalKey::Code(KeyCode::KeyS) => {
+                    self.position.y -= 0.01;
+                    PlayerDirection::Down
+                }
+                _ => PlayerDirection::Neutral,
             }
+        } else {
+            PlayerDirection::Neutral
         }
     }
 }
@@ -112,6 +143,8 @@ enum Event {
     NewWindow(WindowId, WindowName),
     RequestNewWindow(WindowDescriptor, ShaderDescriptor, WindowName),
     RenderUpdate(WindowId, Vec<Vertex>, Vec<u16>),
+    NewTexture(String, Option<u32>),
+    RequestNewTexture(String, String),
 }
 impl ApplicationEvent<u16, Vertex> for Event {
     fn app_resumed() -> Self {
@@ -154,18 +187,41 @@ impl ApplicationEvent<u16, Vertex> for Event {
         }
     }
 
+    fn is_request_new_texture<'a>(&'a self) -> Option<(&'a str, &'a str)> {
+        if let Self::RequestNewTexture(path, label) = self {
+            Some((path, label))
+        } else {
+            None
+        }
+    }
+
+    fn new_texture(label: &str, id: Option<u32>) -> Self {
+        Self::NewTexture(label.to_string(), id)
+    }
+
     fn new_window(id: &WindowId, name: &str) -> Self {
         Self::NewWindow(id.clone(), name.into())
     }
 }
 
 const MAIN_WINDOW: &str = "Main";
+const PLAYER_NEUTRAL: &str = "PlayerNeutral";
+const PLAYER_NEUTRAL_PATH: &str = "res/images/standing/neutral.png";
+const PLAYER_DOWN: &str = "PlayerDown";
+const PLAYER_DOWN_PATH: &str = "res/images/forward/down.png";
+const PLAYER_UP: &str = "PlayerUp";
+const PLAYER_UP_PATH: &str = "res/images/back/up.png";
+const PLAYER_LEFT: &str = "PlayerLeft";
+const PLAYER_LEFT_PATH: &str = "res/images/left/left.png";
+const PLAYER_RIGHT: &str = "PlayerRight";
+const PLAYER_RIGHT_PATH: &str = "res/images/right/right.png";
 
 struct EventHandler {
     default_window: WindowDescriptor,
     window_ids: Vec<(WindowName, WindowId)>,
     window_sizes: Vec<(WindowId, PhysicalSize<u32>)>,
     entities: Vec<(WindowId, Square)>,
+    texture_ids: Vec<(String, u32)>,
     target_fps: u8,
 }
 impl EventHandler {
@@ -175,6 +231,7 @@ impl EventHandler {
             window_ids: Vec::new(),
             window_sizes: Vec::new(),
             entities: Vec::new(),
+            texture_ids: Vec::new(),
             target_fps,
         }
     }
@@ -210,7 +267,48 @@ impl EventManager<Event> for EventHandler {
                 self.entities
                     .iter_mut()
                     .filter(|(i, _)| i == id)
-                    .for_each(|(_, entity)| entity.handle_key_input(event));
+                    .for_each(|(_, entity)| match entity.handle_key_input(event) {
+                        PlayerDirection::Up => {
+                            entity.texture = self
+                                .texture_ids
+                                .iter()
+                                .find(|(n, _)| n == &PLAYER_UP)
+                                .map(|(_, id)| *id)
+                                .unwrap();
+                        }
+                        PlayerDirection::Down => {
+                            entity.texture = self
+                                .texture_ids
+                                .iter()
+                                .find(|(n, _)| n == &PLAYER_DOWN)
+                                .map(|(_, id)| *id)
+                                .unwrap();
+                        }
+                        PlayerDirection::Left => {
+                            entity.texture = self
+                                .texture_ids
+                                .iter()
+                                .find(|(n, _)| n == &PLAYER_LEFT)
+                                .map(|(_, id)| *id)
+                                .unwrap();
+                        }
+                        PlayerDirection::Right => {
+                            entity.texture = self
+                                .texture_ids
+                                .iter()
+                                .find(|(n, _)| n == &PLAYER_RIGHT)
+                                .map(|(_, id)| *id)
+                                .unwrap();
+                        }
+                        PlayerDirection::Neutral => {
+                            entity.texture = self
+                                .texture_ids
+                                .iter()
+                                .find(|(n, _)| n == &PLAYER_NEUTRAL)
+                                .map(|(_, id)| *id)
+                                .unwrap();
+                        }
+                    });
             }
             _ => {}
         }
@@ -258,13 +356,89 @@ impl EventManager<Event> for EventHandler {
             }
             Event::NewWindow(id, name) => {
                 self.window_ids.push((name.clone(), id.clone()));
-                if name.as_str() == MAIN_WINDOW {
+                window_manager
+                    .send_event(Event::RequestNewTexture(
+                        PLAYER_NEUTRAL_PATH.to_string(),
+                        PLAYER_NEUTRAL.to_string(),
+                    ))
+                    .unwrap();
+                window_manager
+                    .send_event(Event::RequestNewTexture(
+                        PLAYER_DOWN_PATH.to_string(),
+                        PLAYER_DOWN.to_string(),
+                    ))
+                    .unwrap();
+                window_manager
+                    .send_event(Event::RequestNewTexture(
+                        PLAYER_UP_PATH.to_string(),
+                        PLAYER_UP.to_string(),
+                    ))
+                    .unwrap();
+                window_manager
+                    .send_event(Event::RequestNewTexture(
+                        PLAYER_LEFT_PATH.to_string(),
+                        PLAYER_LEFT.to_string(),
+                    ))
+                    .unwrap();
+                window_manager
+                    .send_event(Event::RequestNewTexture(
+                        PLAYER_RIGHT_PATH.to_string(),
+                        PLAYER_RIGHT.to_string(),
+                    ))
+                    .unwrap();
+            }
+            Event::NewTexture(label, None) => {
+                if label.as_str() == PLAYER_NEUTRAL {
+                    window_manager
+                        .send_event(Event::RequestNewTexture(
+                            PLAYER_NEUTRAL_PATH.to_string(),
+                            PLAYER_NEUTRAL.to_string(),
+                        ))
+                        .unwrap();
+                }
+                if label.as_str() == PLAYER_DOWN {
+                    window_manager
+                        .send_event(Event::RequestNewTexture(
+                            PLAYER_DOWN_PATH.to_string(),
+                            PLAYER_DOWN.to_string(),
+                        ))
+                        .unwrap();
+                }
+                if label.as_str() == PLAYER_UP {
+                    window_manager
+                        .send_event(Event::RequestNewTexture(
+                            PLAYER_UP_PATH.to_string(),
+                            PLAYER_UP.to_string(),
+                        ))
+                        .unwrap();
+                }
+                if label.as_str() == PLAYER_LEFT {
+                    window_manager
+                        .send_event(Event::RequestNewTexture(
+                            PLAYER_LEFT_PATH.to_string(),
+                            PLAYER_LEFT.to_string(),
+                        ))
+                        .unwrap();
+                }
+                if label.as_str() == PLAYER_RIGHT {
+                    window_manager
+                        .send_event(Event::RequestNewTexture(
+                            PLAYER_RIGHT_PATH.to_string(),
+                            PLAYER_RIGHT.to_string(),
+                        ))
+                        .unwrap();
+                }
+            }
+            Event::NewTexture(label, Some(id)) => {
+                self.texture_ids.push((label.clone(), id.clone()));
+                if label.as_str() == PLAYER_NEUTRAL {
                     self.entities.push((
-                        id.clone(),
+                        self.get_window_id(MAIN_WINDOW.into()).unwrap().clone(),
                         Square {
-                            width: 100,
+                            width: 200,
                             position: Vector::new(0.0, 0.0, 0.0),
-                            color: [0.0, 0.0, 1.0],
+                            texture: *id,
+                            texture_coords: [0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0],
                         },
                     ));
                 }
