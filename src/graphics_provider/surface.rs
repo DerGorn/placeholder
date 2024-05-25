@@ -1,5 +1,5 @@
 use super::{texture::TextureProvider, Index, ShaderDescriptor, Vertex};
-use std::{fmt::Debug, fs};
+use std::fmt::Debug;
 use wgpu::util::DeviceExt;
 
 pub trait WindowSurface<I: Index, V: Vertex>: Debug {
@@ -46,6 +46,7 @@ pub struct Surface<'a, I: Index, V: Vertex> {
     pub index_buffer: wgpu::Buffer,
     pub num_vertices: u32,
     pub num_indices: u32,
+    pub shader: wgpu::ShaderModule,
     pub shader_descriptor: ShaderDescriptor,
     pub render_pipeline: Option<wgpu::RenderPipeline>,
     pub _phantom: std::marker::PhantomData<(I, V)>,
@@ -121,17 +122,6 @@ impl<'a, I: Index, V: Vertex> WindowSurface<I, V> for Surface<'a, I, V> {
         device: &wgpu::Device,
         bind_group_layout: &wgpu::BindGroupLayout,
     ) {
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some(&format!("Shader Module {:?}", self.shader_descriptor.file)),
-            source: wgpu::ShaderSource::Wgsl(
-                fs::read_to_string(self.shader_descriptor.file)
-                    .expect(&format!(
-                        "Could not load '{}'\n",
-                        self.shader_descriptor.file
-                    ))
-                    .into(),
-            ),
-        });
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Pipeline Layout"),
             bind_group_layouts: &[bind_group_layout],
@@ -141,16 +131,16 @@ impl<'a, I: Index, V: Vertex> WindowSurface<I, V> for Surface<'a, I, V> {
             label: Some("Render Pipeline"),
             layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
-                module: &shader,
+                module: &self.shader,
                 entry_point: self.shader_descriptor.vertex_shader,
                 buffers: &[V::describe_buffer_layout()],
             },
             fragment: Some(wgpu::FragmentState {
-                module: &shader,
+                module: &self.shader,
                 entry_point: self.shader_descriptor.fragment_shader,
                 targets: &[Some(wgpu::ColorTargetState {
                     format: self.config.format,
-                    blend: Some(wgpu::BlendState::REPLACE),
+                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
             }),

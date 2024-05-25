@@ -1,4 +1,6 @@
 #![allow(deprecated)]
+use std::fs;
+
 use wgpu::rwh::{HasRawDisplayHandle, HasRawWindowHandle};
 use wgpu::util::DeviceExt;
 use winit::window::{Window, WindowId};
@@ -122,6 +124,18 @@ impl<I: Index, V: Vertex> GraphicsProvider<I, V> {
                 });
         let num_vertices = 0;
         let num_indices = 0;
+        let shader =
+            self.device
+                .as_ref()
+                .unwrap()
+                .create_shader_module(wgpu::ShaderModuleDescriptor {
+                    label: Some(&format!("Shader Module {:?}", shader_descriptor.file)),
+                    source: wgpu::ShaderSource::Wgsl(
+                        fs::read_to_string(shader_descriptor.file)
+                            .expect(&format!("Could not load '{}'\n", shader_descriptor.file))
+                            .into(),
+                    ),
+                });
 
         self.surfaces.push((
             window.id(),
@@ -130,6 +144,7 @@ impl<I: Index, V: Vertex> GraphicsProvider<I, V> {
                 size,
                 config,
                 render_pipeline: None,
+                shader,
                 shader_descriptor: shader_descriptor.clone(),
                 vertex_buffer,
                 index_buffer,

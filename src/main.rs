@@ -49,46 +49,47 @@ impl Vert for Vertex {
     }
 }
 
-enum PlayerDirection {
-    Neutral,
-    Up,
-    Down,
-    Left,
-    Right,
-}
 struct Square {
     width: u16,
     position: Vector<f32>,
-    texture: u32,
-    texture_coords: [f32; 8],
+    sprite_sheet: String,
+    sprite_position: (u8, u8),
 }
 impl Square {
-    fn render(&self, vertices: &mut Vec<Vertex>, indices: &mut Vec<u16>, size: &PhysicalSize<u32>) {
+    fn render(
+        &self,
+        vertices: &mut Vec<Vertex>,
+        indices: &mut Vec<u16>,
+        size: &PhysicalSize<u32>,
+        sprite_sheet: &SpriteSheet,
+    ) {
         let x = self.position.x;
         let y = self.position.y;
         let z = self.position.z;
-        let x_offset = self.width as f32 / (2.0 * size.width as f32);
-        let y_offset = self.width as f32 / (2.0 * size.height as f32);
+        let x_offset = self.width as f32 / (size.width as f32);
+        let y_offset = self.width as f32 / (size.height as f32);
+        let texture_coords =
+            sprite_sheet.get_sprite(self.sprite_position.0, self.sprite_position.1);
         let new_vertices = [
             Vertex {
                 position: [x - x_offset, y + y_offset, z],
-                tex_coords: [self.texture_coords[0], self.texture_coords[1]],
-                texture: self.texture,
+                tex_coords: [texture_coords[0], texture_coords[1]],
+                texture: sprite_sheet.texture,
             },
             Vertex {
                 position: [x + x_offset, y + y_offset, z],
-                tex_coords: [self.texture_coords[2], self.texture_coords[3]],
-                texture: self.texture,
+                tex_coords: [texture_coords[2], texture_coords[3]],
+                texture: sprite_sheet.texture,
             },
             Vertex {
                 position: [x + x_offset, y - y_offset, z],
-                tex_coords: [self.texture_coords[4], self.texture_coords[5]],
-                texture: self.texture,
+                tex_coords: [texture_coords[4], texture_coords[5]],
+                texture: sprite_sheet.texture,
             },
             Vertex {
                 position: [x - x_offset, y - y_offset, z],
-                tex_coords: [self.texture_coords[6], self.texture_coords[7]],
-                texture: self.texture,
+                tex_coords: [texture_coords[6], texture_coords[7]],
+                texture: sprite_sheet.texture,
             },
         ];
         let new_indices = [0, 1, 2, 0, 2, 3];
@@ -96,29 +97,29 @@ impl Square {
         indices.extend_from_slice(&new_indices);
     }
 
-    fn handle_key_input(&mut self, input: &KeyEvent) -> PlayerDirection {
+    fn handle_key_input(&mut self, input: &KeyEvent) {
         if input.state == winit::event::ElementState::Pressed {
             match input.physical_key {
                 PhysicalKey::Code(KeyCode::KeyW) => {
                     self.position.y += 0.01;
-                    PlayerDirection::Up
+                    self.sprite_position = PLAYER_UP;
                 }
                 PhysicalKey::Code(KeyCode::KeyA) => {
                     self.position.x -= 0.01;
-                    PlayerDirection::Left
+                    self.sprite_position = PLAYER_LEFT;
                 }
                 PhysicalKey::Code(KeyCode::KeyD) => {
                     self.position.x += 0.01;
-                    PlayerDirection::Right
+                    self.sprite_position = PLAYER_RIGHT;
                 }
                 PhysicalKey::Code(KeyCode::KeyS) => {
                     self.position.y -= 0.01;
-                    PlayerDirection::Down
+                    self.sprite_position = PLAYER_DOWN;
                 }
-                _ => PlayerDirection::Neutral,
+                _ => self.sprite_position = PLAYER_NEUTRAL,
             }
         } else {
-            PlayerDirection::Neutral
+            self.sprite_position = PLAYER_NEUTRAL;
         }
     }
 }
@@ -133,6 +134,30 @@ impl WindowName {
 impl From<&str> for WindowName {
     fn from(value: &str) -> Self {
         Self(value.to_string())
+    }
+}
+
+struct SpriteSheet {
+    texture: u32,
+    sprites_per_row: u8,
+    sprites_per_column: u8,
+}
+impl SpriteSheet {
+    fn get_sprite(&self, x: u8, y: u8) -> [f32; 8] {
+        let width = 1.0 / self.sprites_per_row as f32;
+        let height = 1.0 / self.sprites_per_column as f32;
+        let x_offset = x as f32 * width;
+        let y_offset = y as f32 * height;
+        [
+            x_offset,
+            y_offset,
+            x_offset + width,
+            y_offset,
+            x_offset + width,
+            y_offset + height,
+            x_offset,
+            y_offset + height,
+        ]
     }
 }
 
@@ -205,23 +230,21 @@ impl ApplicationEvent<u16, Vertex> for Event {
 }
 
 const MAIN_WINDOW: &str = "Main";
-const PLAYER_NEUTRAL: &str = "PlayerNeutral";
-const PLAYER_NEUTRAL_PATH: &str = "res/images/standing/neutral.png";
-const PLAYER_DOWN: &str = "PlayerDown";
-const PLAYER_DOWN_PATH: &str = "res/images/forward/down.png";
-const PLAYER_UP: &str = "PlayerUp";
-const PLAYER_UP_PATH: &str = "res/images/back/up.png";
-const PLAYER_LEFT: &str = "PlayerLeft";
-const PLAYER_LEFT_PATH: &str = "res/images/left/left.png";
-const PLAYER_RIGHT: &str = "PlayerRight";
-const PLAYER_RIGHT_PATH: &str = "res/images/right/right.png";
+const PLAYER_SPRITE_SHEET: &str = "PlayerSpriteSheet";
+const PLAYER_SPRITE_SHEET_PATH: &str = "res/images/spriteSheets/protagonist.png";
+const PLAYER_SPRITE_SHEET_WIDTH: u8 = 8;
+const PLAYER_NEUTRAL: (u8, u8) = (0, 0);
+const PLAYER_DOWN: (u8, u8) = (1, 0);
+const PLAYER_UP: (u8, u8) = (2, 0);
+const PLAYER_LEFT: (u8, u8) = (3, 0);
+const PLAYER_RIGHT: (u8, u8) = (4, 0);
 
 struct EventHandler {
     default_window: WindowDescriptor,
     window_ids: Vec<(WindowName, WindowId)>,
     window_sizes: Vec<(WindowId, PhysicalSize<u32>)>,
     entities: Vec<(WindowId, Square)>,
-    texture_ids: Vec<(String, u32)>,
+    sprite_sheets: Vec<(String, SpriteSheet)>,
     target_fps: u8,
 }
 impl EventHandler {
@@ -231,7 +254,7 @@ impl EventHandler {
             window_ids: Vec::new(),
             window_sizes: Vec::new(),
             entities: Vec::new(),
-            texture_ids: Vec::new(),
+            sprite_sheets: Vec::new(),
             target_fps,
         }
     }
@@ -267,48 +290,7 @@ impl EventManager<Event> for EventHandler {
                 self.entities
                     .iter_mut()
                     .filter(|(i, _)| i == id)
-                    .for_each(|(_, entity)| match entity.handle_key_input(event) {
-                        PlayerDirection::Up => {
-                            entity.texture = self
-                                .texture_ids
-                                .iter()
-                                .find(|(n, _)| n == &PLAYER_UP)
-                                .map(|(_, id)| *id)
-                                .unwrap();
-                        }
-                        PlayerDirection::Down => {
-                            entity.texture = self
-                                .texture_ids
-                                .iter()
-                                .find(|(n, _)| n == &PLAYER_DOWN)
-                                .map(|(_, id)| *id)
-                                .unwrap();
-                        }
-                        PlayerDirection::Left => {
-                            entity.texture = self
-                                .texture_ids
-                                .iter()
-                                .find(|(n, _)| n == &PLAYER_LEFT)
-                                .map(|(_, id)| *id)
-                                .unwrap();
-                        }
-                        PlayerDirection::Right => {
-                            entity.texture = self
-                                .texture_ids
-                                .iter()
-                                .find(|(n, _)| n == &PLAYER_RIGHT)
-                                .map(|(_, id)| *id)
-                                .unwrap();
-                        }
-                        PlayerDirection::Neutral => {
-                            entity.texture = self
-                                .texture_ids
-                                .iter()
-                                .find(|(n, _)| n == &PLAYER_NEUTRAL)
-                                .map(|(_, id)| *id)
-                                .unwrap();
-                        }
-                    });
+                    .for_each(|(_, entity)| entity.handle_key_input(event));
             }
             _ => {}
         }
@@ -358,89 +340,38 @@ impl EventManager<Event> for EventHandler {
                 self.window_ids.push((name.clone(), id.clone()));
                 window_manager
                     .send_event(Event::RequestNewTexture(
-                        PLAYER_NEUTRAL_PATH.to_string(),
-                        PLAYER_NEUTRAL.to_string(),
-                    ))
-                    .unwrap();
-                window_manager
-                    .send_event(Event::RequestNewTexture(
-                        PLAYER_DOWN_PATH.to_string(),
-                        PLAYER_DOWN.to_string(),
-                    ))
-                    .unwrap();
-                window_manager
-                    .send_event(Event::RequestNewTexture(
-                        PLAYER_UP_PATH.to_string(),
-                        PLAYER_UP.to_string(),
-                    ))
-                    .unwrap();
-                window_manager
-                    .send_event(Event::RequestNewTexture(
-                        PLAYER_LEFT_PATH.to_string(),
-                        PLAYER_LEFT.to_string(),
-                    ))
-                    .unwrap();
-                window_manager
-                    .send_event(Event::RequestNewTexture(
-                        PLAYER_RIGHT_PATH.to_string(),
-                        PLAYER_RIGHT.to_string(),
+                        PLAYER_SPRITE_SHEET_PATH.to_string(),
+                        PLAYER_SPRITE_SHEET.to_string(),
                     ))
                     .unwrap();
             }
             Event::NewTexture(label, None) => {
-                if label.as_str() == PLAYER_NEUTRAL {
+                if label.as_str() == PLAYER_SPRITE_SHEET {
                     window_manager
                         .send_event(Event::RequestNewTexture(
-                            PLAYER_NEUTRAL_PATH.to_string(),
-                            PLAYER_NEUTRAL.to_string(),
-                        ))
-                        .unwrap();
-                }
-                if label.as_str() == PLAYER_DOWN {
-                    window_manager
-                        .send_event(Event::RequestNewTexture(
-                            PLAYER_DOWN_PATH.to_string(),
-                            PLAYER_DOWN.to_string(),
-                        ))
-                        .unwrap();
-                }
-                if label.as_str() == PLAYER_UP {
-                    window_manager
-                        .send_event(Event::RequestNewTexture(
-                            PLAYER_UP_PATH.to_string(),
-                            PLAYER_UP.to_string(),
-                        ))
-                        .unwrap();
-                }
-                if label.as_str() == PLAYER_LEFT {
-                    window_manager
-                        .send_event(Event::RequestNewTexture(
-                            PLAYER_LEFT_PATH.to_string(),
-                            PLAYER_LEFT.to_string(),
-                        ))
-                        .unwrap();
-                }
-                if label.as_str() == PLAYER_RIGHT {
-                    window_manager
-                        .send_event(Event::RequestNewTexture(
-                            PLAYER_RIGHT_PATH.to_string(),
-                            PLAYER_RIGHT.to_string(),
+                            PLAYER_SPRITE_SHEET_PATH.to_string(),
+                            PLAYER_SPRITE_SHEET.to_string(),
                         ))
                         .unwrap();
                 }
             }
             Event::NewTexture(label, Some(id)) => {
-                self.texture_ids.push((label.clone(), id.clone()));
-                if label.as_str() == PLAYER_NEUTRAL {
+                if label.as_str() == PLAYER_SPRITE_SHEET {
+                    let sprite_sheet = SpriteSheet {
+                        texture: *id,
+                        sprites_per_row: PLAYER_SPRITE_SHEET_WIDTH,
+                        sprites_per_column: PLAYER_SPRITE_SHEET_WIDTH,
+                    };
                     self.entities.push((
                         self.get_window_id(MAIN_WINDOW.into()).unwrap().clone(),
                         Square {
-                            width: 200,
+                            width: 150,
                             position: Vector::new(0.0, 0.0, 0.0),
-                            texture: *id,
-                            texture_coords: [0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0],
+                            sprite_sheet: label.clone(),
+                            sprite_position: PLAYER_NEUTRAL,
                         },
                     ));
+                    self.sprite_sheets.push((label.clone(), sprite_sheet));
                 }
             }
             Event::Timer(_delta_t) => {
@@ -458,7 +389,17 @@ impl EventManager<Event> for EventHandler {
                         if target_id != id {
                             continue;
                         }
-                        square.render(&mut vertices, &mut indices, &size);
+                        square.render(
+                            &mut vertices,
+                            &mut indices,
+                            &size,
+                            &self
+                                .sprite_sheets
+                                .iter()
+                                .find(|(l, _)| l == &square.sprite_sheet)
+                                .unwrap()
+                                .1,
+                        );
                     }
                     window_manager
                         .send_event(Event::RenderUpdate(*id, vertices, indices))
