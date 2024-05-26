@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-threed = { path = "../math/threed" }
+threed = { git = "https://github.com/DerGorn/threed.git" }
 image = "0.25.1"
 winit = { version = "0.30", features = ["rwh_05"] }
 env_logger = "0.10"
