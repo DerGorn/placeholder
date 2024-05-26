@@ -385,6 +385,8 @@ impl EventManager<Event> for EventHandler {
                         .unwrap();
                     let mut vertices = Vec::new();
                     let mut indices = Vec::new();
+                    self.entities
+                        .sort_by(|(_, a), (_, b)| a.position.z.partial_cmp(&b.position.z).unwrap());
                     for (target_id, square) in &self.entities {
                         if target_id != id {
                             continue;
