@@ -1,4 +1,5 @@
 use std::{
+    path::{Path, PathBuf},
     thread,
     time::{Duration, Instant},
 };
@@ -6,8 +7,7 @@ use std::{
 use placeholder::app::{
     ApplicationEvent, EventManager, ManagerApplication, WindowDescriptor, WindowManager,
 };
-use placeholder::graphics::{ShaderDescriptor, Vertex as Vert};
-use repr_trait::C;
+use placeholder::graphics::ShaderDescriptor;
 use threed::Vector;
 use winit::{
     dpi::PhysicalSize,
@@ -15,82 +15,190 @@ use winit::{
     keyboard::{KeyCode, PhysicalKey},
     window::{WindowAttributes, WindowId},
 };
+mod vertex;
+use vertex::Vertex;
 
-#[repr(C)]
-#[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable, repr_trait::C)]
-struct Vertex {
-    position: [f32; 3],
-    tex_coords: [f32; 2],
-    texture: u32,
-}
-impl Vert for Vertex {
-    fn describe_buffer_layout() -> wgpu::VertexBufferLayout<'static> {
-        wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<Vertex>() as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &[
-                wgpu::VertexAttribute {
-                    offset: 0,
-                    format: wgpu::VertexFormat::Float32x3,
-                    shader_location: 0,
-                },
-                wgpu::VertexAttribute {
-                    offset: std::mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
-                    format: wgpu::VertexFormat::Float32x2,
-                    shader_location: 1,
-                },
-                wgpu::VertexAttribute {
-                    offset: std::mem::size_of::<[f32; 5]>() as wgpu::BufferAddress,
-                    format: wgpu::VertexFormat::Uint32,
-                    shader_location: 2,
-                },
-            ],
+macro_rules! create_name_struct {
+    ($name: ident) => {
+        #[derive(Debug, Clone, PartialEq)]
+        struct $name(String);
+        impl $name {
+            #[allow(dead_code)]
+            fn as_str<'a>(&'a self) -> &'a str {
+                self.0.as_str()
+            }
         }
+        impl From<&str> for $name {
+            fn from(value: &str) -> Self {
+                Self(value.to_string())
+            }
+        }
+        impl From<String> for $name {
+            fn from(value: String) -> Self {
+                value.as_str().into()
+            }
+        }
+        impl From<&String> for $name {
+            fn from(value: &String) -> Self {
+                value.as_str().into()
+            }
+        }
+    };
+}
+create_name_struct!(SpriteSheetName);
+create_name_struct!(WindowName);
+
+struct SpritePosition {
+    x: u8,
+    y: u8,
+}
+impl SpritePosition {
+    const fn new(x: u8, y: u8) -> Self {
+        SpritePosition { x, y }
     }
 }
-
-struct Square {
-    width: u16,
-    position: Vector<f32>,
-    sprite_sheet: String,
-    sprite_position: (u8, u8),
+struct SpriteDescriptor {
+    sprite_sheet: SpriteSheetName,
+    position: SpritePosition,
 }
-impl Square {
+
+type Index = u16;
+trait Entity {
+    fn update(&mut self);
     fn render(
         &self,
         vertices: &mut Vec<Vertex>,
-        indices: &mut Vec<u16>,
-        size: &PhysicalSize<u32>,
+        indices: &mut Vec<Index>,
+        window_size: &PhysicalSize<u32>,
+        sprite_sheet: &SpriteSheet,
+    );
+    fn sprite_sheet(&self) -> &SpriteSheetName;
+    fn handle_key_input(&mut self, input: &KeyEvent);
+    fn z(&self) -> f32 {
+        0.0
+    }
+}
+
+enum Direction {
+    Up,
+    Right,
+    Down,
+    Left,
+}
+/// 8 directional VelocityController
+struct VelocityController {
+    speed: f32,
+    up: bool,
+    right: bool,
+    down: bool,
+    left: bool,
+}
+impl VelocityController {
+    fn new(speed: f32) -> Self {
+        Self {
+            speed,
+            up: false,
+            right: false,
+            down: false,
+            left: false,
+        }
+    }
+
+    fn set_direction(&mut self, direction: Direction, value: bool) {
+        match direction {
+            Direction::Up => {
+                self.up = value;
+            }
+            Direction::Right => {
+                self.right = value;
+            }
+            Direction::Down => {
+                self.down = value;
+            }
+            Direction::Left => {
+                self.left = value;
+            }
+        }
+    }
+
+    fn get_velocity(&self) -> Vector<f32> {
+        let mut velocity = Vector::new(0.0, 0.0, 0.0);
+        if self.up {
+            velocity.y += 1.0;
+        }
+        if self.right {
+            velocity.x += 1.0;
+        }
+        if self.down {
+            velocity.y -= 1.0;
+        }
+        if self.left {
+            velocity.x -= 1.0;
+        }
+        let magnitude: f32 = velocity.magnitude_squared();
+        if magnitude != 0.0 {
+            velocity *= 1.0 / magnitude.sqrt();
+        }
+        velocity * self.speed
+    }
+}
+struct TextureCoordinates {
+    u: f32,
+    v: f32,
+}
+struct Square {
+    width: u16,
+    position: Vector<f32>,
+    velocity: VelocityController,
+    sprite: SpriteDescriptor,
+}
+impl Entity for Square {
+    fn update(&mut self) {
+        self.position += self.velocity.get_velocity();
+    }
+
+    fn sprite_sheet(&self) -> &SpriteSheetName {
+        &self.sprite.sprite_sheet
+    }
+
+    fn z(&self) -> f32 {
+        self.position.z
+    }
+
+    fn render(
+        &self,
+        vertices: &mut Vec<Vertex>,
+        indices: &mut Vec<Index>,
+        window_size: &PhysicalSize<u32>,
         sprite_sheet: &SpriteSheet,
     ) {
         let x = self.position.x;
         let y = self.position.y;
         let z = self.position.z;
-        let x_offset = self.width as f32 / (size.width as f32);
-        let y_offset = self.width as f32 / (size.height as f32);
-        let texture_coords =
-            sprite_sheet.get_sprite(self.sprite_position.0, self.sprite_position.1);
+        let x_offset = self.width as f32 / (window_size.width as f32);
+        let y_offset = self.width as f32 / (window_size.height as f32);
+        let texture_coords = sprite_sheet.get_sprite_coordinates(&self.sprite.position);
         let new_vertices = [
-            Vertex {
-                position: [x - x_offset, y + y_offset, z],
-                tex_coords: [texture_coords[0], texture_coords[1]],
-                texture: sprite_sheet.texture,
-            },
-            Vertex {
-                position: [x + x_offset, y + y_offset, z],
-                tex_coords: [texture_coords[2], texture_coords[3]],
-                texture: sprite_sheet.texture,
-            },
-            Vertex {
-                position: [x + x_offset, y - y_offset, z],
-                tex_coords: [texture_coords[4], texture_coords[5]],
-                texture: sprite_sheet.texture,
-            },
-            Vertex {
-                position: [x - x_offset, y - y_offset, z],
-                tex_coords: [texture_coords[6], texture_coords[7]],
-                texture: sprite_sheet.texture,
-            },
+            Vertex::new(
+                Vector::new(x - x_offset, y + y_offset, z),
+                &texture_coords[0],
+                sprite_sheet.texture,
+            ),
+            Vertex::new(
+                Vector::new(x + x_offset, y + y_offset, z),
+                &texture_coords[1],
+                sprite_sheet.texture,
+            ),
+            Vertex::new(
+                Vector::new(x + x_offset, y - y_offset, z),
+                &texture_coords[2],
+                sprite_sheet.texture,
+            ),
+            Vertex::new(
+                Vector::new(x - x_offset, y - y_offset, z),
+                &texture_coords[3],
+                sprite_sheet.texture,
+            ),
         ];
         let new_indices = [0, 1, 2, 0, 2, 3];
         vertices.extend_from_slice(&new_vertices);
@@ -98,42 +206,49 @@ impl Square {
     }
 
     fn handle_key_input(&mut self, input: &KeyEvent) {
-        if input.state == winit::event::ElementState::Pressed {
+        if input.state == winit::event::ElementState::Released {
             match input.physical_key {
                 PhysicalKey::Code(KeyCode::KeyW) => {
-                    self.position.y += 0.01;
-                    self.sprite_position = PLAYER_UP;
+                    self.velocity.set_direction(Direction::Up, false);
+                    self.sprite.position = PLAYER_NEUTRAL;
                 }
                 PhysicalKey::Code(KeyCode::KeyA) => {
-                    self.position.x -= 0.01;
-                    self.sprite_position = PLAYER_LEFT;
+                    self.velocity.set_direction(Direction::Left, false);
+                    self.sprite.position = PLAYER_NEUTRAL;
                 }
                 PhysicalKey::Code(KeyCode::KeyD) => {
-                    self.position.x += 0.01;
-                    self.sprite_position = PLAYER_RIGHT;
+                    self.velocity.set_direction(Direction::Right, false);
+                    self.sprite.position = PLAYER_NEUTRAL;
                 }
                 PhysicalKey::Code(KeyCode::KeyS) => {
-                    self.position.y -= 0.01;
-                    self.sprite_position = PLAYER_DOWN;
+                    self.velocity.set_direction(Direction::Down, false);
+                    self.sprite.position = PLAYER_NEUTRAL;
                 }
-                _ => self.sprite_position = PLAYER_NEUTRAL,
+                _ => {}
+            }
+        } else if input.state == winit::event::ElementState::Pressed {
+            match input.physical_key {
+                PhysicalKey::Code(KeyCode::KeyW) => {
+                    self.velocity.set_direction(Direction::Up, true);
+                    self.sprite.position = PLAYER_UP;
+                }
+                PhysicalKey::Code(KeyCode::KeyA) => {
+                    self.velocity.set_direction(Direction::Left, true);
+                    self.sprite.position = PLAYER_LEFT;
+                }
+                PhysicalKey::Code(KeyCode::KeyD) => {
+                    self.velocity.set_direction(Direction::Right, true);
+                    self.sprite.position = PLAYER_RIGHT;
+                }
+                PhysicalKey::Code(KeyCode::KeyS) => {
+                    self.velocity.set_direction(Direction::Down, true);
+                    self.sprite.position = PLAYER_DOWN;
+                }
+                _ => {}
             }
         } else {
-            self.sprite_position = PLAYER_NEUTRAL;
+            self.sprite.position = PLAYER_NEUTRAL;
         }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-struct WindowName(String);
-impl WindowName {
-    fn as_str<'a>(&'a self) -> &'a str {
-        self.0.as_str()
-    }
-}
-impl From<&str> for WindowName {
-    fn from(value: &str) -> Self {
-        Self(value.to_string())
     }
 }
 
@@ -143,20 +258,28 @@ struct SpriteSheet {
     sprites_per_column: u8,
 }
 impl SpriteSheet {
-    fn get_sprite(&self, x: u8, y: u8) -> [f32; 8] {
+    fn get_sprite_coordinates(&self, position: &SpritePosition) -> [TextureCoordinates; 4] {
         let width = 1.0 / self.sprites_per_row as f32;
         let height = 1.0 / self.sprites_per_column as f32;
-        let x_offset = x as f32 * width;
-        let y_offset = y as f32 * height;
+        let x_offset = position.x as f32 * width;
+        let y_offset = position.y as f32 * height;
         [
-            x_offset,
-            y_offset,
-            x_offset + width,
-            y_offset,
-            x_offset + width,
-            y_offset + height,
-            x_offset,
-            y_offset + height,
+            TextureCoordinates {
+                u: x_offset,
+                v: y_offset,
+            },
+            TextureCoordinates {
+                u: x_offset + width,
+                v: y_offset,
+            },
+            TextureCoordinates {
+                u: x_offset + width,
+                v: y_offset + height,
+            },
+            TextureCoordinates {
+                u: x_offset,
+                v: y_offset + height,
+            },
         ]
     }
 }
@@ -167,11 +290,11 @@ enum Event {
     Resumed,
     NewWindow(WindowId, WindowName),
     RequestNewWindow(WindowDescriptor, ShaderDescriptor, WindowName),
-    RenderUpdate(WindowId, Vec<Vertex>, Vec<u16>),
-    NewTexture(String, Option<u32>),
-    RequestNewTexture(String, String),
+    RenderUpdate(WindowId, Vec<Vertex>, Vec<Index>),
+    NewSpriteSheet(SpriteSheetName, Option<u32>),
+    RequestNewSpriteSheet(SpriteSheetName, PathBuf),
 }
-impl ApplicationEvent<u16, Vertex> for Event {
+impl ApplicationEvent<Index, Vertex> for Event {
     fn app_resumed() -> Self {
         Self::Resumed
     }
@@ -190,7 +313,7 @@ impl ApplicationEvent<u16, Vertex> for Event {
         &'a self,
     ) -> Option<(
         &'a winit::window::WindowId,
-        Option<&'a [u16]>,
+        Option<&'a [Index]>,
         Option<&'a [Vertex]>,
     )> {
         if let Self::RenderUpdate(id, vertices, indices) = self {
@@ -212,16 +335,16 @@ impl ApplicationEvent<u16, Vertex> for Event {
         }
     }
 
-    fn is_request_new_texture<'a>(&'a self) -> Option<(&'a str, &'a str)> {
-        if let Self::RequestNewTexture(path, label) = self {
-            Some((path, label))
+    fn is_request_new_texture<'a>(&'a self) -> Option<(&'a Path, &'a str)> {
+        if let Self::RequestNewSpriteSheet(label, path) = self {
+            Some((path, label.as_str()))
         } else {
             None
         }
     }
 
     fn new_texture(label: &str, id: Option<u32>) -> Self {
-        Self::NewTexture(label.to_string(), id)
+        Self::NewSpriteSheet(label.into(), id)
     }
 
     fn new_window(id: &WindowId, name: &str) -> Self {
@@ -233,17 +356,17 @@ const MAIN_WINDOW: &str = "Main";
 const PLAYER_SPRITE_SHEET: &str = "PlayerSpriteSheet";
 const PLAYER_SPRITE_SHEET_PATH: &str = "res/images/spriteSheets/protagonist.png";
 const PLAYER_SPRITE_SHEET_WIDTH: u8 = 8;
-const PLAYER_NEUTRAL: (u8, u8) = (0, 0);
-const PLAYER_DOWN: (u8, u8) = (1, 0);
-const PLAYER_UP: (u8, u8) = (2, 0);
-const PLAYER_LEFT: (u8, u8) = (3, 0);
-const PLAYER_RIGHT: (u8, u8) = (4, 0);
+const PLAYER_NEUTRAL: SpritePosition = SpritePosition::new(0, 0);
+const PLAYER_DOWN: SpritePosition = SpritePosition::new(1, 0);
+const PLAYER_UP: SpritePosition = SpritePosition::new(2, 0);
+const PLAYER_LEFT: SpritePosition = SpritePosition::new(3, 0);
+const PLAYER_RIGHT: SpritePosition = SpritePosition::new(4, 0);
 
 struct EventHandler {
     default_window: WindowDescriptor,
     window_ids: Vec<(WindowName, WindowId)>,
     window_sizes: Vec<(WindowId, PhysicalSize<u32>)>,
-    entities: Vec<(WindowId, Square)>,
+    entities: Vec<(WindowId, Box<dyn Entity>)>,
     sprite_sheets: Vec<(String, SpriteSheet)>,
     target_fps: u8,
 }
@@ -339,23 +462,23 @@ impl EventManager<Event> for EventHandler {
             Event::NewWindow(id, name) => {
                 self.window_ids.push((name.clone(), id.clone()));
                 window_manager
-                    .send_event(Event::RequestNewTexture(
-                        PLAYER_SPRITE_SHEET_PATH.to_string(),
-                        PLAYER_SPRITE_SHEET.to_string(),
+                    .send_event(Event::RequestNewSpriteSheet(
+                        PLAYER_SPRITE_SHEET.into(),
+                        PLAYER_SPRITE_SHEET_PATH.into(),
                     ))
                     .unwrap();
             }
-            Event::NewTexture(label, None) => {
+            Event::NewSpriteSheet(label, None) => {
                 if label.as_str() == PLAYER_SPRITE_SHEET {
                     window_manager
-                        .send_event(Event::RequestNewTexture(
-                            PLAYER_SPRITE_SHEET_PATH.to_string(),
-                            PLAYER_SPRITE_SHEET.to_string(),
+                        .send_event(Event::RequestNewSpriteSheet(
+                            PLAYER_SPRITE_SHEET.into(),
+                            PLAYER_SPRITE_SHEET_PATH.into(),
                         ))
                         .unwrap();
                 }
             }
-            Event::NewTexture(label, Some(id)) => {
+            Event::NewSpriteSheet(label, Some(id)) => {
                 if label.as_str() == PLAYER_SPRITE_SHEET {
                     let sprite_sheet = SpriteSheet {
                         texture: *id,
@@ -364,14 +487,18 @@ impl EventManager<Event> for EventHandler {
                     };
                     self.entities.push((
                         self.get_window_id(MAIN_WINDOW.into()).unwrap().clone(),
-                        Square {
+                        Box::new(Square {
                             width: 150,
                             position: Vector::new(0.0, 0.0, 0.0),
-                            sprite_sheet: label.clone(),
-                            sprite_position: PLAYER_NEUTRAL,
-                        },
+                            velocity: VelocityController::new(0.01),
+                            sprite: SpriteDescriptor {
+                                sprite_sheet: label.clone(),
+                                position: PLAYER_NEUTRAL,
+                            },
+                        }),
                     ));
-                    self.sprite_sheets.push((label.clone(), sprite_sheet));
+                    self.sprite_sheets
+                        .push((label.as_str().to_string(), sprite_sheet));
                 }
             }
             Event::Timer(_delta_t) => {
@@ -386,19 +513,20 @@ impl EventManager<Event> for EventHandler {
                     let mut vertices = Vec::new();
                     let mut indices = Vec::new();
                     self.entities
-                        .sort_by(|(_, a), (_, b)| a.position.z.partial_cmp(&b.position.z).unwrap());
-                    for (target_id, square) in &self.entities {
+                        .sort_by(|(_, a), (_, b)| a.z().partial_cmp(&b.z()).unwrap());
+                    for (target_id, entity) in self.entities.iter_mut() {
                         if target_id != id {
                             continue;
                         }
-                        square.render(
+                        entity.update();
+                        entity.render(
                             &mut vertices,
                             &mut indices,
                             &size,
                             &self
                                 .sprite_sheets
                                 .iter()
-                                .find(|(l, _)| l == &square.sprite_sheet)
+                                .find(|(l, _)| l == &entity.sprite_sheet().0)
                                 .unwrap()
                                 .1,
                         );

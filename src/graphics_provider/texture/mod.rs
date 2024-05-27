@@ -1,4 +1,4 @@
-use std::{fs, num::NonZeroU32};
+use std::{fs, num::NonZeroU32, path::Path};
 
 use image::GenericImageView;
 
@@ -30,7 +30,7 @@ impl TextureProvider {
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-        path: &str,
+        path: &Path,
         label: &str,
     ) -> u32 {
         if let Some(index) = self.get_texture_index(label) {
@@ -103,8 +103,8 @@ pub struct Texture {
 }
 
 impl Texture {
-    pub fn new(device: &wgpu::Device, queue: &wgpu::Queue, path: &str, label: &str) -> Self {
-        let bytes = fs::read(path).unwrap();
+    pub fn new(device: &wgpu::Device, queue: &wgpu::Queue, path: &Path, label: &str) -> Self {
+        let bytes = fs::read(path).expect(&format!("Could not read: '{:?}'", path));
         let img = image::load_from_memory(&bytes).unwrap();
 
         let rgba = img.to_rgba8();

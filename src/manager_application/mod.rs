@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+use std::{fmt::Debug, path::Path};
 use winit::{
     application::ApplicationHandler,
     event::{ElementState, KeyEvent, WindowEvent},
@@ -161,5 +161,5 @@ pub trait ApplicationEvent<I: Index, V: Vertex>: Debug {
         &'a self,
     ) -> Option<(&'a WindowDescriptor, &'a ShaderDescriptor, &'a str)>;
     fn is_render_update<'a>(&'a self) -> Option<(&'a WindowId, Option<&'a [I]>, Option<&'a [V]>)>;
-    fn is_request_new_texture<'a>(&'a self) -> Option<(&'a str, &'a str)>;
+    fn is_request_new_texture<'a>(&'a self) -> Option<(&'a Path, &'a str)>;
 }

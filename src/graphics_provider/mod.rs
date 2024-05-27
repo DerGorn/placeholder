@@ -1,5 +1,6 @@
 #![allow(deprecated)]
 use std::fs;
+use std::path::Path;
 
 use wgpu::rwh::{HasRawDisplayHandle, HasRawWindowHandle};
 use wgpu::util::DeviceExt;
@@ -185,7 +186,7 @@ impl<I: Index, V: Vertex> GraphicsProvider<I, V> {
         self.surfaces.retain(|(i, _)| i != id);
     }
 
-    pub fn create_texture(&mut self, path: &str, label: &str) -> Option<u32> {
+    pub fn create_texture(&mut self, path: &Path, label: &str) -> Option<u32> {
         if let (Some(device), Some(queue), Some(texture_provider)) =
             (&self.device, &self.queue, &mut self.texture_provider)
         {
