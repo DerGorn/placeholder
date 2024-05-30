@@ -1,17 +1,16 @@
 use env_logger::Env;
 use placeholder::app::{
-    ApplicationEvent, EventManager, ManagerApplication, WindowDescriptor, WindowManager,
+    ApplicationEvent,ManagerApplication, WindowDescriptor,
 };
 use placeholder::graphics::ShaderDescriptor;
 use std::{
     path::{Path, PathBuf},
-    thread,
-    time::{Duration, Instant},
+    time::Duration,
 };
 use threed::Vector;
 use winit::{
     dpi::PhysicalSize,
-    event::{KeyEvent, WindowEvent},
+    event::KeyEvent,
     keyboard::{KeyCode, PhysicalKey},
     window::{WindowAttributes, WindowId},
 };
@@ -298,13 +297,6 @@ impl Scene {
             entity.handle_key_input(input);
         }
     }
-
-    fn needed_sprite_sheets(&self) -> Vec<&SpriteSheetName> {
-        self.entities
-            .iter()
-            .map(|entity| entity.sprite_sheet())
-            .collect()
-    }
 }
 
 #[derive(Debug)]
@@ -385,6 +377,7 @@ const PLAYER_UP: SpritePosition = SpritePosition::new(2, 0);
 const PLAYER_LEFT: SpritePosition = SpritePosition::new(3, 0);
 const PLAYER_RIGHT: SpritePosition = SpritePosition::new(4, 0);
 
+#[derive(Debug, Clone)]
 struct SpriteSheetDimensions {
     rows: u8,
     columns: u8,
@@ -392,6 +385,20 @@ struct SpriteSheetDimensions {
 struct RessourceDescriptor {
     windows: Vec<(WindowName, WindowDescriptor, ShaderDescriptor)>,
     sprite_sheets: Vec<(SpriteSheetName, PathBuf, SpriteSheetDimensions)>,
+}
+impl RessourceDescriptor {
+    fn get_window(&self, name: &WindowName) -> Option<(WindowDescriptor, ShaderDescriptor)> {
+        self.windows
+            .iter()
+            .find(|(window_name, _, _)| window_name == name)
+            .map(|(_, window, shader)| (window.clone(), shader.clone()))
+    }
+    fn get_sprite_sheet(&self, name: &SpriteSheetName) -> Option<(PathBuf, SpriteSheetDimensions)> {
+        self.sprite_sheets
+            .iter()
+            .find(|(sprite_sheet_name, _, _)| sprite_sheet_name == name)
+            .map(|(_, path, dimensions)| (path.clone(), dimensions.clone()))
+    }
 }
 
 fn main() {

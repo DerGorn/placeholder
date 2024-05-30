@@ -50,7 +50,7 @@ impl<I: Index, V: Vertex> GraphicsProvider<I, V> {
                 force_fallback_adapter: false,
             },
         ))
-        .unwrap();
+        .expect("Buy a new GPU. Not all prerequisites met");
 
         let (device, queue) = futures::executor::block_on(adapter.request_device(
             &wgpu::DeviceDescriptor {
@@ -61,7 +61,7 @@ impl<I: Index, V: Vertex> GraphicsProvider<I, V> {
             },
             None, // Trace path
         ))
-        .unwrap();
+        .expect("Buy a new GPU. Not all prerequisites met");
         self.texture_provider = Some(TextureProvider::new());
         self.adapter = Some(adapter);
         self.device = Some(device);
@@ -76,24 +76,34 @@ impl<I: Index, V: Vertex> GraphicsProvider<I, V> {
         let surface = unsafe {
             self.instance
                 .create_surface_unsafe(wgpu::SurfaceTargetUnsafe::RawHandle {
-                    raw_display_handle: window.raw_display_handle().unwrap(),
-                    raw_window_handle: window.raw_window_handle().unwrap(),
+                    raw_display_handle: window
+                        .raw_display_handle()
+                        .expect("The window has no display handle"),
+                    raw_window_handle: window
+                        .raw_window_handle()
+                        .expect("The window has no window handle"),
                 })
         }
-        .unwrap();
+        .expect("Could not create a surface");
 
         if self.adapter.is_none() {
             self.init(&surface);
         }
 
-        let capabilities = surface.get_capabilities(&self.adapter.as_ref().unwrap());
+        let capabilities = surface.get_capabilities(
+            &self
+                .adapter
+                .as_ref()
+                .expect("The surface is not compatible with the adapter"),
+        );
         let format = capabilities
             .formats
             .iter()
             .copied()
             .filter(|f| f.is_srgb())
             .next()
-            .unwrap_or(capabilities.formats[0]);
+            .or(Some(capabilities.formats[0]))
+            .expect("No compatible format found");
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format,
@@ -105,38 +115,27 @@ impl<I: Index, V: Vertex> GraphicsProvider<I, V> {
             desired_maximum_frame_latency: 2,
         };
 
-        let vertex_buffer =
-            self.device
-                .as_ref()
-                .unwrap()
-                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some(&format!("Vertex Buffer {:?}", window.id())),
-                    contents: &[],
-                    usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-                });
-        let index_buffer =
-            self.device
-                .as_ref()
-                .unwrap()
-                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some(&format!("Index Buffer {:?}", window.id())),
-                    contents: &[],
-                    usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
-                });
+        let device = self.device.as_ref().expect("The device vanished");
+        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some(&format!("Vertex Buffer {:?}", window.id())),
+            contents: &[],
+            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+        });
+        let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some(&format!("Index Buffer {:?}", window.id())),
+            contents: &[],
+            usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
+        });
         let num_vertices = 0;
         let num_indices = 0;
-        let shader =
-            self.device
-                .as_ref()
-                .unwrap()
-                .create_shader_module(wgpu::ShaderModuleDescriptor {
-                    label: Some(&format!("Shader Module {:?}", shader_descriptor.file)),
-                    source: wgpu::ShaderSource::Wgsl(
-                        fs::read_to_string(shader_descriptor.file)
-                            .expect(&format!("Could not load '{}'\n", shader_descriptor.file))
-                            .into(),
-                    ),
-                });
+        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some(&format!("Shader Module {:?}", shader_descriptor.file)),
+            source: wgpu::ShaderSource::Wgsl(
+                fs::read_to_string(shader_descriptor.file)
+                    .expect(&format!("Could not load '{}'\n", shader_descriptor.file))
+                    .into(),
+            ),
+        });
 
         self.surfaces.push((
             window.id(),
@@ -197,7 +196,10 @@ impl<I: Index, V: Vertex> GraphicsProvider<I, V> {
             self.surfaces.iter_mut().for_each(|(_, surface)| {
                 surface.create_render_pipeline(
                     device,
-                    texture_provider.bind_group_layout.as_ref().unwrap(),
+                    texture_provider
+                        .bind_group_layout
+                        .as_ref()
+                        .expect("No bind group layout"),
                 );
             });
             Some(index)

@@ -1,7 +1,9 @@
-use std::fs;
 use image::imageops::{resize, FilterType};
-use winit::{event_loop::ActiveEventLoop, window::{CustomCursor, CustomCursorSource, Icon, WindowAttributes}};
-
+use std::fs;
+use winit::{
+    event_loop::ActiveEventLoop,
+    window::{CustomCursor, CustomCursorSource, Icon, WindowAttributes},
+};
 
 #[derive(Clone, Debug)]
 pub struct WindowDescriptor {
@@ -31,22 +33,28 @@ impl WindowDescriptor {
         let bytes = fs::read(path).expect(&format!("Could not read icon file at '{}'", path));
 
         let (icon_rgba, icon_width, icon_height) = {
-            let image = image::load_from_memory(&bytes).unwrap().into_rgba8();
+            let image = image::load_from_memory(&bytes)
+                .expect(&format!("Could not parse icon file at '{}'", path))
+                .into_rgba8();
             let (width, height) = image.dimensions();
             let rgba = image.into_raw();
             (rgba, width, height)
         };
-        Icon::from_rgba(icon_rgba, icon_width, icon_height).expect("Failed to open icon")
+        Icon::from_rgba(icon_rgba, icon_width, icon_height)
+            .expect(&format!("Could not make icon from file at '{}'", path))
     }
 
     fn decode_cursor(&self, path: &'static str) -> CustomCursorSource {
         let bytes = fs::read(path).expect(&format!("Could not read cursor file at '{}'", path));
-        let img = image::load_from_memory(&bytes).unwrap().into_rgba8();
+        let img = image::load_from_memory(&bytes)
+            .expect(&format!("Could not parse cursor file at '{}'", path))
+            .into_rgba8();
         let img = resize(&img, 32, 32, FilterType::Gaussian);
         let samples = img.into_flat_samples();
         let (_, w, h) = samples.extents();
         let (w, h) = (w as u16, h as u16);
-        CustomCursor::from_rgba(samples.samples, w, h, w / 4, 0).unwrap()
+        CustomCursor::from_rgba(samples.samples, w, h, w / 4, 0)
+            .expect(&format!("Could not make cursor from file at '{}'", path))
     }
 
     pub fn get_attributes(&self, event_loop: &ActiveEventLoop) -> WindowAttributes {
@@ -71,4 +79,3 @@ impl Default for WindowDescriptor {
         }
     }
 }
-

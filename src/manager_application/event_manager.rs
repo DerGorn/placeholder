@@ -1,8 +1,10 @@
+use std::fmt::Debug;
+
 use winit::{event::WindowEvent, event_loop::ActiveEventLoop, window::WindowId};
 
 use super::WindowManager;
 
-pub trait EventManager<E: 'static> {
+pub trait EventManager<E: 'static + Debug> {
     /// Handles window events in a WindowManager. Return `false` to prevent default behavior of the
     /// WindowManager. Default behavior is closing, resizing and rendering the window and toggling fullscreen on F11
     fn window_event(

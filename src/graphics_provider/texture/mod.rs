@@ -105,7 +105,8 @@ pub struct Texture {
 impl Texture {
     pub fn new(device: &wgpu::Device, queue: &wgpu::Queue, path: &Path, label: &str) -> Self {
         let bytes = fs::read(path).expect(&format!("Could not read: '{:?}'", path));
-        let img = image::load_from_memory(&bytes).unwrap();
+        let img =
+            image::load_from_memory(&bytes).expect(&format!("Could not load image: '{:?}", path));
 
         let rgba = img.to_rgba8();
         let dimensions = img.dimensions();

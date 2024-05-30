@@ -172,7 +172,10 @@ impl<'a, I: Index, V: Vertex> WindowSurface<I, V> for Surface<'a, I, V> {
         queue: &wgpu::Queue,
         texture_provider: &TextureProvider,
     ) {
-        let output = self.surface().get_current_texture().unwrap();
+        let output = self
+            .surface()
+            .get_current_texture()
+            .expect("Our food has no texture");
         let view = output
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());

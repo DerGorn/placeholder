@@ -33,7 +33,7 @@ impl<'a, E: ApplicationEvent<I, V> + 'static, M: EventManager<E>, I: Index, V: V
     ApplicationHandler<E> for ManagerApplication<E, M, I, V>
 {
     fn resumed(&mut self, _active_loop: &ActiveEventLoop) {
-        self.window_manager.send_event(E::app_resumed()).unwrap();
+        self.window_manager.send_event(E::app_resumed());
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, id: WindowId, event: WindowEvent) {
@@ -58,7 +58,7 @@ impl<'a, E: ApplicationEvent<I, V> + 'static, M: EventManager<E>, I: Index, V: V
                     self.graphics_provider.render_window(&id);
                     self.window_manager
                         .get_window(&id)
-                        .unwrap()
+                        .expect("The window dissapeared")
                         .request_redraw();
                 }
                 WindowEvent::KeyboardInput {
@@ -70,7 +70,10 @@ impl<'a, E: ApplicationEvent<I, V> + 'static, M: EventManager<E>, I: Index, V: V
                         },
                     ..
                 } => {
-                    let window = self.window_manager.get_window(&id).unwrap();
+                    let window = self
+                        .window_manager
+                        .get_window(&id)
+                        .expect("The window dissapeared");
                     match window.fullscreen() {
                         Some(Fullscreen::Borderless(_)) => {
                             window.set_fullscreen(None);
@@ -101,7 +104,7 @@ impl<'a, E: ApplicationEvent<I, V> + 'static, M: EventManager<E>, I: Index, V: V
         match event.is_request_new_texture() {
             Some((path, label)) => {
                 let id = self.graphics_provider.create_texture(path, label);
-                self.window_manager.send_event(E::new_texture(label, id)).unwrap();
+                self.window_manager.send_event(E::new_texture(label, id));
             }
             None => {}
         }
@@ -131,10 +134,9 @@ impl<'a, E: ApplicationEvent<I, V> + 'static, M: EventManager<E>, I: Index, V: V
     ) {
         let window = active_loop
             .create_window(descriptor.get_attributes(active_loop))
-            .unwrap();
+            .expect("OS says: 'No more windows for you'");
         self.window_manager
-            .send_event(E::new_window(&window.id(), name))
-            .unwrap();
+            .send_event(E::new_window(&window.id(), name));
         self.graphics_provider
             .init_window(&window, shader_descriptor);
         // window.request_redraw();
@@ -142,13 +144,15 @@ impl<'a, E: ApplicationEvent<I, V> + 'static, M: EventManager<E>, I: Index, V: V
     }
 
     pub fn run(&mut self) {
-        let event_loop = EventLoop::<E>::with_user_event().build().unwrap();
+        let event_loop = EventLoop::<E>::with_user_event()
+            .build()
+            .expect("No loop for you");
         let event_loop_proxy = event_loop.create_proxy();
         self.window_manager.set_event_loop(event_loop_proxy);
 
         event_loop.set_control_flow(ControlFlow::Poll);
 
-        event_loop.run_app(self).unwrap();
+        event_loop.run_app(self).expect("No App for you");
     }
 }
 

@@ -1,20 +1,33 @@
-use winit::{event_loop::{EventLoopClosed, EventLoopProxy}, window::{Window, WindowId}};
+use std::fmt::Debug;
 
-pub struct WindowManager<E: 'static> {
+use winit::{
+    event_loop::EventLoopProxy,
+    window::{Window, WindowId},
+};
+
+pub struct WindowManager<E: 'static + Debug> {
     windows: Vec<Window>,
     event_loop: Option<EventLoopProxy<E>>,
 }
-impl<E: 'static> WindowManager<E> {
+impl<E: 'static + Debug> WindowManager<E> {
     pub fn set_event_loop(&mut self, event_loop: EventLoopProxy<E>) {
         self.event_loop = Some(event_loop);
     }
 
-    pub fn send_event(&self, event: E) -> Result<(), EventLoopClosed<E>> {
-        self.event_loop.as_ref().unwrap().send_event(event)
+    fn get_event_loop(&self) -> &EventLoopProxy<E> {
+        self.event_loop
+            .as_ref()
+            .expect("WindowManger must be initialized with '.set_event_loop' before sendind events")
+    }
+
+    pub fn send_event(&self, event: E) {
+        self.get_event_loop()
+            .send_event(event)
+            .expect("The event loop has been closed. Cannot send an event");
     }
 
     pub fn create_event_loop_proxy(&self) -> EventLoopProxy<E> {
-        self.event_loop.as_ref().unwrap().clone()
+        self.get_event_loop().clone()
     }
 
     pub fn amount_windows(&self) -> usize {
@@ -31,9 +44,9 @@ impl<E: 'static> WindowManager<E> {
 
     pub fn add_window(&mut self, window: Window) {
         self.windows.push(window);
-    }   
+    }
 }
-impl<E: 'static> Default for WindowManager<E> {
+impl<E: 'static + Debug> Default for WindowManager<E> {
     fn default() -> Self {
         Self {
             windows: Vec::new(),
