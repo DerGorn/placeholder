@@ -1,0 +1,257 @@
+use std::{
+    thread,
+    time::{Duration, Instant},
+};
+
+use log::warn;
+use placeholder::app::{EventManager, WindowManager};
+use winit::{dpi::PhysicalSize, event::WindowEvent, window::WindowId};
+
+use crate::{Event, RessourceDescriptor, Scene, SpriteSheet, SpriteSheetName, WindowName};
+
+pub struct Game {
+    ressources: RessourceDescriptor,
+    active_scenes: Vec<Scene>,
+    window_ids: Vec<(WindowName, WindowId)>,
+    window_sizes: Vec<(WindowId, PhysicalSize<u32>)>,
+    sprite_sheets: Vec<(SpriteSheetName, SpriteSheet)>,
+    target_fps: u8,
+}
+impl Game {
+    pub fn new(ressources: RessourceDescriptor, inital_scenes: Vec<Scene>, target_fps: u8) -> Self {
+        Self {
+            ressources,
+            active_scenes: inital_scenes,
+            window_ids: Vec::new(),
+            window_sizes: Vec::new(),
+            sprite_sheets: Vec::new(),
+            target_fps,
+        }
+    }
+
+    fn get_window_name(&self, id: &WindowId) -> Option<&WindowName> {
+        self.window_ids
+            .iter()
+            .find(|(_, i)| i == id)
+            .map(|(name, _)| name)
+    }
+
+    fn get_scenes(&self, window_name: &WindowName) -> Vec<&Scene> {
+        self.active_scenes
+            .iter()
+            .filter(|scene| scene.target_window == *window_name)
+            .collect()
+    }
+
+    fn get_scenes_mut(&mut self, window_name: &WindowName) -> Vec<&mut Scene> {
+        self.active_scenes
+            .iter_mut()
+            .filter(|scene| scene.target_window == *window_name)
+            .collect()
+    }
+}
+impl EventManager<Event> for Game {
+    fn window_event(
+        &mut self,
+        _window_manager: &mut WindowManager<Event>,
+        _event_loop: &winit::event_loop::ActiveEventLoop,
+        id: &winit::window::WindowId,
+        event: &winit::event::WindowEvent,
+    ) -> bool
+    where
+        Self: Sized,
+    {
+        match event {
+            WindowEvent::Resized(size) => {
+                let window_size = self.window_sizes.iter_mut().find(|(i, _)| i == id);
+                if let Some((_, s)) = window_size {
+                    *s = *size
+                } else {
+                    self.window_sizes.push((id.clone(), *size));
+                }
+            }
+            WindowEvent::KeyboardInput { event, .. } => {
+                match self.get_window_name(id) {
+                    Some(window_name) => {
+                        let window_name = window_name.clone();
+                        for scene in self.get_scenes_mut(&window_name) {
+                            scene.handle_key_input(event);
+                        }
+                    }
+                    None => {
+                        warn!("No window name found for window id {:?}", id)
+                    }
+                };
+            }
+            _ => {}
+        }
+        true
+    }
+
+    fn user_event(
+        &mut self,
+        window_manager: &mut WindowManager<Event>,
+        _event_loop: &winit::event_loop::ActiveEventLoop,
+        event: &Event,
+    ) where
+        Self: Sized,
+    {
+        match event {
+            Event::Resumed => {
+                let mut needed_windows = Vec::new();
+                for window_name in self.active_scenes.iter().map(|scene| &scene.target_window) {
+                    if self
+                        .window_ids
+                        .iter()
+                        .find(|(existing_window, _)| window_name == existing_window)
+                        .is_none()
+                        && !needed_windows.contains(window_name)
+                    {
+                        needed_windows.push(window_name.clone());
+                    }
+                }
+                for window_name in needed_windows {
+                    let (_, window_descriptor, shader_descriptor) = &self
+                        .ressources
+                        .windows
+                        .iter()
+                        .find(|(n, _, _)| n == &window_name)
+                        .expect(&format!(
+                            "No WidndowDescriptor provided for {:?}",
+                            window_name
+                        ));
+                    window_manager
+                        .send_event(Event::RequestNewWindow(
+                            window_descriptor.clone(),
+                            shader_descriptor.clone(),
+                            window_name.clone(),
+                        ))
+                        .unwrap();
+                }
+
+                let ns_per_frame = 1e9 / (self.target_fps as f64);
+                let frame_duration = Duration::from_nanos(ns_per_frame as u64);
+                let timer_event_loop = window_manager.create_event_loop_proxy();
+                thread::spawn(move || {
+                    let mut last_update = Instant::now();
+                    loop {
+                        match timer_event_loop.send_event(Event::Timer(last_update.elapsed())) {
+                            Ok(()) => {}
+                            Err(_) => break,
+                        };
+                        last_update = Instant::now();
+                        thread::sleep(frame_duration);
+                    }
+                });
+            }
+            Event::NewWindow(id, name) => {
+                self.window_ids.push((name.clone(), id.clone()));
+                let mut needed_sprite_sheets = Vec::new();
+                for scene in self
+                    .active_scenes
+                    .iter()
+                    .filter(|scene| scene.target_window == *name)
+                {
+                    for entity in &scene.entities {
+                        let sprite_sheet = entity.sprite_sheet();
+                        if self
+                            .sprite_sheets
+                            .iter()
+                            .find(|(name, _)| name == sprite_sheet)
+                            .is_none()
+                            && !needed_sprite_sheets.contains(sprite_sheet)
+                        {
+                            needed_sprite_sheets.push(sprite_sheet.clone())
+                        }
+                    }
+                }
+                for sprite_sheet in needed_sprite_sheets {
+                    let path = &self
+                        .ressources
+                        .sprite_sheets
+                        .iter()
+                        .find(|(name, _, _)| name == &sprite_sheet)
+                        .expect(&format!(
+                            "No source path provided for SpriteSheet '{:?}'",
+                            sprite_sheet
+                        ))
+                        .1;
+                    window_manager
+                        .send_event(Event::RequestNewSpriteSheet(sprite_sheet, path.clone()))
+                        .unwrap();
+                }
+            }
+            Event::NewSpriteSheet(label, None) => {
+                let path = &self
+                    .ressources
+                    .sprite_sheets
+                    .iter()
+                    .find(|(name, _, _)| name == label)
+                    .expect(&format!(
+                        "No source path provided for SpriteSheet '{:?}'",
+                        label
+                    ))
+                    .1;
+                window_manager
+                    .send_event(Event::RequestNewSpriteSheet(label.clone(), path.clone()))
+                    .unwrap();
+            }
+            Event::NewSpriteSheet(label, Some(id)) => {
+                let dimensions = &self
+                    .ressources
+                    .sprite_sheets
+                    .iter()
+                    .find(|(name, _, _)| name == label)
+                    .expect(&format!(
+                        "No dimensions provided for SpriteSheet '{:?}'",
+                        label
+                    ))
+                    .2;
+                let sprite_sheet = SpriteSheet {
+                    texture: *id,
+                    sprites_per_row: dimensions.rows,
+                    sprites_per_column: dimensions.columns,
+                };
+                self.sprite_sheets.push((label.clone(), sprite_sheet));
+            }
+            Event::Timer(_delta_t) => {
+                for (name, id) in &self.window_ids {
+                    let size = self
+                        .window_sizes
+                        .iter()
+                        .find(|(i, _)| i == id)
+                        .map(|(_, s)| *s)
+                        .or_else(|| Some(PhysicalSize::new(1, 1)))
+                        .unwrap();
+                    let mut vertices = Vec::new();
+                    let mut indices = Vec::new();
+                    let mut entities = self
+                        .active_scenes
+                        .iter_mut()
+                        .filter(|scene| scene.target_window == *name)
+                        .fold(Vec::new(), |mut entities, scene| {
+                            for entity in scene.entities.iter_mut() {
+                                entities.push(entity);
+                            }
+                            entities
+                        });
+                    entities.sort_by(|a, b| a.z().partial_cmp(&b.z()).unwrap());
+                    for entity in entities.iter_mut() {
+                        entity.update();
+                        if let Some((_, sprite_sheet)) = &self
+                            .sprite_sheets
+                            .iter()
+                            .find(|(l, _)| l == entity.sprite_sheet())
+                        {
+                            entity.render(&mut vertices, &mut indices, &size, sprite_sheet);
+                        }
+                    }
+                    window_manager
+                        .send_event(Event::RenderUpdate(*id, vertices, indices))
+                        .unwrap();
+                }
+            }
+            _ => {}
+        }
+    }
+}

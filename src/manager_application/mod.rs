@@ -142,7 +142,6 @@ impl<'a, E: ApplicationEvent<I, V> + 'static, M: EventManager<E>, I: Index, V: V
     }
 
     pub fn run(&mut self) {
-        env_logger::init();
         let event_loop = EventLoop::<E>::with_user_event().build().unwrap();
         let event_loop_proxy = event_loop.create_proxy();
         self.window_manager.set_event_loop(event_loop_proxy);
