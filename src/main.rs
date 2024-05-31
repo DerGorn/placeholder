@@ -1,6 +1,8 @@
 use env_logger::Env;
 use placeholder::app::{ManagerApplication, WindowDescriptor};
 use placeholder::graphics::ShaderDescriptor;
+use wgpu::Backend;
+use std::fmt::Debug;
 use std::path::PathBuf;
 use threed::Vector;
 use winit::{
@@ -82,13 +84,82 @@ impl VelocityController {
         velocity * self.speed
     }
 }
-struct Square {
+struct Background {
+    sprite_sheet: SpriteSheetName,
+}
+impl Debug for Background {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Background")
+            .field("z", &self.z())
+            .field("sprite", &self.sprite_sheet())
+            .finish()
+    }
+}
+impl Entity for Background {
+    fn update(&mut self) {}
+    fn sprite_sheet(&self) -> &SpriteSheetName {
+        &self.sprite_sheet
+    }
+    fn z(&self) -> f32 {
+        -1000.0
+    }
+    fn handle_key_input(&mut self, _input: &KeyEvent) {}
+    fn render(
+        &self,
+        vertices: &mut Vec<Vertex>,
+        indices: &mut Vec<Index>,
+        window_size: &PhysicalSize<u32>,
+        sprite_sheet: &SpriteSheet,
+    ) {
+        let x = 0.0;
+        let y = 0.0;
+        let z = 0.0;
+        let x_offset = 1280.0 / (window_size.width as f32);
+        let y_offset = 800.0 / (window_size.height as f32);
+        let texture_coords = sprite_sheet.get_sprite_coordinates(&SpritePosition::new(0, 0));
+        let new_vertices = [
+            Vertex::new(
+                Vector::new(x - x_offset, y + y_offset, z),
+                &texture_coords[0],
+                sprite_sheet.texture(),
+            ),
+            Vertex::new(
+                Vector::new(x + x_offset, y + y_offset, z),
+                &texture_coords[1],
+                sprite_sheet.texture(),
+            ),
+            Vertex::new(
+                Vector::new(x + x_offset, y - y_offset, z),
+                &texture_coords[2],
+                sprite_sheet.texture(),
+            ),
+            Vertex::new(
+                Vector::new(x - x_offset, y - y_offset, z),
+                &texture_coords[3],
+                sprite_sheet.texture(),
+            ),
+        ];
+        println!("Background vertices: {:?}", new_vertices);
+        let new_indices = [0, 1, 2, 0, 2, 3];
+        vertices.extend_from_slice(&new_vertices);
+        indices.extend_from_slice(&new_indices);
+    }
+}
+struct Player {
     width: u16,
     position: Vector<f32>,
     velocity: VelocityController,
     sprite: SpriteDescriptor,
 }
-impl Entity for Square {
+impl Debug for Player {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Player")
+            .field("z", &self.z())
+            .field("sprite", &self.sprite_sheet())
+            .finish()
+    }
+}
+impl Entity for Player {
     fn update(&mut self) {
         self.position += self.velocity.get_velocity();
     }
@@ -136,6 +207,7 @@ impl Entity for Square {
                 sprite_sheet.texture(),
             ),
         ];
+        println!("Player vertices: {:?}", new_vertices);
         let new_indices = [0, 1, 2, 0, 2, 3];
         vertices.extend_from_slice(&new_vertices);
         indices.extend_from_slice(&new_indices);
@@ -209,26 +281,39 @@ fn main() {
     };
     let main_window = "MainWindow";
     let player_sprite_sheet = "PlayerSpriteSheet";
+    let background = "Background";
     let ressources = RessourceDescriptor {
         windows: vec![(
             main_window.into(),
             main_window_descriptor,
             shader_descriptor,
         )],
-        sprite_sheets: vec![(
-            player_sprite_sheet.into(),
-            PathBuf::from("res/images/spriteSheets/protagonist.png"),
-            SpriteSheetDimensions::new(8, 8),
-        )],
+        sprite_sheets: vec![
+            (
+                player_sprite_sheet.into(),
+                PathBuf::from("res/images/spriteSheets/protagonist.png"),
+                SpriteSheetDimensions::new(8, 8),
+            ),
+            (
+                background.into(),
+                PathBuf::from("res/images/spriteSheets/background.png"),
+                SpriteSheetDimensions::new(1, 1),
+            ),
+        ],
     };
     let scene = Scene {
         target_window: main_window.into(),
-        entities: vec![Box::new(Square {
-            width: 150,
-            position: Vector::new(0.0, 0.0, 0.0),
-            velocity: VelocityController::new(0.01),
-            sprite: SpriteDescriptor::new(player_sprite_sheet.into(), PLAYER_NEUTRAL),
-        })],
+        entities: vec![
+            Box::new(Player {
+                width: 150,
+                position: Vector::new(0.0, 0.0, 0.02),
+                velocity: VelocityController::new(0.01),
+                sprite: SpriteDescriptor::new(player_sprite_sheet.into(), PLAYER_NEUTRAL),
+            }),
+            Box::new(Background {
+                sprite_sheet: background.into(),
+            }),
+        ],
     };
     let mut app = ManagerApplication::new(Game::new(ressources, vec![scene], target_fps));
     app.run();

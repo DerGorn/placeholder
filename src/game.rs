@@ -240,6 +240,7 @@ impl EventManager<GameEvent> for Game {
                             entities
                         });
                     entities.sort_by(|a, b| a.z().partial_cmp(&b.z()).expect("NaN NaN NaN"));
+                    println!("{:?}", entities);
                     for entity in entities.iter_mut() {
                         entity.update();
                         let entity_sprite_sheet = entity.sprite_sheet();

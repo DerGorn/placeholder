@@ -1,10 +1,11 @@
+use std::fmt::Debug;
 use winit::{dpi::PhysicalSize, event::KeyEvent};
 
 use crate::vertex::Vertex;
 
 use super::{ressource_descriptor::SpriteSheetName, sprite_sheet::SpriteSheet, Index};
 
-pub trait Entity {
+pub trait Entity: Debug {
     fn update(&mut self);
     fn render(
         &self,
