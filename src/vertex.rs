@@ -2,7 +2,10 @@ use placeholder::graphics::Vertex as Vert;
 use repr_trait::C;
 use threed::Vector;
 
-use crate::TextureCoordinates;
+pub struct TextureCoordinates {
+    pub u: f32,
+    pub v: f32,
+}
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable, repr_trait::C)]
