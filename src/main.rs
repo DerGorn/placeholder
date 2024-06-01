@@ -51,6 +51,7 @@ struct CameraDescriptor {
     position: Vector<f32>,
     view_size: PhysicalSize<f32>,
     speed: f32,
+    acceleration_steps: u32,
 }
 impl From<&CameraDescriptor> for Camera {
     fn from(descriptor: &CameraDescriptor) -> Self {
@@ -58,6 +59,7 @@ impl From<&CameraDescriptor> for Camera {
             descriptor.position.clone(),
             descriptor.view_size,
             descriptor.speed,
+            descriptor.acceleration_steps,
         )
     }
 }
@@ -65,28 +67,35 @@ struct Camera {
     position: Vector<f32>,
     velocity: Vector<f32>,
     max_speed: f32,
+    decceleration_factor: f32,
     acceleration: VelocityController,
     view_size: PhysicalSize<f32>,
 }
 impl Camera {
-    fn new(position: Vector<f32>, view_size: PhysicalSize<f32>, speed: f32) -> Self {
+    fn new(
+        position: Vector<f32>,
+        view_size: PhysicalSize<f32>,
+        speed: f32,
+        acceleration_steps: u32,
+    ) -> Self {
         Self {
             position,
             velocity: Vector::new(0.0, 0.0, 0.0),
-            max_speed: speed.powi(2),
-            acceleration: VelocityController::new(speed / 10.0),
+            max_speed: speed,
+            decceleration_factor: 1.0 - 1.0 / acceleration_steps as f32,
+            acceleration: VelocityController::new(speed / acceleration_steps as f32),
             view_size,
         }
     }
     fn update(&mut self) {
         let acceleration = self.acceleration.get_velocity();
         if acceleration == Vector::new(0.0, 0.0, 0.0) {
-            self.velocity *= 0.9;
+            self.velocity *= self.decceleration_factor;
         } else {
             self.velocity += acceleration;
-        }
-        if self.velocity.magnitude_squared() > self.max_speed {
-            self.velocity = self.velocity.normalize() * self.max_speed;
+            if self.velocity.magnitude_squared() >= self.max_speed {
+                self.velocity = self.velocity.normalize() * self.max_speed;
+            }
         }
         self.position += &self.velocity;
     }
@@ -396,11 +405,12 @@ fn main() {
         vertex_shader: "vs_main",
         fragment_shader: "fs_main",
     };
-    let speed = 1.0;
+    let speed = 2.0;
     let camera_descriptor = CameraDescriptor {
         position: Vector::new(0.0, 0.0, 1.0),
         view_size: PhysicalSize::new(800.0, 600.0),
         speed,
+        acceleration_steps: 20,
     };
     let main_window = "MainWindow";
     let player_sprite_sheet = "PlayerSpriteSheet";
