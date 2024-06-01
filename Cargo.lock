@@ -2120,7 +2120,7 @@ dependencies = [
 [[package]]
 name = "threed"
 version = "0.1.0"
-source = "git+https://github.com/DerGorn/threed.git#ae07c99837b3e3580e39d841067d48f7f93fcaa8"
+source = "git+https://github.com/DerGorn/threed.git#889abb0429ba1757d7e34ae0b28d253d817afc18"
 
 [[package]]
 name = "tiff"

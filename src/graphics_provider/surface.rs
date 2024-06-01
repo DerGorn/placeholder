@@ -28,13 +28,13 @@ pub trait WindowSurface<I: Index, V: Vertex>: Debug {
     fn create_render_pipeline(
         &mut self,
         device: &wgpu::Device,
-        bind_group_layout: &wgpu::BindGroupLayout,
+        bind_group_layout: &[&wgpu::BindGroupLayout],
     );
     fn render(
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-        texture_provider: &TextureProvider,
+        bind_groups: &[&wgpu::BindGroup],
     );
 }
 
@@ -120,11 +120,11 @@ impl<'a, I: Index, V: Vertex> WindowSurface<I, V> for Surface<'a, I, V> {
     fn create_render_pipeline(
         &mut self,
         device: &wgpu::Device,
-        bind_group_layout: &wgpu::BindGroupLayout,
+        bind_group_layouts: &[&wgpu::BindGroupLayout],
     ) {
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Pipeline Layout"),
-            bind_group_layouts: &[bind_group_layout],
+            bind_group_layouts,
             push_constant_ranges: &[],
         });
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -170,7 +170,7 @@ impl<'a, I: Index, V: Vertex> WindowSurface<I, V> for Surface<'a, I, V> {
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-        texture_provider: &TextureProvider,
+        bind_groups: &[&wgpu::BindGroup],
     ) {
         let output = self
             .surface()
@@ -202,8 +202,9 @@ impl<'a, I: Index, V: Vertex> WindowSurface<I, V> for Surface<'a, I, V> {
             if let Some(render_pipeline) = self.render_pipeline.as_ref() {
                 render_pass.set_pipeline(render_pipeline);
             }
-            if let Some(bind_group) = texture_provider.bind_group.as_ref() {
-                render_pass.set_bind_group(0, bind_group, &[]);
+            for (i, bind_group) in bind_groups.iter().enumerate() {
+                println!("Bind group: {} {:?}", i, bind_group);
+                render_pass.set_bind_group(i as u32, bind_group, &[]);
             }
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             render_pass.set_index_buffer(self.index_buffer.slice(..), I::index_format());

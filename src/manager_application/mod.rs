@@ -20,7 +20,7 @@ use crate::graphics_provider::{GraphicsProvider, Index, ShaderDescriptor, Vertex
 
 pub struct ManagerApplication<
     E: ApplicationEvent<I, V> + 'static,
-    M: EventManager<E>,
+    M: EventManager<E, I, V>,
     I: Index,
     V: Vertex,
 > {
@@ -29,7 +29,7 @@ pub struct ManagerApplication<
     graphics_provider: GraphicsProvider<I, V>,
 }
 
-impl<'a, E: ApplicationEvent<I, V> + 'static, M: EventManager<E>, I: Index, V: Vertex>
+impl<'a, E: ApplicationEvent<I, V> + 'static, M: EventManager<E, I, V>, I: Index, V: Vertex>
     ApplicationHandler<E> for ManagerApplication<E, M, I, V>
 {
     fn resumed(&mut self, _active_loop: &ActiveEventLoop) {
@@ -110,11 +110,11 @@ impl<'a, E: ApplicationEvent<I, V> + 'static, M: EventManager<E>, I: Index, V: V
         }
 
         self.event_manager
-            .user_event(&mut self.window_manager, event_loop, &event);
+            .user_event(&mut self.window_manager, &mut self.graphics_provider, event_loop, &event);
     }
 }
 
-impl<'a, E: ApplicationEvent<I, V> + 'static, M: EventManager<E>, I: Index, V: Vertex>
+impl<'a, E: ApplicationEvent<I, V> + 'static, M: EventManager<E, I, V>, I: Index, V: Vertex>
     ManagerApplication<E, M, I, V>
 {
     pub fn new(event_manager: M) -> Self {

@@ -10,7 +10,7 @@ pub struct TextureCoordinates {
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable, repr_trait::C)]
 pub struct Vertex {
-    position: [f32; 3],
+    position: [f32; 2],
     tex_coords: [f32; 2],
     texture: u32,
 }
@@ -21,7 +21,7 @@ impl Vertex {
         texture: u32,
     ) -> Self {
         Self {
-            position: [position.x, position.y, position.z],
+            position: [position.x, position.y],
             tex_coords: [texture_coordinates.u, texture_coordinates.v],
             texture,
         }
@@ -35,16 +35,16 @@ impl Vert for Vertex {
             attributes: &[
                 wgpu::VertexAttribute {
                     offset: 0,
-                    format: wgpu::VertexFormat::Float32x3,
+                    format: wgpu::VertexFormat::Float32x2,
                     shader_location: 0,
                 },
                 wgpu::VertexAttribute {
-                    offset: std::mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
+                    offset: std::mem::size_of::<[f32; 2]>() as wgpu::BufferAddress,
                     format: wgpu::VertexFormat::Float32x2,
                     shader_location: 1,
                 },
                 wgpu::VertexAttribute {
-                    offset: std::mem::size_of::<[f32; 5]>() as wgpu::BufferAddress,
+                    offset: std::mem::size_of::<[f32; 4]>() as wgpu::BufferAddress,
                     format: wgpu::VertexFormat::Uint32,
                     shader_location: 2,
                 },

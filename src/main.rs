@@ -1,7 +1,6 @@
 use env_logger::Env;
 use placeholder::app::{ManagerApplication, WindowDescriptor};
 use placeholder::graphics::ShaderDescriptor;
-use wgpu::Backend;
 use std::fmt::Debug;
 use std::path::PathBuf;
 use threed::Vector;
@@ -20,7 +19,118 @@ use game::{
     Entity, Game, Index, RessourceDescriptor, Scene, SpriteDescriptor, SpritePosition, SpriteSheet,
     SpriteSheetDimensions, SpriteSheetName,
 };
-
+#[repr(C)]
+#[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+struct CameraUniform {
+    view: [[f32; 3]; 2],
+}
+impl CameraUniform {
+    fn new() -> Self {
+        Self {
+            view: [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]],
+        }
+    }
+}
+impl From<&Camera> for CameraUniform {
+    fn from(camera: &Camera) -> Self {
+        let c = Self {
+            view: [
+                [
+                    2.0 / camera.view_size.width,
+                    0.0,
+                    -2.0 * camera.position.x / camera.view_size.width,
+                ],
+                [
+                    0.0,
+                    2.0 / camera.view_size.height,
+                    -2.0 * camera.position.y / camera.view_size.height,
+                ],
+            ],
+        };
+        println!("{:?}", c);
+        c
+    }
+}
+#[derive(Clone)]
+struct CameraDescriptor {
+    position: Vector<f32>,
+    view_size: PhysicalSize<f32>,
+    speed: f32,
+}
+impl From<&CameraDescriptor> for Camera {
+    fn from(descriptor: &CameraDescriptor) -> Self {
+        Self::new(
+            descriptor.position.clone(),
+            descriptor.view_size,
+            descriptor.speed,
+        )
+    }
+}
+struct Camera {
+    position: Vector<f32>,
+    velocity: Vector<f32>,
+    max_speed: f32,
+    acceleration: VelocityController,
+    view_size: PhysicalSize<f32>,
+}
+impl Camera {
+    fn new(position: Vector<f32>, view_size: PhysicalSize<f32>, speed: f32) -> Self {
+        Self {
+            position,
+            velocity: Vector::new(0.0, 0.0, 0.0),
+            max_speed: speed.powi(2),
+            acceleration: VelocityController::new(speed / 10.0),
+            view_size,
+        }
+    }
+    fn update(&mut self) {
+        let acceleration = self.acceleration.get_velocity();
+        if acceleration == Vector::new(0.0, 0.0, 0.0) {
+            self.velocity *= 0.9;
+        } else {
+            self.velocity += acceleration;
+        }
+        if self.velocity.magnitude_squared() > self.max_speed {
+            self.velocity = self.velocity.normalize() * self.max_speed;
+        }
+        self.position += &self.velocity;
+    }
+    fn handle_key_input(&mut self, input: &KeyEvent) {
+        if input.state == winit::event::ElementState::Released {
+            match input.physical_key {
+                PhysicalKey::Code(KeyCode::KeyW) => {
+                    self.acceleration.set_direction(Direction::Up, false);
+                }
+                PhysicalKey::Code(KeyCode::KeyA) => {
+                    self.acceleration.set_direction(Direction::Left, false);
+                }
+                PhysicalKey::Code(KeyCode::KeyD) => {
+                    self.acceleration.set_direction(Direction::Right, false);
+                }
+                PhysicalKey::Code(KeyCode::KeyS) => {
+                    self.acceleration.set_direction(Direction::Down, false);
+                }
+                _ => {}
+            }
+        } else if input.state == winit::event::ElementState::Pressed {
+            match input.physical_key {
+                PhysicalKey::Code(KeyCode::KeyW) => {
+                    self.acceleration.set_direction(Direction::Up, true);
+                }
+                PhysicalKey::Code(KeyCode::KeyA) => {
+                    self.acceleration.set_direction(Direction::Left, true);
+                }
+                PhysicalKey::Code(KeyCode::KeyD) => {
+                    self.acceleration.set_direction(Direction::Right, true);
+                }
+                PhysicalKey::Code(KeyCode::KeyS) => {
+                    self.acceleration.set_direction(Direction::Down, true);
+                }
+                _ => {}
+            }
+        }
+    }
+}
 enum Direction {
     Up,
     Right,
@@ -114,33 +224,41 @@ impl Entity for Background {
         let x = 0.0;
         let y = 0.0;
         let z = 0.0;
-        let x_offset = 1280.0 / (window_size.width as f32);
-        let y_offset = 800.0 / (window_size.height as f32);
+        let x_offset = 1280.0;
+        let y_offset = 800.0;
         let texture_coords = sprite_sheet.get_sprite_coordinates(&SpritePosition::new(0, 0));
         let new_vertices = [
             Vertex::new(
-                Vector::new(x - x_offset, y + y_offset, z),
+                Vector::new(x - x_offset, y + y_offset, 0.0),
                 &texture_coords[0],
                 sprite_sheet.texture(),
             ),
             Vertex::new(
-                Vector::new(x + x_offset, y + y_offset, z),
+                Vector::new(x + x_offset, y + y_offset, 0.0),
                 &texture_coords[1],
                 sprite_sheet.texture(),
             ),
             Vertex::new(
-                Vector::new(x + x_offset, y - y_offset, z),
+                Vector::new(x + x_offset, y - y_offset, 0.0),
                 &texture_coords[2],
                 sprite_sheet.texture(),
             ),
             Vertex::new(
-                Vector::new(x - x_offset, y - y_offset, z),
+                Vector::new(x - x_offset, y - y_offset, 0.0),
                 &texture_coords[3],
                 sprite_sheet.texture(),
             ),
         ];
-        println!("Background vertices: {:?}", new_vertices);
-        let new_indices = [0, 1, 2, 0, 2, 3];
+        let start_index = vertices.len() as u16;
+        let new_indices = [
+            start_index,
+            start_index + 1,
+            start_index + 2,
+            start_index,
+            start_index + 2,
+            start_index + 3,
+        ];
+        println!("Background_vertices: {:?}", new_vertices);
         vertices.extend_from_slice(&new_vertices);
         indices.extend_from_slice(&new_indices);
     }
@@ -181,34 +299,41 @@ impl Entity for Player {
     ) {
         let x = self.position.x;
         let y = self.position.y;
-        let z = self.position.z;
-        let x_offset = self.width as f32 / (window_size.width as f32);
-        let y_offset = self.width as f32 / (window_size.height as f32);
+        let x_offset = self.width as f32;
+        let y_offset = self.width as f32;
         let texture_coords = sprite_sheet.get_sprite_coordinates(&self.sprite.position);
         let new_vertices = [
             Vertex::new(
-                Vector::new(x - x_offset, y + y_offset, z),
+                Vector::new(x - x_offset, y + y_offset, 0.0),
                 &texture_coords[0],
                 sprite_sheet.texture(),
             ),
             Vertex::new(
-                Vector::new(x + x_offset, y + y_offset, z),
+                Vector::new(x + x_offset, y + y_offset, 0.0),
                 &texture_coords[1],
                 sprite_sheet.texture(),
             ),
             Vertex::new(
-                Vector::new(x + x_offset, y - y_offset, z),
+                Vector::new(x + x_offset, y - y_offset, 0.0),
                 &texture_coords[2],
                 sprite_sheet.texture(),
             ),
             Vertex::new(
-                Vector::new(x - x_offset, y - y_offset, z),
+                Vector::new(x - x_offset, y - y_offset, 0.0),
                 &texture_coords[3],
                 sprite_sheet.texture(),
             ),
         ];
-        println!("Player vertices: {:?}", new_vertices);
-        let new_indices = [0, 1, 2, 0, 2, 3];
+        let start_index = vertices.len() as u16;
+        let new_indices = [
+            start_index,
+            start_index + 1,
+            start_index + 2,
+            start_index,
+            start_index + 2,
+            start_index + 3,
+        ];
+        println!("Player_vertices: {:?}", new_vertices);
         vertices.extend_from_slice(&new_vertices);
         indices.extend_from_slice(&new_indices);
     }
@@ -273,11 +398,15 @@ fn main() {
     let cursor_path = "res/images/cursor/Cursor_Goth_Cursor.png";
     let main_window = WindowAttributes::default().with_title("Wispers in the Void - Dark Dynasty");
     let main_window_descriptor = WindowDescriptor::new(main_window).with_cursor(cursor_path);
-
     let shader_descriptor = ShaderDescriptor {
         file: "res/shader/shader.wgsl",
         vertex_shader: "vs_main",
         fragment_shader: "fs_main",
+    };
+    let camera_descriptor = CameraDescriptor {
+        position: Vector::new(0.0, 0.0, 1.0),
+        view_size: PhysicalSize::new(400.0, 400.0),
+        speed: 0.01,
     };
     let main_window = "MainWindow";
     let player_sprite_sheet = "PlayerSpriteSheet";
@@ -287,6 +416,7 @@ fn main() {
             main_window.into(),
             main_window_descriptor,
             shader_descriptor,
+            camera_descriptor,
         )],
         sprite_sheets: vec![
             (
@@ -306,7 +436,7 @@ fn main() {
         entities: vec![
             Box::new(Player {
                 width: 150,
-                position: Vector::new(0.0, 0.0, 0.02),
+                position: Vector::new(0.0, 0.0, 0.0),
                 velocity: VelocityController::new(0.01),
                 sprite: SpriteDescriptor::new(player_sprite_sheet.into(), PLAYER_NEUTRAL),
             }),

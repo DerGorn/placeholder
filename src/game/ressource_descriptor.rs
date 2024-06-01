@@ -1,19 +1,28 @@
 use std::path::PathBuf;
 
 use placeholder::{app::WindowDescriptor, graphics::ShaderDescriptor};
+use placeholder::create_name_struct;
+
+use crate::CameraDescriptor;
 
 use super::sprite_sheet::SpriteSheetDimensions;
 
 pub struct RessourceDescriptor {
-    pub windows: Vec<(WindowName, WindowDescriptor, ShaderDescriptor)>,
+    pub windows: Vec<(WindowName, WindowDescriptor, ShaderDescriptor, CameraDescriptor)>,
     pub sprite_sheets: Vec<(SpriteSheetName, PathBuf, SpriteSheetDimensions)>,
 }
 impl RessourceDescriptor {
     pub fn get_window(&self, name: &WindowName) -> Option<(WindowDescriptor, ShaderDescriptor)> {
         self.windows
             .iter()
-            .find(|(window_name, _, _)| window_name == name)
-            .map(|(_, window, shader)| (window.clone(), shader.clone()))
+            .find(|(window_name, _, _, _)| window_name == name)
+            .map(|(_, window, shader, camera)| (window.clone(), shader.clone()))
+    }
+    pub fn get_camera(&self, name: &WindowName) -> Option<CameraDescriptor> {
+        self.windows
+            .iter()
+            .find(|(window_name, _, _, _)| window_name == name)
+            .map(|(_, _, _, camera)| camera.clone())
     }
     pub fn get_sprite_sheet(
         &self,
@@ -26,32 +35,5 @@ impl RessourceDescriptor {
     }
 }
 
-macro_rules! create_name_struct {
-    ($name: ident) => {
-        #[derive(Debug, Clone, PartialEq)]
-        pub struct $name(String);
-        impl $name {
-            #[allow(dead_code)]
-            pub fn as_str<'a>(&'a self) -> &'a str {
-                self.0.as_str()
-            }
-        }
-        impl From<&str> for $name {
-            fn from(value: &str) -> Self {
-                Self(value.to_string())
-            }
-        }
-        impl From<String> for $name {
-            fn from(value: String) -> Self {
-                value.as_str().into()
-            }
-        }
-        impl From<&String> for $name {
-            fn from(value: &String) -> Self {
-                value.as_str().into()
-            }
-        }
-    };
-}
 create_name_struct!(SpriteSheetName);
 create_name_struct!(WindowName);

@@ -18,12 +18,22 @@ pub use shader_descriptor::ShaderDescriptor;
 mod texture;
 use texture::TextureProvider;
 
+use crate::create_name_struct;
+
+create_name_struct!(UniformBufferName);
+
 pub struct GraphicsProvider<I: Index, V: Vertex> {
     instance: wgpu::Instance,
     adapter: Option<wgpu::Adapter>,
     device: Option<wgpu::Device>,
     queue: Option<wgpu::Queue>,
     surfaces: Vec<(WindowId, Box<dyn WindowSurface<I, V>>)>,
+    uniform_buffers: Vec<(
+        UniformBufferName,
+        wgpu::Buffer,
+        wgpu::BindGroupLayout,
+        wgpu::BindGroup,
+    )>,
     texture_provider: Option<TextureProvider>,
 }
 impl<I: Index, V: Vertex> GraphicsProvider<I, V> {
@@ -38,6 +48,7 @@ impl<I: Index, V: Vertex> GraphicsProvider<I, V> {
             device: None,
             queue: None,
             surfaces: Vec::new(),
+            uniform_buffers: Vec::new(),
             texture_provider: None,
         }
     }
@@ -168,11 +179,16 @@ impl<I: Index, V: Vertex> GraphicsProvider<I, V> {
             if let (Some(device), Some(queue), Some(texture_provider)) =
                 (&self.device, &self.queue, &self.texture_provider)
             {
-                surface.render(device, queue, texture_provider);
+                let mut bind_groups =
+                    vec![texture_provider.bind_group.as_ref().expect("No bind group")];
+                bind_groups.extend(self.uniform_buffers.iter().map(|(_, _, _, bg)| bg));
+                println!("camera buffer: {:?}", bind_groups[1]);
+                surface.render(device, queue, &bind_groups);
             }
         }
     }
 
+    /// Update the vertex and index buffers of a window
     pub fn update_buffers(&mut self, id: &WindowId, vertices: Option<&[V]>, indices: Option<&[I]>) {
         if let Some((_, surface)) = self.surfaces.iter_mut().find(|(i, _)| i == id) {
             if let (Some(device), Some(queue)) = (&self.device, &self.queue) {
@@ -193,18 +209,68 @@ impl<I: Index, V: Vertex> GraphicsProvider<I, V> {
                 return Some(index);
             }
             let index = texture_provider.create_texture(device, queue, path, label);
+            let mut bind_groups_layouts = vec![texture_provider
+                .bind_group_layout
+                .as_ref()
+                .expect("No texture bind group layout")];
+            bind_groups_layouts.extend(
+                self.uniform_buffers
+                    .iter()
+                    .map(|(_, _, bind_group_layout, _)| bind_group_layout),
+            );
             self.surfaces.iter_mut().for_each(|(_, surface)| {
-                surface.create_render_pipeline(
-                    device,
-                    texture_provider
-                        .bind_group_layout
-                        .as_ref()
-                        .expect("No bind group layout"),
-                );
+                surface.create_render_pipeline(device, &bind_groups_layouts);
             });
             Some(index)
         } else {
             None
+        }
+    }
+
+    pub fn create_uniform_buffer(
+        &mut self,
+        label: impl Into<UniformBufferName>,
+        contents: &[u8],
+        visibility: wgpu::ShaderStages,
+    ) {
+        let label: UniformBufferName = label.into();
+        let device = self.device.as_ref().expect("The device vanished");
+        let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some(label.as_str()),
+            contents,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some(label.as_str()),
+            entries: &[wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            }],
+        });
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some(label.as_str()),
+            layout: &bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: buffer.as_entire_binding(),
+            }],
+        });
+        self.uniform_buffers
+            .push((label.clone(), buffer, bind_group_layout, bind_group));
+    }
+
+    pub fn update_uniform_buffer(&self, label: &UniformBufferName, contents: &[u8]) {
+        if let Some((_, buffer, _, _)) = self.uniform_buffers.iter().find(|(l, _, _, _)| l == label)
+        {
+            println!("Updating buffer {:?} with {:?}", label, contents);
+            let queue = self.queue.as_ref().expect("The queue vanished");
+            queue.write_buffer(buffer, 0, contents);
         }
     }
 }

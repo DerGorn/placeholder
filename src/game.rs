@@ -4,8 +4,13 @@ use std::{
 };
 
 use log::warn;
-use placeholder::app::{EventManager, WindowManager};
+use placeholder::{
+    app::{EventManager, WindowManager},
+    graphics::{GraphicsProvider, UniformBufferName},
+};
 use winit::{dpi::PhysicalSize, event::WindowEvent, window::WindowId};
+
+use crate::{vertex::Vertex, Camera, CameraUniform};
 
 use self::game_event::GameEvent;
 pub use self::{
@@ -37,6 +42,7 @@ pub struct Game {
     window_ids: Vec<(WindowName, WindowId)>,
     window_sizes: Vec<(WindowId, PhysicalSize<u32>)>,
     sprite_sheets: Vec<(SpriteSheetName, SpriteSheet)>,
+    cameras: Vec<(WindowName, Camera, UniformBufferName)>,
     target_fps: u8,
 }
 impl Game {
@@ -48,11 +54,16 @@ impl Game {
             window_ids: Vec::new(),
             window_sizes: Vec::new(),
             sprite_sheets: Vec::new(),
+            cameras: Vec::new(),
             target_fps,
         }
     }
 
-    fn activate_scenes(&mut self, window_manager: &mut WindowManager<GameEvent>) {
+    fn activate_scenes(
+        &mut self,
+        window_manager: &mut WindowManager<GameEvent>,
+        graphics_provider: &mut GraphicsProvider<Index, Vertex>,
+    ) {
         let mut needed_windows = Vec::new();
         for window_name in self.pending_scenes.iter().map(|scene| &scene.target_window) {
             if self
@@ -116,7 +127,7 @@ impl Game {
             .collect()
     }
 }
-impl EventManager<GameEvent> for Game {
+impl EventManager<GameEvent, Index, Vertex> for Game {
     fn window_event(
         &mut self,
         _window_manager: &mut WindowManager<GameEvent>,
@@ -143,6 +154,11 @@ impl EventManager<GameEvent> for Game {
                         for scene in self.get_scenes_mut(&window_name) {
                             scene.handle_key_input(event);
                         }
+                        if let Some((_, camera, _)) =
+                            self.cameras.iter_mut().find(|(n, _, _)| n == &window_name)
+                        {
+                            camera.handle_key_input(event);
+                        }
                     }
                     None => {
                         warn!("No window name found for window id {:?}", id)
@@ -157,6 +173,7 @@ impl EventManager<GameEvent> for Game {
     fn user_event(
         &mut self,
         window_manager: &mut WindowManager<GameEvent>,
+        graphics_provider: &mut GraphicsProvider<Index, Vertex>,
         _event_loop: &winit::event_loop::ActiveEventLoop,
         event: &GameEvent,
     ) where
@@ -164,7 +181,7 @@ impl EventManager<GameEvent> for Game {
     {
         match event {
             GameEvent::Resumed => {
-                self.activate_scenes(window_manager);
+                self.activate_scenes(window_manager, graphics_provider);
 
                 let ns_per_frame = 1e9 / (self.target_fps as f64);
                 let frame_duration = Duration::from_nanos(ns_per_frame as u64);
@@ -200,6 +217,16 @@ impl EventManager<GameEvent> for Game {
                 }
                 for sprite_sheet in needed_sprite_sheets {
                     self.request_sprite_sheet(&sprite_sheet, window_manager);
+                }
+                if let Some(camera_descriptor) = &self.ressources.get_camera(name) {
+                    let camera: Camera = camera_descriptor.into();
+                    let camera_buffer = graphics_provider.create_uniform_buffer(
+                        name.as_str(),
+                        bytemuck::cast_slice(&CameraUniform::from(&camera).view),
+                        wgpu::ShaderStages::VERTEX,
+                    );
+                    self.cameras
+                        .push((name.clone(), camera, name.as_str().into()));
                 }
             }
             GameEvent::NewSpriteSheet(label, None) => {
@@ -240,7 +267,6 @@ impl EventManager<GameEvent> for Game {
                             entities
                         });
                     entities.sort_by(|a, b| a.z().partial_cmp(&b.z()).expect("NaN NaN NaN"));
-                    println!("{:?}", entities);
                     for entity in entities.iter_mut() {
                         entity.update();
                         let entity_sprite_sheet = entity.sprite_sheet();
@@ -251,6 +277,15 @@ impl EventManager<GameEvent> for Game {
                         {
                             entity.render(&mut vertices, &mut indices, &size, sprite_sheet);
                         }
+                    }
+                    if let Some((_, camera, camera_name)) =
+                        self.cameras.iter_mut().find(|(n, _, _)| n == name)
+                    {
+                        camera.update();
+                        graphics_provider.update_uniform_buffer(
+                            camera_name,
+                            bytemuck::cast_slice(&CameraUniform::from(&*camera).view),
+                        );
                     }
                     window_manager.send_event(GameEvent::RenderUpdate(*id, vertices, indices));
                 }
