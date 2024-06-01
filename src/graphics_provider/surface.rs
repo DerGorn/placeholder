@@ -203,7 +203,6 @@ impl<'a, I: Index, V: Vertex> WindowSurface<I, V> for Surface<'a, I, V> {
                 render_pass.set_pipeline(render_pipeline);
             }
             for (i, bind_group) in bind_groups.iter().enumerate() {
-                println!("Bind group: {} {:?}", i, bind_group);
                 render_pass.set_bind_group(i as u32, bind_group, &[]);
             }
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));

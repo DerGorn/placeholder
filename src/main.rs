@@ -22,12 +22,12 @@ use game::{
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct CameraUniform {
-    view: [[f32; 3]; 2],
+    view: [[f32; 2]; 3],
 }
 impl CameraUniform {
     fn new() -> Self {
         Self {
-            view: [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]],
+            view: [[1.0, 0.0], [0.0, 1.0], [0.0, 0.0]],
         }
     }
 }
@@ -35,19 +35,14 @@ impl From<&Camera> for CameraUniform {
     fn from(camera: &Camera) -> Self {
         let c = Self {
             view: [
+                [2.0 / camera.view_size.width, 0.0],
+                [0.0, 2.0 / camera.view_size.height],
                 [
-                    2.0 / camera.view_size.width,
-                    0.0,
                     -2.0 * camera.position.x / camera.view_size.width,
-                ],
-                [
-                    0.0,
-                    2.0 / camera.view_size.height,
                     -2.0 * camera.position.y / camera.view_size.height,
                 ],
             ],
         };
-        println!("{:?}", c);
         c
     }
 }
@@ -224,8 +219,8 @@ impl Entity for Background {
         let x = 0.0;
         let y = 0.0;
         let z = 0.0;
-        let x_offset = 1280.0;
-        let y_offset = 800.0;
+        let x_offset = 1280.0 / 2.0;
+        let y_offset = 800.0 / 2.0;
         let texture_coords = sprite_sheet.get_sprite_coordinates(&SpritePosition::new(0, 0));
         let new_vertices = [
             Vertex::new(
@@ -258,7 +253,6 @@ impl Entity for Background {
             start_index + 2,
             start_index + 3,
         ];
-        println!("Background_vertices: {:?}", new_vertices);
         vertices.extend_from_slice(&new_vertices);
         indices.extend_from_slice(&new_indices);
     }
@@ -299,8 +293,8 @@ impl Entity for Player {
     ) {
         let x = self.position.x;
         let y = self.position.y;
-        let x_offset = self.width as f32;
-        let y_offset = self.width as f32;
+        let x_offset = self.width as f32 / 2.0;
+        let y_offset = self.width as f32 / 2.0;
         let texture_coords = sprite_sheet.get_sprite_coordinates(&self.sprite.position);
         let new_vertices = [
             Vertex::new(
@@ -333,7 +327,6 @@ impl Entity for Player {
             start_index + 2,
             start_index + 3,
         ];
-        println!("Player_vertices: {:?}", new_vertices);
         vertices.extend_from_slice(&new_vertices);
         indices.extend_from_slice(&new_indices);
     }
@@ -403,10 +396,11 @@ fn main() {
         vertex_shader: "vs_main",
         fragment_shader: "fs_main",
     };
+    let speed = 1.0;
     let camera_descriptor = CameraDescriptor {
         position: Vector::new(0.0, 0.0, 1.0),
-        view_size: PhysicalSize::new(400.0, 400.0),
-        speed: 0.01,
+        view_size: PhysicalSize::new(800.0, 600.0),
+        speed,
     };
     let main_window = "MainWindow";
     let player_sprite_sheet = "PlayerSpriteSheet";
@@ -437,7 +431,7 @@ fn main() {
             Box::new(Player {
                 width: 150,
                 position: Vector::new(0.0, 0.0, 0.0),
-                velocity: VelocityController::new(0.01),
+                velocity: VelocityController::new(speed),
                 sprite: SpriteDescriptor::new(player_sprite_sheet.into(), PLAYER_NEUTRAL),
             }),
             Box::new(Background {

@@ -182,7 +182,6 @@ impl<I: Index, V: Vertex> GraphicsProvider<I, V> {
                 let mut bind_groups =
                     vec![texture_provider.bind_group.as_ref().expect("No bind group")];
                 bind_groups.extend(self.uniform_buffers.iter().map(|(_, _, _, bg)| bg));
-                println!("camera buffer: {:?}", bind_groups[1]);
                 surface.render(device, queue, &bind_groups);
             }
         }
@@ -268,7 +267,6 @@ impl<I: Index, V: Vertex> GraphicsProvider<I, V> {
     pub fn update_uniform_buffer(&self, label: &UniformBufferName, contents: &[u8]) {
         if let Some((_, buffer, _, _)) = self.uniform_buffers.iter().find(|(l, _, _, _)| l == label)
         {
-            println!("Updating buffer {:?} with {:?}", label, contents);
             let queue = self.queue.as_ref().expect("The queue vanished");
             queue.write_buffer(buffer, 0, contents);
         }

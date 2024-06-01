@@ -25,7 +25,9 @@ fn vs_main(
     out.tex_index = model.tex_index;
 
     let position = camera.projection * vec3<f32>(model.position, 1.0);
+    //let position = camera.projection * vec3<f32>(1.0, 1.0, 0.0);
     out.clip_position = vec4<f32>(position, 0.0, 1.0);
+    //out.tex_coords = position;
     return out;
 }
 
@@ -37,6 +39,6 @@ var sampler_array: binding_array<sampler>;
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    //return textureSampleLevel(texture_array[in.tex_index], sampler_array[in.tex_index], in.tex_coords, 0.0);
-    return vec4<f32>(1.0, 0.0, 0.0, 1.0);
+    return textureSampleLevel(texture_array[in.tex_index], sampler_array[in.tex_index], in.tex_coords, 0.0);
+    //return vec4<f32>(0.0, in.tex_coords*150.0, 1.0);
 }
