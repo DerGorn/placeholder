@@ -1,9 +1,13 @@
 use std::fmt::Debug;
+use placeholder::create_name_struct;
+use threed::Vector;
 use winit::event::KeyEvent;
 
 use crate::vertex::Vertex;
 
 use super::{ressource_descriptor::SpriteSheetName, sprite_sheet::SpriteSheet, Index};
+
+create_name_struct!(EntityName);
 
 pub trait Entity: Debug {
     fn update(&mut self);
@@ -18,4 +22,6 @@ pub trait Entity: Debug {
     fn z(&self) -> f32 {
         0.0
     }
+    fn name(&self) -> &EntityName;
+    fn position(&self) -> Vector<f32>;
 }

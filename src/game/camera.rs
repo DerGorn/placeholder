@@ -7,6 +7,8 @@ use winit::{
 
 use crate::{Direction, VelocityController};
 
+use super::entity::EntityName;
+
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct CameraUniform {
@@ -14,13 +16,15 @@ struct CameraUniform {
 }
 impl From<&Camera> for CameraUniform {
     fn from(camera: &Camera) -> Self {
+        let x = camera.position.x + camera.offset_position.x;
+        let y = camera.position.y + camera.offset_position.y;
         let c = Self {
             view: [
                 [2.0 / camera.view_size.width, 0.0],
                 [0.0, 2.0 / camera.view_size.height],
                 [
-                    -2.0 * camera.position.x / camera.view_size.width,
-                    -2.0 * camera.position.y / camera.view_size.height,
+                    -2.0 * x / camera.view_size.width,
+                    -2.0 * y / camera.view_size.height,
                 ],
             ],
         };
@@ -30,48 +34,47 @@ impl From<&Camera> for CameraUniform {
 
 #[derive(Clone)]
 pub struct CameraDescriptor {
-    pub position: Vector<f32>,
     pub view_size: PhysicalSize<f32>,
     pub speed: f32,
     pub acceleration_steps: u32,
+    pub target_entity: EntityName,
+    pub max_offset_position: f32,
 }
 impl From<&CameraDescriptor> for Camera {
     fn from(descriptor: &CameraDescriptor) -> Self {
-        Self::new(
-            descriptor.position.clone(),
-            descriptor.view_size,
-            descriptor.speed,
-            descriptor.acceleration_steps,
-        )
+        Self::new(descriptor)
     }
 }
 
 pub struct Camera {
     position: Vector<f32>,
+    offset_position: Vector<f32>,
+    max_offset: f32,
     velocity: Vector<f32>,
     max_speed: f32,
     decceleration_factor: f32,
     acceleration: VelocityController,
     view_size: PhysicalSize<f32>,
+    pub target_entity: EntityName,
 }
 impl Camera {
-    fn new(
-        position: Vector<f32>,
-        view_size: PhysicalSize<f32>,
-        speed: f32,
-        acceleration_steps: u32,
-    ) -> Self {
+    fn new(descriptor: &CameraDescriptor) -> Self {
         Self {
-            position,
+            position: Vector::new(0.0, 0.0, 0.0),
+            offset_position: Vector::new(0.0, 0.0, 0.0),
+            max_offset: descriptor.max_offset_position,
             velocity: Vector::new(0.0, 0.0, 0.0),
-            max_speed: speed,
-            decceleration_factor: 1.0 - 1.0 / acceleration_steps as f32,
-            acceleration: VelocityController::new(speed / acceleration_steps as f32),
-            view_size,
+            max_speed: descriptor.speed,
+            decceleration_factor: 1.0 - 1.0 / descriptor.acceleration_steps as f32,
+            acceleration: VelocityController::new(
+                descriptor.speed / descriptor.acceleration_steps as f32,
+            ),
+            view_size: descriptor.view_size,
+            target_entity: descriptor.target_entity.clone(),
         }
     }
 
-    pub fn update(&mut self) {
+    pub fn update(&mut self, target_position: &Vector<f32>) {
         let acceleration = self.acceleration.get_velocity();
         if acceleration == Vector::new(0.0, 0.0, 0.0) {
             self.velocity *= self.decceleration_factor;
@@ -81,7 +84,15 @@ impl Camera {
                 self.velocity = self.velocity.normalize() * self.max_speed;
             }
         }
-        self.position += &self.velocity;
+        if self.velocity.magnitude_squared() < 1e-6 {
+            self.offset_position = Vector::new(0.0, 0.0, 0.0);
+        } else {
+            self.offset_position += &self.velocity;
+            if self.offset_position.magnitude_squared() > self.max_offset {
+                self.offset_position = self.offset_position.normalize() * self.max_offset;
+            }
+        }
+        self.position = target_position.clone();
     }
 
     pub fn as_bytes(&self) -> Vec<u8> {

@@ -15,7 +15,7 @@ use crate::vertex::Vertex;
 use self::game_event::GameEvent;
 pub use self::{
     camera::{Camera, CameraDescriptor},
-    entity::Entity,
+    entity::{Entity, EntityName},
     ressource_descriptor::{RessourceDescriptor, SpriteSheetName, WindowName},
     scene::Scene,
     sprite::{SpriteDescriptor, SpritePosition},
@@ -266,7 +266,8 @@ impl EventManager<GameEvent, Index, Vertex> for Game {
                     if let Some((_, camera, camera_name)) =
                         self.cameras.iter_mut().find(|(n, _, _)| n == name)
                     {
-                        camera.update();
+                        let target_entity = entities.iter().find(|entity| entity.name() == &camera.target_entity).expect(&format!("Target entity '{:?}' on window '{:?}' for the camera could not be found", camera.target_entity, name));
+                        camera.update(&target_entity.position());
                         graphics_provider.update_uniform_buffer(camera_name, &camera.as_bytes());
                     }
                     window_manager.send_event(GameEvent::RenderUpdate(*id, vertices, indices));

@@ -16,8 +16,8 @@ use vertex::Vertex;
 
 mod game;
 use game::{
-    Entity, Game, Index, RessourceDescriptor, Scene, SpriteDescriptor, SpritePosition, SpriteSheet,
-    SpriteSheetDimensions, SpriteSheetName, CameraDescriptor,
+    CameraDescriptor, Entity, EntityName, Game, Index, RessourceDescriptor, Scene,
+    SpriteDescriptor, SpritePosition, SpriteSheet, SpriteSheetDimensions, SpriteSheetName,
 };
 enum Direction {
     Up,
@@ -83,6 +83,7 @@ impl VelocityController {
     }
 }
 struct Background {
+    name: EntityName,
     sprite_sheet: SpriteSheetName,
 }
 impl Debug for Background {
@@ -97,6 +98,12 @@ impl Entity for Background {
     fn update(&mut self) {}
     fn sprite_sheet(&self) -> &SpriteSheetName {
         &self.sprite_sheet
+    }
+    fn name(&self) -> &EntityName {
+        &self.name
+    }
+    fn position(&self) -> Vector<f32> {
+        Vector::new(0.0, 0.0, 0.0)
     }
     fn z(&self) -> f32 {
         -1000.0
@@ -149,6 +156,7 @@ impl Entity for Background {
     }
 }
 struct Player {
+    name: EntityName,
     width: u16,
     position: Vector<f32>,
     velocity: VelocityController,
@@ -165,6 +173,14 @@ impl Debug for Player {
 impl Entity for Player {
     fn update(&mut self) {
         self.position += self.velocity.get_velocity();
+    }
+
+    fn name(&self) -> &EntityName {
+        &self.name
+    }
+
+    fn position(&self) -> Vector<f32> {
+        self.position.clone()
     }
 
     fn sprite_sheet(&self) -> &SpriteSheetName {
@@ -288,11 +304,13 @@ fn main() {
         fragment_shader: "fs_main",
     };
     let speed = 2.0;
+    let protaginist_name = "Protagonist";
     let camera_descriptor = CameraDescriptor {
-        position: Vector::new(0.0, 0.0, 1.0),
         view_size: PhysicalSize::new(800.0, 600.0),
-        speed,
+        speed: -speed,
         acceleration_steps: 20,
+        target_entity: protaginist_name.into(),
+        max_offset_position: 50.0,
     };
     let main_window = "MainWindow";
     let player_sprite_sheet = "PlayerSpriteSheet";
@@ -321,12 +339,14 @@ fn main() {
         target_window: main_window.into(),
         entities: vec![
             Box::new(Player {
+                name: protaginist_name.into(),
                 width: 150,
                 position: Vector::new(0.0, 0.0, 0.0),
                 velocity: VelocityController::new(speed),
                 sprite: SpriteDescriptor::new(player_sprite_sheet.into(), PLAYER_NEUTRAL),
             }),
             Box::new(Background {
+                name: background.into(),
                 sprite_sheet: background.into(),
             }),
         ],
