@@ -1,4 +1,4 @@
-use super::{texture::TextureProvider, Index, ShaderDescriptor, Vertex};
+use super::{Index, ShaderDescriptor, Vertex};
 use std::fmt::Debug;
 use wgpu::util::DeviceExt;
 

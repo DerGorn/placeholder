@@ -1,5 +1,5 @@
 use std::fmt::Debug;
-use winit::{dpi::PhysicalSize, event::KeyEvent};
+use winit::event::KeyEvent;
 
 use crate::vertex::Vertex;
 
@@ -11,7 +11,6 @@ pub trait Entity: Debug {
         &self,
         vertices: &mut Vec<Vertex>,
         indices: &mut Vec<Index>,
-        window_size: &PhysicalSize<u32>,
         sprite_sheet: &SpriteSheet,
     );
     fn sprite_sheet(&self) -> &SpriteSheetName;

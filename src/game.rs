@@ -10,10 +10,11 @@ use placeholder::{
 };
 use winit::{dpi::PhysicalSize, event::WindowEvent, window::WindowId};
 
-use crate::{vertex::Vertex, Camera, CameraUniform};
+use crate::vertex::Vertex;
 
 use self::game_event::GameEvent;
 pub use self::{
+    camera::{Camera, CameraDescriptor},
     entity::Entity,
     ressource_descriptor::{RessourceDescriptor, SpriteSheetName, WindowName},
     scene::Scene,
@@ -21,17 +22,13 @@ pub use self::{
     sprite_sheet::{SpriteSheet, SpriteSheetDimensions},
 };
 
-mod sprite_sheet;
-
-mod sprite;
-
-mod ressource_descriptor;
-
-mod scene;
-
-mod game_event;
-
+mod camera;
 mod entity;
+mod game_event;
+mod ressource_descriptor;
+mod scene;
+mod sprite;
+mod sprite_sheet;
 
 pub type Index = u16;
 
@@ -59,11 +56,7 @@ impl Game {
         }
     }
 
-    fn activate_scenes(
-        &mut self,
-        window_manager: &mut WindowManager<GameEvent>,
-        graphics_provider: &mut GraphicsProvider<Index, Vertex>,
-    ) {
+    fn activate_scenes(&mut self, window_manager: &mut WindowManager<GameEvent>) {
         let mut needed_windows = Vec::new();
         for window_name in self.pending_scenes.iter().map(|scene| &scene.target_window) {
             if self
@@ -181,7 +174,7 @@ impl EventManager<GameEvent, Index, Vertex> for Game {
     {
         match event {
             GameEvent::Resumed => {
-                self.activate_scenes(window_manager, graphics_provider);
+                self.activate_scenes(window_manager);
 
                 let ns_per_frame = 1e9 / (self.target_fps as f64);
                 let frame_duration = Duration::from_nanos(ns_per_frame as u64);
@@ -220,9 +213,9 @@ impl EventManager<GameEvent, Index, Vertex> for Game {
                 }
                 if let Some(camera_descriptor) = &self.ressources.get_camera(name) {
                     let camera: Camera = camera_descriptor.into();
-                    let camera_buffer = graphics_provider.create_uniform_buffer(
+                    graphics_provider.create_uniform_buffer(
                         name.as_str(),
-                        bytemuck::cast_slice(&CameraUniform::from(&camera).view),
+                        &camera.as_bytes(),
                         wgpu::ShaderStages::VERTEX,
                     );
                     self.cameras
@@ -246,14 +239,6 @@ impl EventManager<GameEvent, Index, Vertex> for Game {
             }
             GameEvent::Timer(_delta_t) => {
                 for (name, id) in &self.window_ids {
-                    let size = self
-                        .window_sizes
-                        .iter()
-                        .find(|(i, _)| i == id)
-                        .map(|(_, s)| *s)
-                        //Default size if no resize event happened until now
-                        .or(Some(PhysicalSize::new(1, 1)))
-                        .expect("The universe killed the default");
                     let mut vertices = Vec::new();
                     let mut indices = Vec::new();
                     let mut entities = self
@@ -275,17 +260,14 @@ impl EventManager<GameEvent, Index, Vertex> for Game {
                             .iter()
                             .find(|(l, _)| l == entity_sprite_sheet)
                         {
-                            entity.render(&mut vertices, &mut indices, &size, sprite_sheet);
+                            entity.render(&mut vertices, &mut indices, sprite_sheet);
                         }
                     }
                     if let Some((_, camera, camera_name)) =
                         self.cameras.iter_mut().find(|(n, _, _)| n == name)
                     {
                         camera.update();
-                        graphics_provider.update_uniform_buffer(
-                            camera_name,
-                            bytemuck::cast_slice(&CameraUniform::from(&*camera).view),
-                        );
+                        graphics_provider.update_uniform_buffer(camera_name, &camera.as_bytes());
                     }
                     window_manager.send_event(GameEvent::RenderUpdate(*id, vertices, indices));
                 }

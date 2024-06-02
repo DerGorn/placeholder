@@ -16,7 +16,7 @@ impl RessourceDescriptor {
         self.windows
             .iter()
             .find(|(window_name, _, _, _)| window_name == name)
-            .map(|(_, window, shader, camera)| (window.clone(), shader.clone()))
+            .map(|(_, window, shader, _)| (window.clone(), shader.clone()))
     }
     pub fn get_camera(&self, name: &WindowName) -> Option<CameraDescriptor> {
         self.windows

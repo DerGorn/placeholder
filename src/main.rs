@@ -17,124 +17,8 @@ use vertex::Vertex;
 mod game;
 use game::{
     Entity, Game, Index, RessourceDescriptor, Scene, SpriteDescriptor, SpritePosition, SpriteSheet,
-    SpriteSheetDimensions, SpriteSheetName,
+    SpriteSheetDimensions, SpriteSheetName, CameraDescriptor,
 };
-#[repr(C)]
-#[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
-struct CameraUniform {
-    view: [[f32; 2]; 3],
-}
-impl CameraUniform {
-    fn new() -> Self {
-        Self {
-            view: [[1.0, 0.0], [0.0, 1.0], [0.0, 0.0]],
-        }
-    }
-}
-impl From<&Camera> for CameraUniform {
-    fn from(camera: &Camera) -> Self {
-        let c = Self {
-            view: [
-                [2.0 / camera.view_size.width, 0.0],
-                [0.0, 2.0 / camera.view_size.height],
-                [
-                    -2.0 * camera.position.x / camera.view_size.width,
-                    -2.0 * camera.position.y / camera.view_size.height,
-                ],
-            ],
-        };
-        c
-    }
-}
-#[derive(Clone)]
-struct CameraDescriptor {
-    position: Vector<f32>,
-    view_size: PhysicalSize<f32>,
-    speed: f32,
-    acceleration_steps: u32,
-}
-impl From<&CameraDescriptor> for Camera {
-    fn from(descriptor: &CameraDescriptor) -> Self {
-        Self::new(
-            descriptor.position.clone(),
-            descriptor.view_size,
-            descriptor.speed,
-            descriptor.acceleration_steps,
-        )
-    }
-}
-struct Camera {
-    position: Vector<f32>,
-    velocity: Vector<f32>,
-    max_speed: f32,
-    decceleration_factor: f32,
-    acceleration: VelocityController,
-    view_size: PhysicalSize<f32>,
-}
-impl Camera {
-    fn new(
-        position: Vector<f32>,
-        view_size: PhysicalSize<f32>,
-        speed: f32,
-        acceleration_steps: u32,
-    ) -> Self {
-        Self {
-            position,
-            velocity: Vector::new(0.0, 0.0, 0.0),
-            max_speed: speed,
-            decceleration_factor: 1.0 - 1.0 / acceleration_steps as f32,
-            acceleration: VelocityController::new(speed / acceleration_steps as f32),
-            view_size,
-        }
-    }
-    fn update(&mut self) {
-        let acceleration = self.acceleration.get_velocity();
-        if acceleration == Vector::new(0.0, 0.0, 0.0) {
-            self.velocity *= self.decceleration_factor;
-        } else {
-            self.velocity += acceleration;
-            if self.velocity.magnitude_squared() >= self.max_speed {
-                self.velocity = self.velocity.normalize() * self.max_speed;
-            }
-        }
-        self.position += &self.velocity;
-    }
-    fn handle_key_input(&mut self, input: &KeyEvent) {
-        if input.state == winit::event::ElementState::Released {
-            match input.physical_key {
-                PhysicalKey::Code(KeyCode::KeyW) => {
-                    self.acceleration.set_direction(Direction::Up, false);
-                }
-                PhysicalKey::Code(KeyCode::KeyA) => {
-                    self.acceleration.set_direction(Direction::Left, false);
-                }
-                PhysicalKey::Code(KeyCode::KeyD) => {
-                    self.acceleration.set_direction(Direction::Right, false);
-                }
-                PhysicalKey::Code(KeyCode::KeyS) => {
-                    self.acceleration.set_direction(Direction::Down, false);
-                }
-                _ => {}
-            }
-        } else if input.state == winit::event::ElementState::Pressed {
-            match input.physical_key {
-                PhysicalKey::Code(KeyCode::KeyW) => {
-                    self.acceleration.set_direction(Direction::Up, true);
-                }
-                PhysicalKey::Code(KeyCode::KeyA) => {
-                    self.acceleration.set_direction(Direction::Left, true);
-                }
-                PhysicalKey::Code(KeyCode::KeyD) => {
-                    self.acceleration.set_direction(Direction::Right, true);
-                }
-                PhysicalKey::Code(KeyCode::KeyS) => {
-                    self.acceleration.set_direction(Direction::Down, true);
-                }
-                _ => {}
-            }
-        }
-    }
-}
 enum Direction {
     Up,
     Right,
@@ -222,12 +106,10 @@ impl Entity for Background {
         &self,
         vertices: &mut Vec<Vertex>,
         indices: &mut Vec<Index>,
-        window_size: &PhysicalSize<u32>,
         sprite_sheet: &SpriteSheet,
     ) {
         let x = 0.0;
         let y = 0.0;
-        let z = 0.0;
         let x_offset = 1280.0 / 2.0;
         let y_offset = 800.0 / 2.0;
         let texture_coords = sprite_sheet.get_sprite_coordinates(&SpritePosition::new(0, 0));
@@ -297,7 +179,6 @@ impl Entity for Player {
         &self,
         vertices: &mut Vec<Vertex>,
         indices: &mut Vec<Index>,
-        window_size: &PhysicalSize<u32>,
         sprite_sheet: &SpriteSheet,
     ) {
         let x = self.position.x;
@@ -394,6 +275,7 @@ const PLAYER_LEFT: SpritePosition = SpritePosition::new(3, 0);
 const PLAYER_RIGHT: SpritePosition = SpritePosition::new(4, 0);
 
 fn main() {
+    //TODO: CAMERA RUNS AWAY, WHEN MOVING OFTEN INTO ONE DIRECTION
     env_logger::Builder::from_env(Env::default().default_filter_or("warn")).init();
     let target_fps = 60;
 
