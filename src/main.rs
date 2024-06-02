@@ -310,7 +310,7 @@ fn main() {
         speed: -speed,
         acceleration_steps: 20,
         target_entity: protaginist_name.into(),
-        max_offset_position: 50.0,
+        max_offset_position: 100.0,
     };
     let main_window = "MainWindow";
     let player_sprite_sheet = "PlayerSpriteSheet";

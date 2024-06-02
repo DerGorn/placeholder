@@ -62,7 +62,7 @@ impl Camera {
         Self {
             position: Vector::new(0.0, 0.0, 0.0),
             offset_position: Vector::new(0.0, 0.0, 0.0),
-            max_offset: descriptor.max_offset_position,
+            max_offset: descriptor.max_offset_position.powi(2),
             velocity: Vector::new(0.0, 0.0, 0.0),
             max_speed: descriptor.speed,
             decceleration_factor: 1.0 - 1.0 / descriptor.acceleration_steps as f32,
@@ -75,23 +75,16 @@ impl Camera {
     }
 
     pub fn update(&mut self, target_position: &Vector<f32>) {
-        let acceleration = self.acceleration.get_velocity();
-        if acceleration == Vector::new(0.0, 0.0, 0.0) {
-            self.velocity *= self.decceleration_factor;
-        } else {
-            self.velocity += acceleration;
-            if self.velocity.magnitude_squared() >= self.max_speed {
-                self.velocity = self.velocity.normalize() * self.max_speed;
-            }
-        }
-        if self.velocity.magnitude_squared() < 1e-6 {
-            self.offset_position = Vector::new(0.0, 0.0, 0.0);
-        } else {
-            self.offset_position += &self.velocity;
-            if self.offset_position.magnitude_squared() > self.max_offset {
-                self.offset_position = self.offset_position.normalize() * self.max_offset;
-            }
-        }
+        // let acceleration = self.acceleration.get_velocity();
+        // if acceleration == Vector::new(0.0, 0.0, 0.0) {
+        //     self.velocity*= self.decceleration_factor;
+        // } else {
+        //     self.velocity += acceleration;
+        //     if self.velocity.magnitude_squared() >= self.max_speed {
+        //         self.velocity = self.velocity.normalize() * self.max_speed;
+        //     }
+        //     self.offset_position = self.velocity.clone();
+        // }
         self.position = target_position.clone();
     }
 
