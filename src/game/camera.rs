@@ -50,10 +50,8 @@ pub struct Camera {
     position: Vector<f32>,
     offset_position: Vector<f32>,
     max_offset: f32,
-    velocity: Vector<f32>,
-    max_speed: f32,
     decceleration_factor: f32,
-    acceleration: VelocityController,
+    velocity: VelocityController,
     view_size: PhysicalSize<f32>,
     pub target_entity: EntityName,
 }
@@ -62,11 +60,9 @@ impl Camera {
         Self {
             position: Vector::new(0.0, 0.0, 0.0),
             offset_position: Vector::new(0.0, 0.0, 0.0),
-            max_offset: descriptor.max_offset_position.powi(2),
-            velocity: Vector::new(0.0, 0.0, 0.0),
-            max_speed: descriptor.speed,
+            max_offset: descriptor.max_offset_position,
             decceleration_factor: 1.0 - 1.0 / descriptor.acceleration_steps as f32,
-            acceleration: VelocityController::new(
+            velocity: VelocityController::new(
                 descriptor.speed / descriptor.acceleration_steps as f32,
             ),
             view_size: descriptor.view_size,
@@ -75,17 +71,23 @@ impl Camera {
     }
 
     pub fn update(&mut self, target_position: &Vector<f32>) {
-        // let acceleration = self.acceleration.get_velocity();
-        // if acceleration == Vector::new(0.0, 0.0, 0.0) {
-        //     self.velocity*= self.decceleration_factor;
-        // } else {
-        //     self.velocity += acceleration;
-        //     if self.velocity.magnitude_squared() >= self.max_speed {
-        //         self.velocity = self.velocity.normalize() * self.max_speed;
-        //     }
-        //     self.offset_position = self.velocity.clone();
-        // }
+        let velocity = self.velocity.get_velocity();
+        if velocity.x.abs() <= 1e-4 {
+            self.offset_position.x *= self.decceleration_factor;
+        }
+        if velocity.y.abs() <= 1e-4 {
+            self.offset_position.y *= self.decceleration_factor;
+        }
+        println!("Vel: {:?}", velocity);
+        self.offset_position += velocity;
+        println!("Magnitude: {}", self.offset_position.magnitude_squared());
+        if self.offset_position.magnitude_squared() >= self.max_offset.powi(2) {
+            println!("Normalized: {:?}", self.offset_position.normalize());
+            self.offset_position = self.offset_position.normalize() * self.max_offset;
+        }
+        println!("Offset: {:?}", self.offset_position);
         self.position = target_position.clone();
+        println!("Pos: {:?}", self.position);
     }
 
     pub fn as_bytes(&self) -> Vec<u8> {
@@ -98,32 +100,32 @@ impl Camera {
         if input.state == winit::event::ElementState::Released {
             match input.physical_key {
                 PhysicalKey::Code(KeyCode::KeyW) => {
-                    self.acceleration.set_direction(Direction::Up, false);
+                    self.velocity.set_direction(Direction::Up, false);
                 }
                 PhysicalKey::Code(KeyCode::KeyA) => {
-                    self.acceleration.set_direction(Direction::Left, false);
+                    self.velocity.set_direction(Direction::Left, false);
                 }
                 PhysicalKey::Code(KeyCode::KeyD) => {
-                    self.acceleration.set_direction(Direction::Right, false);
+                    self.velocity.set_direction(Direction::Right, false);
                 }
                 PhysicalKey::Code(KeyCode::KeyS) => {
-                    self.acceleration.set_direction(Direction::Down, false);
+                    self.velocity.set_direction(Direction::Down, false);
                 }
                 _ => {}
             }
         } else if input.state == winit::event::ElementState::Pressed {
             match input.physical_key {
                 PhysicalKey::Code(KeyCode::KeyW) => {
-                    self.acceleration.set_direction(Direction::Up, true);
+                    self.velocity.set_direction(Direction::Up, true);
                 }
                 PhysicalKey::Code(KeyCode::KeyA) => {
-                    self.acceleration.set_direction(Direction::Left, true);
+                    self.velocity.set_direction(Direction::Left, true);
                 }
                 PhysicalKey::Code(KeyCode::KeyD) => {
-                    self.acceleration.set_direction(Direction::Right, true);
+                    self.velocity.set_direction(Direction::Right, true);
                 }
                 PhysicalKey::Code(KeyCode::KeyS) => {
-                    self.acceleration.set_direction(Direction::Down, true);
+                    self.velocity.set_direction(Direction::Down, true);
                 }
                 _ => {}
             }

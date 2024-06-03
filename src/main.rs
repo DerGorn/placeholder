@@ -307,8 +307,8 @@ fn main() {
     let protaginist_name = "Protagonist";
     let camera_descriptor = CameraDescriptor {
         view_size: PhysicalSize::new(800.0, 600.0),
-        speed: -speed,
-        acceleration_steps: 20,
+        speed: 90.0,
+        acceleration_steps: 30,
         target_entity: protaginist_name.into(),
         max_offset_position: 100.0,
     };
