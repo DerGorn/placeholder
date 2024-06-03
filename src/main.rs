@@ -82,9 +82,21 @@ impl VelocityController {
         velocity * self.speed
     }
 }
+
+struct BoundingBox {
+    ///Top Left Corner
+    anchor: Vector<f32>,
+    size: PhysicalSize<f32>,
+}
+impl BoundingBox {
+    fn contains_point(&self, point: &Vector<f32>) -> bool {
+        let offset = point - &self.anchor;
+    }
+}
 struct Background {
     name: EntityName,
     sprite_sheet: SpriteSheetName,
+    size: PhysicalSize<u16>,
 }
 impl Debug for Background {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -117,8 +129,8 @@ impl Entity for Background {
     ) {
         let x = 0.0;
         let y = 0.0;
-        let x_offset = 1280.0 / 2.0;
-        let y_offset = 800.0 / 2.0;
+        let x_offset = self.size.width as f32 / 2.0;
+        let y_offset = self.size.height as f32 / 2.0;
         let texture_coords = sprite_sheet.get_sprite_coordinates(&SpritePosition::new(0, 0));
         let new_vertices = [
             Vertex::new(
@@ -347,6 +359,7 @@ fn main() {
             }),
             Box::new(Background {
                 name: background.into(),
+                size: PhysicalSize::new(1280, 800),
                 sprite_sheet: background.into(),
             }),
         ],
