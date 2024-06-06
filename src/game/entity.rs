@@ -3,7 +3,7 @@ use placeholder::create_name_struct;
 use threed::Vector;
 use winit::event::KeyEvent;
 
-use crate::vertex::Vertex;
+use crate::{vertex::Vertex, BoundingBox};
 
 use super::{ressource_descriptor::SpriteSheetName, sprite_sheet::SpriteSheet, Index};
 
@@ -24,4 +24,5 @@ pub trait Entity: Debug {
     }
     fn name(&self) -> &EntityName;
     fn position(&self) -> Vector<f32>;
+    fn bounding_box(&self) -> BoundingBox;
 }

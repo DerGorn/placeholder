@@ -83,14 +83,68 @@ impl VelocityController {
     }
 }
 
+///Bounding Box defined by middle point and width and height
+///The negative sides (anchor - size/2) and the positive sides (anchor + size/2) are inclusive
 struct BoundingBox {
-    ///Top Left Corner
+    ///Middle point
     anchor: Vector<f32>,
     size: PhysicalSize<f32>,
 }
 impl BoundingBox {
     fn contains_point(&self, point: &Vector<f32>) -> bool {
         let offset = point - &self.anchor;
+        let width = self.size.width / 2.0;
+        let height = self.size.height / 2.0;
+        offset.x >= -width && offset.x <= width && offset.y >= -height && offset.y <= height
+    }
+
+    fn contains_box(&self, other: &BoundingBox) -> bool {
+        let offset = Vector::new(other.size.width, other.size.height, 0.0) / 2.0;
+        let top_left = &other.anchor - &offset;
+        let bottom_right = &other.anchor + &offset;
+        self.contains_point(&top_left) && self.contains_point(&bottom_right)
+    }
+
+    ///Returns the nearest position for the other box to be inside self
+    ///If a axis of other is bigger than self, self.anchor's value will be returned
+    ///If other is already in self, None will be returned
+    pub fn clamp_box_inside(&self, other: &BoundingBox) -> Option<Vector<f32>> {
+        if self.contains_box(other) {
+            None
+        } else {
+            let x = if other.size.width < self.size.width {
+                let size_difference = (other.size.width - self.size.width) / 2.0;
+                let left_distance = self.anchor.x - other.anchor.x;
+
+                other.anchor.x
+                    + if left_distance.abs() <= -size_difference {
+                        0.0
+                    } else if left_distance > 0.0 {
+                        left_distance + size_difference
+                    } else {
+                        left_distance - size_difference
+                    }
+            } else {
+                self.anchor.x
+            };
+            let y = if other.size.height < self.size.height {
+                let size_difference = (other.size.height - self.size.height) / 2.0;
+                let top_distance = self.anchor.y - other.anchor.y;
+
+                other.anchor.y
+                    + if top_distance.abs() <= -size_difference {
+                        0.0
+                    } else if top_distance > 0.0 {
+                        top_distance + size_difference
+                    } else {
+                        top_distance - size_difference
+                    }
+            } else {
+                self.anchor.y
+            };
+            let inside_anchor = Vector::new(x, y, 0.0);
+            Some(inside_anchor)
+        }
     }
 }
 struct Background {
@@ -116,6 +170,12 @@ impl Entity for Background {
     }
     fn position(&self) -> Vector<f32> {
         Vector::new(0.0, 0.0, 0.0)
+    }
+    fn bounding_box(&self) -> BoundingBox {
+        BoundingBox {
+            anchor: Vector::new(0.0, 0.0, 0.0),
+            size: PhysicalSize::new(self.size.width as f32, self.size.height as f32),
+        }
     }
     fn z(&self) -> f32 {
         -1000.0
@@ -193,6 +253,13 @@ impl Entity for Player {
 
     fn position(&self) -> Vector<f32> {
         self.position.clone()
+    }
+
+    fn bounding_box(&self) -> BoundingBox {
+        BoundingBox {
+            anchor: self.position.clone(),
+            size: PhysicalSize::new(self.width as f32, self.width as f32),
+        }
     }
 
     fn sprite_sheet(&self) -> &SpriteSheetName {
@@ -317,16 +384,17 @@ fn main() {
     };
     let speed = 2.0;
     let protaginist_name = "Protagonist";
+    let main_window = "MainWindow";
+    let player_sprite_sheet = "PlayerSpriteSheet";
+    let background = "Background";
     let camera_descriptor = CameraDescriptor {
         view_size: PhysicalSize::new(800.0, 600.0),
         speed: 90.0,
         acceleration_steps: 30,
         target_entity: protaginist_name.into(),
+        bound_entity: Some(background.into()),
         max_offset_position: 100.0,
     };
-    let main_window = "MainWindow";
-    let player_sprite_sheet = "PlayerSpriteSheet";
-    let background = "Background";
     let ressources = RessourceDescriptor {
         windows: vec![(
             main_window.into(),
@@ -366,4 +434,12 @@ fn main() {
     };
     let mut app = ManagerApplication::new(Game::new(ressources, vec![scene], target_fps));
     app.run();
+    // let bb = BoundingBox {
+    //     anchor: Vector::new(0.0, 0.0, 0.0),
+    //     size: PhysicalSize::new(800.0, 600.0),
+    // };
+    // println!("{}", bb.contains_point(&Vector::new(0.0, 0.0, 0.0)));
+    // println!("{}", bb.contains_point(&Vector::new(-400.0, -300.0, 0.0)));
+    // println!("{}", bb.contains_point(&Vector::new(400.0, 300.0, 0.0)));
+    // println!("{}", bb.contains_box(&bb));
 }
