@@ -12,16 +12,18 @@ use winit::{dpi::PhysicalSize, event::WindowEvent, window::WindowId};
 
 use crate::vertex::Vertex;
 
-use self::game_event::GameEvent;
 pub use self::{
-    camera::{Camera, CameraDescriptor},
-    entity::{Entity, EntityName},
+    bounding_box::BoundingBox,
+    camera::CameraDescriptor,
+    entity::{Entity, EntityName, EntityType},
     ressource_descriptor::{RessourceDescriptor, SpriteSheetName, WindowName},
     scene::Scene,
     sprite::{SpriteDescriptor, SpritePosition},
     sprite_sheet::{SpriteSheet, SpriteSheetDimensions},
 };
+use self::{camera::Camera, game_event::GameEvent};
 
+mod bounding_box;
 mod camera;
 mod entity;
 mod game_event;
@@ -32,18 +34,22 @@ mod sprite_sheet;
 
 pub type Index = u16;
 
-pub struct Game {
+pub struct Game<T: EntityType> {
     ressources: RessourceDescriptor,
-    active_scenes: Vec<Scene>,
-    pending_scenes: Vec<Scene>,
+    active_scenes: Vec<Scene<T>>,
+    pending_scenes: Vec<Scene<T>>,
     window_ids: Vec<(WindowName, WindowId)>,
     window_sizes: Vec<(WindowId, PhysicalSize<u32>)>,
     sprite_sheets: Vec<(SpriteSheetName, SpriteSheet)>,
     cameras: Vec<(WindowName, Camera, UniformBufferName)>,
     target_fps: u8,
 }
-impl Game {
-    pub fn new(ressources: RessourceDescriptor, inital_scenes: Vec<Scene>, target_fps: u8) -> Self {
+impl<T: EntityType> Game<T> {
+    pub fn new(
+        ressources: RessourceDescriptor,
+        inital_scenes: Vec<Scene<T>>,
+        target_fps: u8,
+    ) -> Self {
         Self {
             ressources,
             pending_scenes: inital_scenes,
@@ -106,21 +112,21 @@ impl Game {
             .map(|(name, _)| name)
     }
 
-    fn get_scenes(&self, window_name: &WindowName) -> Vec<&Scene> {
+    fn get_scenes(&self, window_name: &WindowName) -> Vec<&Scene<T>> {
         self.active_scenes
             .iter()
             .filter(|scene| scene.target_window == *window_name)
             .collect()
     }
 
-    fn get_scenes_mut(&mut self, window_name: &WindowName) -> Vec<&mut Scene> {
+    fn get_scenes_mut(&mut self, window_name: &WindowName) -> Vec<&mut Scene<T>> {
         self.active_scenes
             .iter_mut()
             .filter(|scene| scene.target_window == *window_name)
             .collect()
     }
 }
-impl EventManager<GameEvent, Index, Vertex> for Game {
+impl<T: EntityType> EventManager<GameEvent, Index, Vertex> for Game<T> {
     fn window_event(
         &mut self,
         _window_manager: &mut WindowManager<GameEvent>,
@@ -252,8 +258,11 @@ impl EventManager<GameEvent, Index, Vertex> for Game {
                             entities
                         });
                     entities.sort_by(|a, b| a.z().partial_cmp(&b.z()).expect("NaN NaN NaN"));
-                    for entity in entities.iter_mut() {
-                        entity.update();
+                    for i in 0..entities.len() {
+                        let (left, right) = entities.split_at_mut(i);
+                        let (entity, right) = right.split_first_mut().unwrap();
+                        let interactions = left.iter().chain(right.iter()).map(|e| &**e).collect();
+                        entity.update(&interactions);
                         let entity_sprite_sheet = entity.sprite_sheet();
                         if let Some((_, sprite_sheet)) = &self
                             .sprite_sheets

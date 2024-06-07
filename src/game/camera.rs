@@ -7,7 +7,10 @@ use winit::{
 
 use crate::{BoundingBox, Direction, VelocityController};
 
-use super::{entity::EntityName, Entity};
+use super::{
+    entity::{EntityName, EntityType},
+    Entity,
+};
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
@@ -76,7 +79,7 @@ impl Camera {
         }
     }
 
-    pub fn update(&mut self, entities: Vec<&Box<dyn Entity>>) {
+    pub fn update<T: EntityType>(&mut self, entities: Vec<&Box<dyn Entity<T>>>) {
         let target_entity = entities
             .iter()
             .find(|entity| entity.name() == &self.target_entity)
@@ -108,10 +111,8 @@ impl Camera {
                 anchor: &self.position + &self.offset_position,
                 size: self.view_size,
             }) {
-                None => {},
-                Some(new_offset) => {
-                    self.position = new_offset - &self.offset_position
-                }
+                None => {}
+                Some(new_offset) => self.position = new_offset - &self.offset_position,
             };
         }
     }

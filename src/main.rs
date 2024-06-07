@@ -16,8 +16,9 @@ use vertex::Vertex;
 
 mod game;
 use game::{
-    CameraDescriptor, Entity, EntityName, Game, Index, RessourceDescriptor, Scene,
-    SpriteDescriptor, SpritePosition, SpriteSheet, SpriteSheetDimensions, SpriteSheetName,
+    BoundingBox, CameraDescriptor, Entity, EntityName, EntityType, Game, Index,
+    RessourceDescriptor, Scene, SpriteDescriptor, SpritePosition, SpriteSheet,
+    SpriteSheetDimensions, SpriteSheetName,
 };
 enum Direction {
     Up,
@@ -83,70 +84,13 @@ impl VelocityController {
     }
 }
 
-///Bounding Box defined by middle point and width and height
-///The negative sides (anchor - size/2) and the positive sides (anchor + size/2) are inclusive
-struct BoundingBox {
-    ///Middle point
-    anchor: Vector<f32>,
-    size: PhysicalSize<f32>,
+#[derive(Debug, PartialEq)]
+enum Type {
+    Background,
+    Player,
 }
-impl BoundingBox {
-    fn contains_point(&self, point: &Vector<f32>) -> bool {
-        let offset = point - &self.anchor;
-        let width = self.size.width / 2.0;
-        let height = self.size.height / 2.0;
-        offset.x >= -width && offset.x <= width && offset.y >= -height && offset.y <= height
-    }
+impl EntityType for Type {}
 
-    fn contains_box(&self, other: &BoundingBox) -> bool {
-        let offset = Vector::new(other.size.width, other.size.height, 0.0) / 2.0;
-        let top_left = &other.anchor - &offset;
-        let bottom_right = &other.anchor + &offset;
-        self.contains_point(&top_left) && self.contains_point(&bottom_right)
-    }
-
-    ///Returns the nearest position for the other box to be inside self
-    ///If a axis of other is bigger than self, self.anchor's value will be returned
-    ///If other is already in self, None will be returned
-    pub fn clamp_box_inside(&self, other: &BoundingBox) -> Option<Vector<f32>> {
-        if self.contains_box(other) {
-            None
-        } else {
-            let x = if other.size.width < self.size.width {
-                let size_difference = (other.size.width - self.size.width) / 2.0;
-                let left_distance = self.anchor.x - other.anchor.x;
-
-                other.anchor.x
-                    + if left_distance.abs() <= -size_difference {
-                        0.0
-                    } else if left_distance > 0.0 {
-                        left_distance + size_difference
-                    } else {
-                        left_distance - size_difference
-                    }
-            } else {
-                self.anchor.x
-            };
-            let y = if other.size.height < self.size.height {
-                let size_difference = (other.size.height - self.size.height) / 2.0;
-                let top_distance = self.anchor.y - other.anchor.y;
-
-                other.anchor.y
-                    + if top_distance.abs() <= -size_difference {
-                        0.0
-                    } else if top_distance > 0.0 {
-                        top_distance + size_difference
-                    } else {
-                        top_distance - size_difference
-                    }
-            } else {
-                self.anchor.y
-            };
-            let inside_anchor = Vector::new(x, y, 0.0);
-            Some(inside_anchor)
-        }
-    }
-}
 struct Background {
     name: EntityName,
     sprite_sheet: SpriteSheetName,
@@ -160,8 +104,11 @@ impl Debug for Background {
             .finish()
     }
 }
-impl Entity for Background {
-    fn update(&mut self) {}
+impl Entity<Type> for Background {
+    fn entity_type(&self) -> Type {
+        Type::Background
+    }
+    fn update(&mut self, _entities: &Vec<&Box<dyn Entity<Type>>>) {}
     fn sprite_sheet(&self) -> &SpriteSheetName {
         &self.sprite_sheet
     }
@@ -227,6 +174,7 @@ impl Entity for Background {
         indices.extend_from_slice(&new_indices);
     }
 }
+
 struct Player {
     name: EntityName,
     width: u16,
@@ -242,9 +190,23 @@ impl Debug for Player {
             .finish()
     }
 }
-impl Entity for Player {
-    fn update(&mut self) {
+impl Entity<Type> for Player {
+    fn entity_type(&self) -> Type {
+        Type::Player
+    }
+    fn update(&mut self, entities: &Vec<&Box<dyn Entity<Type>>>) {
         self.position += self.velocity.get_velocity();
+        let background = entities
+            .iter()
+            .filter(|e| e.entity_type() == Type::Background)
+            .next()
+            .expect("No Background found to restrict Playermovement");
+        if let Some(new_position) = background
+            .bounding_box()
+            .clamp_box_inside(&self.bounding_box())
+        {
+            self.position = new_position;
+        }
     }
 
     fn name(&self) -> &EntityName {
@@ -370,7 +332,6 @@ const PLAYER_LEFT: SpritePosition = SpritePosition::new(3, 0);
 const PLAYER_RIGHT: SpritePosition = SpritePosition::new(4, 0);
 
 fn main() {
-    //TODO: CAMERA RUNS AWAY, WHEN MOVING OFTEN INTO ONE DIRECTION
     env_logger::Builder::from_env(Env::default().default_filter_or("warn")).init();
     let target_fps = 60;
 
@@ -434,12 +395,4 @@ fn main() {
     };
     let mut app = ManagerApplication::new(Game::new(ressources, vec![scene], target_fps));
     app.run();
-    // let bb = BoundingBox {
-    //     anchor: Vector::new(0.0, 0.0, 0.0),
-    //     size: PhysicalSize::new(800.0, 600.0),
-    // };
-    // println!("{}", bb.contains_point(&Vector::new(0.0, 0.0, 0.0)));
-    // println!("{}", bb.contains_point(&Vector::new(-400.0, -300.0, 0.0)));
-    // println!("{}", bb.contains_point(&Vector::new(400.0, 300.0, 0.0)));
-    // println!("{}", bb.contains_box(&bb));
 }
