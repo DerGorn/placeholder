@@ -177,10 +177,13 @@ impl Entity<Type> for Background {
 
 struct Player {
     name: EntityName,
-    width: u16,
+    size: PhysicalSize<u16>,
     position: Vector<f32>,
     velocity: VelocityController,
     sprite: SpriteDescriptor,
+    keyframes: Vec<(u8, SpritePosition)>,
+    current_keyframe: usize,
+    frames_since_keyframe_start: u8,
 }
 impl Debug for Player {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -207,6 +210,11 @@ impl Entity<Type> for Player {
         {
             self.position = new_position;
         }
+        self.frames_since_keyframe_start += 1;
+        if self.frames_since_keyframe_start >= self.keyframes[self.current_keyframe].0 {
+            self.current_keyframe = (self.current_keyframe + 1) % self.keyframes.len();
+            self.frames_since_keyframe_start = 0;
+        }
     }
 
     fn name(&self) -> &EntityName {
@@ -220,7 +228,7 @@ impl Entity<Type> for Player {
     fn bounding_box(&self) -> BoundingBox {
         BoundingBox {
             anchor: self.position.clone(),
-            size: PhysicalSize::new(self.width as f32, self.width as f32),
+            size: PhysicalSize::new(self.size.width as f32, self.size.height as f32),
         }
     }
 
@@ -240,9 +248,10 @@ impl Entity<Type> for Player {
     ) {
         let x = self.position.x;
         let y = self.position.y;
-        let x_offset = self.width as f32 / 2.0;
-        let y_offset = self.width as f32 / 2.0;
-        let texture_coords = sprite_sheet.get_sprite_coordinates(&self.sprite.position);
+        let x_offset = self.size.width as f32 / 2.0;
+        let y_offset = self.size.height as f32 / 2.0;
+        let sprite_position = &self.keyframes[self.current_keyframe].1;
+        let texture_coords = sprite_sheet.get_sprite_coordinates(sprite_position);
         let new_vertices = [
             Vertex::new(
                 Vector::new(x - x_offset, y + y_offset, 0.0),
@@ -303,19 +312,19 @@ impl Entity<Type> for Player {
             match input.physical_key {
                 PhysicalKey::Code(KeyCode::KeyW) => {
                     self.velocity.set_direction(Direction::Up, true);
-                    self.sprite.position = PLAYER_UP;
+                    // self.sprite.position = PLAYER_UP;
                 }
                 PhysicalKey::Code(KeyCode::KeyA) => {
                     self.velocity.set_direction(Direction::Left, true);
-                    self.sprite.position = PLAYER_LEFT;
+                    // self.sprite.position = PLAYER_LEFT;
                 }
                 PhysicalKey::Code(KeyCode::KeyD) => {
                     self.velocity.set_direction(Direction::Right, true);
-                    self.sprite.position = PLAYER_RIGHT;
+                    // self.sprite.position = PLAYER_RIGHT;
                 }
                 PhysicalKey::Code(KeyCode::KeyS) => {
                     self.velocity.set_direction(Direction::Down, true);
-                    self.sprite.position = PLAYER_DOWN;
+                    // self.sprite.position = PLAYER_DOWN;
                 }
                 _ => {}
             }
@@ -326,10 +335,10 @@ impl Entity<Type> for Player {
 }
 
 const PLAYER_NEUTRAL: SpritePosition = SpritePosition::new(0, 0);
-const PLAYER_DOWN: SpritePosition = SpritePosition::new(1, 0);
-const PLAYER_UP: SpritePosition = SpritePosition::new(2, 0);
-const PLAYER_LEFT: SpritePosition = SpritePosition::new(3, 0);
-const PLAYER_RIGHT: SpritePosition = SpritePosition::new(4, 0);
+// const PLAYER_DOWN: SpritePosition = SpritePosition::new(1, 0);
+// const PLAYER_UP: SpritePosition = SpritePosition::new(2, 0);
+// const PLAYER_LEFT: SpritePosition = SpritePosition::new(3, 0);
+// const PLAYER_RIGHT: SpritePosition = SpritePosition::new(4, 0);
 
 fn main() {
     env_logger::Builder::from_env(Env::default().default_filter_or("warn")).init();
@@ -366,8 +375,8 @@ fn main() {
         sprite_sheets: vec![
             (
                 player_sprite_sheet.into(),
-                PathBuf::from("res/images/spriteSheets/protagonist.png"),
-                SpriteSheetDimensions::new(8, 8),
+                PathBuf::from("res/images/spriteSheets/ProtagonistP.png"),
+                SpriteSheetDimensions::new(4, 1),
             ),
             (
                 background.into(),
@@ -381,10 +390,18 @@ fn main() {
         entities: vec![
             Box::new(Player {
                 name: protaginist_name.into(),
-                width: 150,
+                size: PhysicalSize::new(64, 128),
                 position: Vector::new(0.0, 0.0, 0.0),
                 velocity: VelocityController::new(speed),
                 sprite: SpriteDescriptor::new(player_sprite_sheet.into(), PLAYER_NEUTRAL),
+                keyframes: vec![
+                    (14, SpritePosition::new(0, 0)),
+                    (14, SpritePosition::new(1, 0)),
+                    (14, SpritePosition::new(2, 0)),
+                    (14, SpritePosition::new(3, 0)),
+                ],
+                current_keyframe: 0,
+                frames_since_keyframe_start: 0,
             }),
             Box::new(Background {
                 name: background.into(),
