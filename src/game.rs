@@ -20,6 +20,7 @@ pub use self::{
     scene::Scene,
     sprite::{SpriteDescriptor, SpritePosition},
     sprite_sheet::{SpriteSheet, SpriteSheetDimensions},
+    velocity_controller::{Direction, VelocityController},
 };
 use self::{camera::Camera, game_event::GameEvent};
 
@@ -31,6 +32,7 @@ mod ressource_descriptor;
 mod scene;
 mod sprite;
 mod sprite_sheet;
+mod velocity_controller;
 
 pub type Index = u16;
 
@@ -243,7 +245,7 @@ impl<T: EntityType> EventManager<GameEvent, Index, Vertex> for Game<T> {
                 let sprite_sheet = SpriteSheet::new(*id, dimensions);
                 self.sprite_sheets.push((label.clone(), sprite_sheet));
             }
-            GameEvent::Timer(_delta_t) => {
+            GameEvent::Timer(delta_t) => {
                 for (name, id) in &self.window_ids {
                     let mut vertices = Vec::new();
                     let mut indices = Vec::new();
@@ -262,7 +264,7 @@ impl<T: EntityType> EventManager<GameEvent, Index, Vertex> for Game<T> {
                         let (left, right) = entities.split_at_mut(i);
                         let (entity, right) = right.split_first_mut().unwrap();
                         let interactions = left.iter().chain(right.iter()).map(|e| &**e).collect();
-                        entity.update(&interactions);
+                        entity.update(&interactions, delta_t);
                         let entity_sprite_sheet = entity.sprite_sheet();
                         if let Some((_, sprite_sheet)) = &self
                             .sprite_sheets
@@ -275,7 +277,7 @@ impl<T: EntityType> EventManager<GameEvent, Index, Vertex> for Game<T> {
                     if let Some((_, camera, camera_name)) =
                         self.cameras.iter_mut().find(|(n, _, _)| n == name)
                     {
-                        camera.update(entities.iter().map(|e| &**e).collect());
+                        camera.update(entities.iter().map(|e| &**e).collect(), delta_t);
                         graphics_provider.update_uniform_buffer(camera_name, &camera.as_bytes());
                     }
                     window_manager.send_event(GameEvent::RenderUpdate(*id, vertices, indices));

@@ -23,6 +23,17 @@ impl BoundingBox {
         self.contains_point(&top_left) && self.contains_point(&bottom_right)
     }
 
+    pub fn intersects(&self, other: &BoundingBox) -> bool {
+        let s_width = self.size.width / 2.0;
+        let s_height = self.size.height / 2.0;
+        let o_width = other.size.width / 2.0;
+        let o_height = other.size.height / 2.0;
+        self.anchor.x - s_width < other.anchor.x + o_width
+            && self.anchor.x + s_width > other.anchor.x - o_width
+            && self.anchor.y - s_height < other.anchor.y + o_height
+            && self.anchor.y + s_height > other.anchor.y - o_height
+    }
+
     ///Returns the nearest position for the other box to be inside self
     ///If a axis of other is bigger than self, self.anchor's value will be returned
     ///If other is already in self, None will be returned
@@ -72,13 +83,13 @@ mod tests {
 
     #[test]
     fn contains_box() {
-    let bb = BoundingBox {
-        anchor: Vector::new(0.0, 0.0, 0.0),
-        size: PhysicalSize::new(800.0, 600.0),
-    };
-    assert!(bb.contains_point(&Vector::new(0.0, 0.0, 0.0)));
-    assert!(bb.contains_point(&Vector::new(-400.0, -300.0, 0.0)));
-    assert!(bb.contains_point(&Vector::new(400.0, 300.0, 0.0)));
-    assert!(bb.contains_box(&bb));
+        let bb = BoundingBox {
+            anchor: Vector::new(0.0, 0.0, 0.0),
+            size: PhysicalSize::new(800.0, 600.0),
+        };
+        assert!(bb.contains_point(&Vector::new(0.0, 0.0, 0.0)));
+        assert!(bb.contains_point(&Vector::new(-400.0, -300.0, 0.0)));
+        assert!(bb.contains_point(&Vector::new(400.0, 300.0, 0.0)));
+        assert!(bb.contains_box(&bb));
     }
 }

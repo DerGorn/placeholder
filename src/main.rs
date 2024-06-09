@@ -3,6 +3,7 @@ use placeholder::app::{ManagerApplication, WindowDescriptor};
 use placeholder::graphics::ShaderDescriptor;
 use std::fmt::Debug;
 use std::path::PathBuf;
+use std::time::Duration;
 use threed::Vector;
 use winit::{
     dpi::PhysicalSize,
@@ -16,71 +17,37 @@ use vertex::Vertex;
 
 mod game;
 use game::{
-    BoundingBox, CameraDescriptor, Entity, EntityName, EntityType, Game, Index,
-    RessourceDescriptor, Scene, SpriteDescriptor, SpritePosition, SpriteSheet,
-    SpriteSheetDimensions, SpriteSheetName,
+    BoundingBox, CameraDescriptor, Direction, Entity, EntityName, EntityType, Game, Index,
+    RessourceDescriptor, Scene, SpritePosition, SpriteSheet, SpriteSheetDimensions,
+    SpriteSheetName, VelocityController,
 };
-enum Direction {
-    Up,
-    Right,
-    Down,
-    Left,
+
+struct Animation {
+    sprite_sheet: SpriteSheetName,
+    keyframes: Vec<(Duration, SpritePosition)>,
+    current_keyframe: usize,
+    time_since_frame_start: Duration,
 }
-/// 8 directional VelocityController
-struct VelocityController {
-    speed: f32,
-    up: bool,
-    right: bool,
-    down: bool,
-    left: bool,
-}
-impl VelocityController {
-    fn new(speed: f32) -> Self {
+impl Animation {
+    fn new(sprite_sheet: SpriteSheetName, keyframes: Vec<(Duration, SpritePosition)>) -> Self {
         Self {
-            speed,
-            up: false,
-            right: false,
-            down: false,
-            left: false,
+            sprite_sheet,
+            keyframes,
+            current_keyframe: 0,
+            time_since_frame_start: Duration::from_millis(0),
         }
     }
 
-    fn set_direction(&mut self, direction: Direction, value: bool) {
-        match direction {
-            Direction::Up => {
-                self.up = value;
-            }
-            Direction::Right => {
-                self.right = value;
-            }
-            Direction::Down => {
-                self.down = value;
-            }
-            Direction::Left => {
-                self.left = value;
-            }
+    fn update(&mut self, delta_t: &Duration) {
+        self.time_since_frame_start += *delta_t;
+        if self.time_since_frame_start >= self.keyframes[self.current_keyframe].0 {
+            self.current_keyframe = (self.current_keyframe + 1) % self.keyframes.len();
+            self.time_since_frame_start = Duration::from_millis(0);
         }
     }
 
-    fn get_velocity(&self) -> Vector<f32> {
-        let mut velocity = Vector::new(0.0, 0.0, 0.0);
-        if self.up {
-            velocity.y += 1.0;
-        }
-        if self.right {
-            velocity.x += 1.0;
-        }
-        if self.down {
-            velocity.y -= 1.0;
-        }
-        if self.left {
-            velocity.x -= 1.0;
-        }
-        let magnitude: f32 = velocity.magnitude_squared();
-        if magnitude >= 1.0 {
-            velocity *= 1.0 / magnitude.sqrt();
-        }
-        velocity * self.speed
+    fn sprite_position(&self) -> &SpritePosition {
+        &self.keyframes[self.current_keyframe].1
     }
 }
 
@@ -88,6 +55,7 @@ impl VelocityController {
 enum Type {
     Background,
     Player,
+    Enemy,
 }
 impl EntityType for Type {}
 
@@ -108,7 +76,7 @@ impl Entity<Type> for Background {
     fn entity_type(&self) -> Type {
         Type::Background
     }
-    fn update(&mut self, _entities: &Vec<&Box<dyn Entity<Type>>>) {}
+    fn update(&mut self, _entities: &Vec<&Box<dyn Entity<Type>>>, _delta_t: &Duration) {}
     fn sprite_sheet(&self) -> &SpriteSheetName {
         &self.sprite_sheet
     }
@@ -134,44 +102,68 @@ impl Entity<Type> for Background {
         indices: &mut Vec<Index>,
         sprite_sheet: &SpriteSheet,
     ) {
-        let x = 0.0;
-        let y = 0.0;
-        let x_offset = self.size.width as f32 / 2.0;
-        let y_offset = self.size.height as f32 / 2.0;
-        let texture_coords = sprite_sheet.get_sprite_coordinates(&SpritePosition::new(0, 0));
-        let new_vertices = [
-            Vertex::new(
-                Vector::new(x - x_offset, y + y_offset, 0.0),
-                &texture_coords[0],
-                sprite_sheet.texture(),
-            ),
-            Vertex::new(
-                Vector::new(x + x_offset, y + y_offset, 0.0),
-                &texture_coords[1],
-                sprite_sheet.texture(),
-            ),
-            Vertex::new(
-                Vector::new(x + x_offset, y - y_offset, 0.0),
-                &texture_coords[2],
-                sprite_sheet.texture(),
-            ),
-            Vertex::new(
-                Vector::new(x - x_offset, y - y_offset, 0.0),
-                &texture_coords[3],
-                sprite_sheet.texture(),
-            ),
-        ];
-        let start_index = vertices.len() as u16;
-        let new_indices = [
-            start_index,
-            start_index + 1,
-            start_index + 2,
-            start_index,
-            start_index + 2,
-            start_index + 3,
-        ];
-        vertices.extend_from_slice(&new_vertices);
-        indices.extend_from_slice(&new_indices);
+        self.render_sprite(vertices, indices, sprite_sheet, &SpritePosition::new(0, 0))
+    }
+}
+
+struct Enemy {
+    name: EntityName,
+    size: PhysicalSize<u16>,
+    position: Vector<f32>,
+    animation: Animation,
+}
+impl Debug for Enemy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Enemy")
+            .field("z", &self.z())
+            .field("sprite", &self.sprite_sheet())
+            .finish()
+    }
+}
+impl Entity<Type> for Enemy {
+    fn update(&mut self, entities: &Vec<&Box<dyn Entity<Type>>>, delta_t: &Duration) {
+        self.animation.update(delta_t);
+        let players = entities.iter().filter(|e| e.entity_type() == Type::Player);
+        let own_bounding_box = self.bounding_box();
+        for player in players {
+            let bounding_box = player.bounding_box();
+            if own_bounding_box.intersects(&bounding_box) {
+                println!(
+                    "Player {:?} collided with enemy {:?}",
+                    player.name(),
+                    self.name()
+                );
+            }
+        }
+    }
+    fn render(
+        &self,
+        vertices: &mut Vec<Vertex>,
+        indices: &mut Vec<Index>,
+        sprite_sheet: &SpriteSheet,
+    ) {
+        self.render_sprite(
+            vertices,
+            indices,
+            sprite_sheet,
+            self.animation.sprite_position(),
+        )
+    }
+    fn sprite_sheet(&self) -> &SpriteSheetName {
+        &self.animation.sprite_sheet
+    }
+    fn handle_key_input(&mut self, _input: &KeyEvent) {}
+    fn name(&self) -> &EntityName {
+        &self.name
+    }
+    fn bounding_box(&self) -> BoundingBox {
+        BoundingBox {
+            anchor: self.position.clone(),
+            size: PhysicalSize::new(self.size.width as f32, self.size.height as f32),
+        }
+    }
+    fn entity_type(&self) -> Type {
+        Type::Enemy
     }
 }
 
@@ -180,10 +172,7 @@ struct Player {
     size: PhysicalSize<u16>,
     position: Vector<f32>,
     velocity: VelocityController,
-    sprite: SpriteDescriptor,
-    keyframes: Vec<(u8, SpritePosition)>,
-    current_keyframe: usize,
-    frames_since_keyframe_start: u8,
+    animation: Animation,
 }
 impl Debug for Player {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -197,7 +186,7 @@ impl Entity<Type> for Player {
     fn entity_type(&self) -> Type {
         Type::Player
     }
-    fn update(&mut self, entities: &Vec<&Box<dyn Entity<Type>>>) {
+    fn update(&mut self, entities: &Vec<&Box<dyn Entity<Type>>>, delta_t: &Duration) {
         self.position += self.velocity.get_velocity();
         let background = entities
             .iter()
@@ -210,11 +199,7 @@ impl Entity<Type> for Player {
         {
             self.position = new_position;
         }
-        self.frames_since_keyframe_start += 1;
-        if self.frames_since_keyframe_start >= self.keyframes[self.current_keyframe].0 {
-            self.current_keyframe = (self.current_keyframe + 1) % self.keyframes.len();
-            self.frames_since_keyframe_start = 0;
-        }
+        self.animation.update(delta_t);
     }
 
     fn name(&self) -> &EntityName {
@@ -233,7 +218,7 @@ impl Entity<Type> for Player {
     }
 
     fn sprite_sheet(&self) -> &SpriteSheetName {
-        &self.sprite.sprite_sheet()
+        &self.animation.sprite_sheet
     }
 
     fn z(&self) -> f32 {
@@ -246,45 +231,12 @@ impl Entity<Type> for Player {
         indices: &mut Vec<Index>,
         sprite_sheet: &SpriteSheet,
     ) {
-        let x = self.position.x;
-        let y = self.position.y;
-        let x_offset = self.size.width as f32 / 2.0;
-        let y_offset = self.size.height as f32 / 2.0;
-        let sprite_position = &self.keyframes[self.current_keyframe].1;
-        let texture_coords = sprite_sheet.get_sprite_coordinates(sprite_position);
-        let new_vertices = [
-            Vertex::new(
-                Vector::new(x - x_offset, y + y_offset, 0.0),
-                &texture_coords[0],
-                sprite_sheet.texture(),
-            ),
-            Vertex::new(
-                Vector::new(x + x_offset, y + y_offset, 0.0),
-                &texture_coords[1],
-                sprite_sheet.texture(),
-            ),
-            Vertex::new(
-                Vector::new(x + x_offset, y - y_offset, 0.0),
-                &texture_coords[2],
-                sprite_sheet.texture(),
-            ),
-            Vertex::new(
-                Vector::new(x - x_offset, y - y_offset, 0.0),
-                &texture_coords[3],
-                sprite_sheet.texture(),
-            ),
-        ];
-        let start_index = vertices.len() as u16;
-        let new_indices = [
-            start_index,
-            start_index + 1,
-            start_index + 2,
-            start_index,
-            start_index + 2,
-            start_index + 3,
-        ];
-        vertices.extend_from_slice(&new_vertices);
-        indices.extend_from_slice(&new_indices);
+        self.render_sprite(
+            vertices,
+            indices,
+            sprite_sheet,
+            self.animation.sprite_position(),
+        );
     }
 
     fn handle_key_input(&mut self, input: &KeyEvent) {
@@ -292,19 +244,19 @@ impl Entity<Type> for Player {
             match input.physical_key {
                 PhysicalKey::Code(KeyCode::KeyW) => {
                     self.velocity.set_direction(Direction::Up, false);
-                    self.sprite.position = PLAYER_NEUTRAL;
+                    // self.sprite.position = PLAYER_NEUTRAL;
                 }
                 PhysicalKey::Code(KeyCode::KeyA) => {
                     self.velocity.set_direction(Direction::Left, false);
-                    self.sprite.position = PLAYER_NEUTRAL;
+                    // self.sprite.position = PLAYER_NEUTRAL;
                 }
                 PhysicalKey::Code(KeyCode::KeyD) => {
                     self.velocity.set_direction(Direction::Right, false);
-                    self.sprite.position = PLAYER_NEUTRAL;
+                    // self.sprite.position = PLAYER_NEUTRAL;
                 }
                 PhysicalKey::Code(KeyCode::KeyS) => {
                     self.velocity.set_direction(Direction::Down, false);
-                    self.sprite.position = PLAYER_NEUTRAL;
+                    // self.sprite.position = PLAYER_NEUTRAL;
                 }
                 _ => {}
             }
@@ -329,16 +281,10 @@ impl Entity<Type> for Player {
                 _ => {}
             }
         } else {
-            self.sprite.position = PLAYER_NEUTRAL;
+            // self.sprite.position = PLAYER_NEUTRAL;
         }
     }
 }
-
-const PLAYER_NEUTRAL: SpritePosition = SpritePosition::new(0, 0);
-// const PLAYER_DOWN: SpritePosition = SpritePosition::new(1, 0);
-// const PLAYER_UP: SpritePosition = SpritePosition::new(2, 0);
-// const PLAYER_LEFT: SpritePosition = SpritePosition::new(3, 0);
-// const PLAYER_RIGHT: SpritePosition = SpritePosition::new(4, 0);
 
 fn main() {
     env_logger::Builder::from_env(Env::default().default_filter_or("warn")).init();
@@ -352,7 +298,7 @@ fn main() {
         vertex_shader: "vs_main",
         fragment_shader: "fs_main",
     };
-    let speed = 2.0;
+    let frog_name = "Frog";
     let protaginist_name = "Protagonist";
     let main_window = "MainWindow";
     let player_sprite_sheet = "PlayerSpriteSheet";
@@ -383,6 +329,11 @@ fn main() {
                 PathBuf::from("res/images/spriteSheets/background.png"),
                 SpriteSheetDimensions::new(1, 1),
             ),
+            (
+                frog_name.into(),
+                PathBuf::from("res/images/spriteSheets/frog.png"),
+                SpriteSheetDimensions::new(4, 1),
+            ),
         ],
     };
     let scene = Scene {
@@ -392,21 +343,35 @@ fn main() {
                 name: protaginist_name.into(),
                 size: PhysicalSize::new(64, 128),
                 position: Vector::new(0.0, 0.0, 0.0),
-                velocity: VelocityController::new(speed),
-                sprite: SpriteDescriptor::new(player_sprite_sheet.into(), PLAYER_NEUTRAL),
-                keyframes: vec![
-                    (14, SpritePosition::new(0, 0)),
-                    (14, SpritePosition::new(1, 0)),
-                    (14, SpritePosition::new(2, 0)),
-                    (14, SpritePosition::new(3, 0)),
-                ],
-                current_keyframe: 0,
-                frames_since_keyframe_start: 0,
+                velocity: VelocityController::new(3.0),
+                animation: Animation::new(
+                    player_sprite_sheet.into(),
+                    vec![
+                        (Duration::from_millis(240), SpritePosition::new(0, 0)),
+                        (Duration::from_millis(240), SpritePosition::new(1, 0)),
+                        (Duration::from_millis(240), SpritePosition::new(2, 0)),
+                        (Duration::from_millis(240), SpritePosition::new(3, 0)),
+                    ],
+                ),
             }),
             Box::new(Background {
                 name: background.into(),
                 size: PhysicalSize::new(1280, 800),
                 sprite_sheet: background.into(),
+            }),
+            Box::new(Enemy {
+                name: frog_name.into(),
+                size: PhysicalSize::new(64, 64),
+                position: Vector::new(100.0, 100.0, 0.0),
+                animation: Animation::new(
+                    frog_name.into(),
+                    vec![
+                        (Duration::from_millis(240), SpritePosition::new(0, 0)),
+                        (Duration::from_millis(240), SpritePosition::new(1, 0)),
+                        (Duration::from_millis(240), SpritePosition::new(2, 0)),
+                        (Duration::from_millis(240), SpritePosition::new(3, 0)),
+                    ],
+                ),
             }),
         ],
     };

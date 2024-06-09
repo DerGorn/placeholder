@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use threed::Vector;
 use winit::{
     dpi::PhysicalSize,
@@ -5,11 +7,10 @@ use winit::{
     keyboard::{KeyCode, PhysicalKey},
 };
 
-use crate::{BoundingBox, Direction, VelocityController};
+use crate::BoundingBox;
 
 use super::{
-    entity::{EntityName, EntityType},
-    Entity,
+    entity::{EntityName, EntityType}, Direction, Entity, VelocityController
 };
 
 #[repr(C)]
@@ -79,7 +80,11 @@ impl Camera {
         }
     }
 
-    pub fn update<T: EntityType>(&mut self, entities: Vec<&Box<dyn Entity<T>>>) {
+    pub fn update<T: EntityType>(
+        &mut self,
+        entities: Vec<&Box<dyn Entity<T>>>,
+        _delta_t: &Duration,
+    ) {
         let target_entity = entities
             .iter()
             .find(|entity| entity.name() == &self.target_entity)
