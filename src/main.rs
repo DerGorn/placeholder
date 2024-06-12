@@ -22,14 +22,14 @@ use game::{
     SpriteSheetName, VelocityController,
 };
 
-struct Animation {
+struct Animation<T> {
     sprite_sheet: SpriteSheetName,
-    keyframes: Vec<(Duration, SpritePosition)>,
+    keyframes: Vec<(Duration, T)>,
     current_keyframe: usize,
     time_since_frame_start: Duration,
 }
-impl Animation {
-    fn new(sprite_sheet: SpriteSheetName, keyframes: Vec<(Duration, SpritePosition)>) -> Self {
+impl<T> Animation<T> {
+    fn new(sprite_sheet: SpriteSheetName, keyframes: Vec<(Duration, T)>) -> Self {
         Self {
             sprite_sheet,
             keyframes,
@@ -46,7 +46,7 @@ impl Animation {
         }
     }
 
-    fn sprite_position(&self) -> &SpritePosition {
+    fn keyframe(&self) -> &T {
         &self.keyframes[self.current_keyframe].1
     }
 }
@@ -106,11 +106,54 @@ impl Entity<Type> for Background {
     }
 }
 
+struct Transition {
+    name: EntityName,
+    animation: Animation<(Vec<Vertex>, Vec<Index>)>,
+}
+impl Debug for Transition {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Transition")
+            .field("name", &self.name)
+            .finish()
+    }
+}
+impl Entity<Type> for Transition {
+    fn update(&mut self, _entities: &Vec<&Box<dyn Entity<Type>>>, delta_t: &Duration) {
+        self.animation.update(delta_t);
+    }
+    fn sprite_sheet(&self) -> &SpriteSheetName {
+        todo!()
+    }
+    fn render(
+        &self,
+        vertices: &mut Vec<Vertex>,
+        indices: &mut Vec<Index>,
+        _sprite_sheet: &SpriteSheet,
+    ) {
+        let (new_vertices, new_indices) = self.animation.keyframe();
+        vertices.extend(new_vertices.iter());
+        indices.extend(new_indices.iter());
+    }
+    fn name(&self) -> &EntityName {
+        &self.name
+    }
+    fn entity_type(&self) -> Type {
+        Type::Background
+    }
+    fn handle_key_input(&mut self, _input: &KeyEvent) {}
+    fn bounding_box(&self) -> BoundingBox {
+        BoundingBox {
+            anchor: Vector::new(0.0, 0.0, 0.0),
+            size: PhysicalSize::new(10000.0, 10000.0),
+        }
+    }
+}
+
 struct Enemy {
     name: EntityName,
     size: PhysicalSize<u16>,
     position: Vector<f32>,
-    animation: Animation,
+    animation: Animation<SpritePosition>,
 }
 impl Debug for Enemy {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -142,12 +185,7 @@ impl Entity<Type> for Enemy {
         indices: &mut Vec<Index>,
         sprite_sheet: &SpriteSheet,
     ) {
-        self.render_sprite(
-            vertices,
-            indices,
-            sprite_sheet,
-            self.animation.sprite_position(),
-        )
+        self.render_sprite(vertices, indices, sprite_sheet, self.animation.keyframe())
     }
     fn sprite_sheet(&self) -> &SpriteSheetName {
         &self.animation.sprite_sheet
@@ -172,7 +210,7 @@ struct Player {
     size: PhysicalSize<u16>,
     position: Vector<f32>,
     velocity: VelocityController,
-    animation: Animation,
+    animation: Animation<SpritePosition>,
 }
 impl Debug for Player {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -231,12 +269,7 @@ impl Entity<Type> for Player {
         indices: &mut Vec<Index>,
         sprite_sheet: &SpriteSheet,
     ) {
-        self.render_sprite(
-            vertices,
-            indices,
-            sprite_sheet,
-            self.animation.sprite_position(),
-        );
+        self.render_sprite(vertices, indices, sprite_sheet, self.animation.keyframe());
     }
 
     fn handle_key_input(&mut self, input: &KeyEvent) {
@@ -315,7 +348,6 @@ fn main() {
         windows: vec![(
             main_window.into(),
             main_window_descriptor,
-            shader_descriptor,
             camera_descriptor,
         )],
         sprite_sheets: vec![
@@ -337,6 +369,8 @@ fn main() {
         ],
     };
     let scene = Scene {
+        shader_descriptor,
+        render_scene: "MainScene".into(),
         target_window: main_window.into(),
         entities: vec![
             Box::new(Player {

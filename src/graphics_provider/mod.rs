@@ -20,6 +20,9 @@ use texture::TextureProvider;
 
 use crate::create_name_struct;
 
+use self::surface::RenderScene;
+pub use self::surface::RenderSceneName;
+
 create_name_struct!(UniformBufferName);
 
 pub struct GraphicsProvider<I: Index, V: Vertex> {
@@ -27,7 +30,15 @@ pub struct GraphicsProvider<I: Index, V: Vertex> {
     adapter: Option<wgpu::Adapter>,
     device: Option<wgpu::Device>,
     queue: Option<wgpu::Queue>,
+    ///One to one relationship
     surfaces: Vec<(WindowId, Box<dyn WindowSurface<I, V>>)>,
+    ///One to many relationship
+    render_scenes: Vec<(
+        WindowId,
+        RenderScene<V, I>,
+        wgpu::ShaderModule,
+        ShaderDescriptor,
+    )>,
     uniform_buffers: Vec<(
         UniformBufferName,
         wgpu::Buffer,
@@ -48,6 +59,7 @@ impl<I: Index, V: Vertex> GraphicsProvider<I, V> {
             device: None,
             queue: None,
             surfaces: Vec::new(),
+            render_scenes: Vec::new(),
             uniform_buffers: Vec::new(),
             texture_provider: None,
         }
@@ -73,13 +85,13 @@ impl<I: Index, V: Vertex> GraphicsProvider<I, V> {
             None, // Trace path
         ))
         .expect("Buy a new GPU. Not all prerequisites met");
-        self.texture_provider = Some(TextureProvider::new());
+        self.texture_provider = Some(TextureProvider::new(&device, &queue));
         self.adapter = Some(adapter);
         self.device = Some(device);
         self.queue = Some(queue);
     }
 
-    pub fn init_window(&mut self, window: &Window, shader_descriptor: &ShaderDescriptor) {
+    pub fn init_window(&mut self, window: &Window) {
         let size = window.inner_size();
         //#Safety
         //
@@ -126,41 +138,12 @@ impl<I: Index, V: Vertex> GraphicsProvider<I, V> {
             desired_maximum_frame_latency: 2,
         };
 
-        let device = self.device.as_ref().expect("The device vanished");
-        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some(&format!("Vertex Buffer {:?}", window.id())),
-            contents: &[],
-            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-        });
-        let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some(&format!("Index Buffer {:?}", window.id())),
-            contents: &[],
-            usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
-        });
-        let num_vertices = 0;
-        let num_indices = 0;
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some(&format!("Shader Module {:?}", shader_descriptor.file)),
-            source: wgpu::ShaderSource::Wgsl(
-                fs::read_to_string(shader_descriptor.file)
-                    .expect(&format!("Could not load '{}'\n", shader_descriptor.file))
-                    .into(),
-            ),
-        });
-
         self.surfaces.push((
             window.id(),
             Box::new(Surface {
                 wgpu_surface: surface,
                 size,
                 config,
-                render_pipeline: None,
-                shader,
-                shader_descriptor: shader_descriptor.clone(),
-                vertex_buffer,
-                index_buffer,
-                num_vertices,
-                num_indices,
                 _phantom: std::marker::PhantomData,
             }),
         ));
@@ -182,32 +165,117 @@ impl<I: Index, V: Vertex> GraphicsProvider<I, V> {
                 let mut bind_groups =
                     vec![texture_provider.bind_group.as_ref().expect("No bind group")];
                 bind_groups.extend(self.uniform_buffers.iter().map(|(_, _, _, bg)| bg));
-                surface.render(device, queue, &bind_groups);
+                let render_scenes = self
+                    .render_scenes
+                    .iter()
+                    .filter_map(|(i, s, _, _)| if i == id { Some(s) } else { None })
+                    .collect::<Vec<_>>();
+                surface.render(device, queue, &render_scenes, &bind_groups)
             }
         }
     }
 
     /// Update the vertex and index buffers of a window
-    pub fn update_buffers(&mut self, id: &WindowId, vertices: Option<&[V]>, indices: Option<&[I]>) {
-        if let Some((_, surface)) = self.surfaces.iter_mut().find(|(i, _)| i == id) {
-            if let (Some(device), Some(queue)) = (&self.device, &self.queue) {
-                surface.update(device, queue, vertices, indices)
+    pub fn update_buffers(
+        &mut self,
+        render_scene: &RenderSceneName,
+        vertices: Option<&[V]>,
+        indices: Option<&[I]>,
+    ) {
+        if let (Some(device), Some(queue)) = (&self.device, &self.queue) {
+            for render_scene in self.render_scenes.iter_mut().filter_map(|(_, s, _, _)| {
+                if render_scene == s.name() {
+                    Some(s)
+                } else {
+                    None
+                }
+            }) {
+                render_scene.update(device, queue, vertices, indices)
             }
+        }
+    }
+
+    pub fn add_render_scene(
+        &mut self,
+        window_id: &WindowId,
+        render_scene: RenderSceneName,
+        shader_descriptor: ShaderDescriptor,
+    ) {
+        let device = self.device.as_ref().expect("The device vanished");
+        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some(&format!("Vertex Buffer {:?}", render_scene)),
+            contents: &[],
+            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+        });
+        let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some(&format!("Index Buffer {:?}", render_scene)),
+            contents: &[],
+            usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
+        });
+        let num_vertices = 0;
+        let num_indices = 0;
+
+        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some(&format!("Shader Module {:?}", shader_descriptor.file)),
+            source: wgpu::ShaderSource::Wgsl(
+                fs::read_to_string(shader_descriptor.file)
+                    .expect(&format!("Could not load '{}'\n", shader_descriptor.file))
+                    .into(),
+            ),
+        });
+
+        if let (Some((_, surface)), Some(texture_provider)) = (
+            self.surfaces.iter().find(|(id, _)| id == window_id),
+            &self.texture_provider,
+        ) {
+            let mut bind_groups_layouts = vec![texture_provider
+                .bind_group_layout
+                .as_ref()
+                .expect("Default Texture vanished")];
+            bind_groups_layouts.extend(
+                self.uniform_buffers
+                    .iter()
+                    .map(|(_, _, bind_group_layout, _)| bind_group_layout),
+            );
+            let render_pipeline = surface.create_render_pipeline(
+                device,
+                &bind_groups_layouts,
+                &shader,
+                &shader_descriptor,
+            );
+            let render_scene = RenderScene::new(
+                render_scene,
+                render_pipeline,
+                vertex_buffer,
+                index_buffer,
+                num_vertices,
+                num_indices,
+            );
+            self.render_scenes
+                .push((window_id.clone(), render_scene, shader, shader_descriptor));
+        } else {
+            panic!("No surface on window {:?}", window_id)
         }
     }
 
     pub fn remove_window(&mut self, id: &WindowId) {
         self.surfaces.retain(|(i, _)| i != id);
+        self.render_scenes.retain(|(i, _, _, _)| i != id);
     }
 
-    pub fn create_texture(&mut self, path: &Path, label: &str) -> Option<u32> {
+    pub fn create_texture(
+        &mut self,
+        path: &Path,
+        label: &str,
+        render_scenes: &[RenderSceneName],
+    ) -> Option<u32> {
         if let (Some(device), Some(queue), Some(texture_provider)) =
             (&self.device, &self.queue, &mut self.texture_provider)
         {
-            if let Some(index) = texture_provider.get_texture_index(label) {
+            if let Some(index) = texture_provider.get_texture_index(Some(label)) {
                 return Some(index);
             }
-            let index = texture_provider.create_texture(device, queue, path, label);
+            let index = texture_provider.create_texture(device, queue, path, Some(label));
             let mut bind_groups_layouts = vec![texture_provider
                 .bind_group_layout
                 .as_ref()
@@ -217,9 +285,21 @@ impl<I: Index, V: Vertex> GraphicsProvider<I, V> {
                     .iter()
                     .map(|(_, _, bind_group_layout, _)| bind_group_layout),
             );
-            self.surfaces.iter_mut().for_each(|(_, surface)| {
-                surface.create_render_pipeline(device, &bind_groups_layouts);
-            });
+            self.render_scenes
+                .iter_mut()
+                .filter(|(_, s, _, _)| render_scenes.contains(&s.name()))
+                .for_each(|(window_id, render_scene, shader, shader_descriptor)| {
+                    if let Some((_, surface)) = self.surfaces.iter().find(|(id, _)| id == window_id)
+                    {
+                        let render_pipeline = surface.create_render_pipeline(
+                            device,
+                            &bind_groups_layouts,
+                            shader,
+                            shader_descriptor,
+                        );
+                        render_scene.update_pipeline(render_pipeline);
+                    }
+                });
             Some(index)
         } else {
             None

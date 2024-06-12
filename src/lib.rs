@@ -1,13 +1,14 @@
 mod graphics_provider;
 pub mod graphics {
-    pub use super::graphics_provider::{Vertex, Index, ShaderDescriptor, GraphicsProvider, UniformBufferName};
+    pub use super::graphics_provider::{
+        GraphicsProvider, Index, RenderSceneName, ShaderDescriptor, UniformBufferName, Vertex,
+    };
 }
 
 mod manager_application;
 pub mod app {
     pub use super::manager_application::{
-        ApplicationEvent, EventManager, ManagerApplication, WindowDescriptor,
-        WindowManager,
+        ApplicationEvent, EventManager, ManagerApplication, WindowDescriptor, WindowManager,
     };
 }
 

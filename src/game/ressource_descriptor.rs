@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use placeholder::{app::WindowDescriptor, graphics::ShaderDescriptor};
+use placeholder::app::WindowDescriptor;
 use placeholder::create_name_struct;
 
 use crate::CameraDescriptor;
@@ -8,21 +8,21 @@ use crate::CameraDescriptor;
 use super::sprite_sheet::SpriteSheetDimensions;
 
 pub struct RessourceDescriptor {
-    pub windows: Vec<(WindowName, WindowDescriptor, ShaderDescriptor, CameraDescriptor)>,
+    pub windows: Vec<(WindowName, WindowDescriptor, CameraDescriptor)>,
     pub sprite_sheets: Vec<(SpriteSheetName, PathBuf, SpriteSheetDimensions)>,
 }
 impl RessourceDescriptor {
-    pub fn get_window(&self, name: &WindowName) -> Option<(WindowDescriptor, ShaderDescriptor)> {
+    pub fn get_window(&self, name: &WindowName) -> Option<WindowDescriptor> {
         self.windows
             .iter()
-            .find(|(window_name, _, _, _)| window_name == name)
-            .map(|(_, window, shader, _)| (window.clone(), shader.clone()))
+            .find(|(window_name, _, _)| window_name == name)
+            .map(|(_, window, _)| window.clone())
     }
     pub fn get_camera(&self, name: &WindowName) -> Option<CameraDescriptor> {
         self.windows
             .iter()
-            .find(|(window_name, _, _, _)| window_name == name)
-            .map(|(_, _, _, camera)| camera.clone())
+            .find(|(window_name, _, _)| window_name == name)
+            .map(|(_, _, camera)| camera.clone())
     }
     pub fn get_sprite_sheet(
         &self,

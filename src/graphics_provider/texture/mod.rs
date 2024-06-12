@@ -9,36 +9,42 @@ pub struct TextureProvider {
     current_id: u32,
 }
 impl TextureProvider {
-    pub fn new() -> Self {
-        Self {
+    pub fn new(device: &wgpu::Device, queue: &wgpu::Queue) -> Self {
+        let bytes = [255; 4];
+        let size = wgpu::Extent3d {
+            width: 1,
+            height: 1,
+            depth_or_array_layers: 1,
+        };
+        let texture = Texture::from_bytes(device, queue, &bytes, size, None);
+        let mut provider = Self {
             bind_group_layout: None,
             bind_group: None,
             textures: Vec::new(),
             current_id: 0,
-        }
+        };
+        provider.register_texture(device, texture, None);
+        provider
     }
 
-    pub fn get_texture_index(&self, label: &str) -> Option<u32> {
+    pub fn get_texture_index(&self, label: Option<&str>) -> Option<u32> {
         self.textures
             .iter()
             .enumerate()
-            .find(|(_, texture)| texture.label == label)
+            .find(|(_, texture)| texture.label.as_ref().map(|l| l.as_str()) == label)
             .map(|(index, _)| index as u32)
     }
 
-    pub fn create_texture(
+    fn register_texture(
         &mut self,
         device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        path: &Path,
-        label: &str,
+        texture: Texture,
+        label: Option<&str>,
     ) -> u32 {
         if let Some(index) = self.get_texture_index(label) {
             return index as u32;
         }
-        let texture = Texture::new(device, queue, path, label);
         self.textures.push(texture);
-
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("Texture Bind Group Layout"),
             entries: &[
@@ -60,7 +66,6 @@ impl TextureProvider {
                 },
             ],
         });
-
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: &bind_group_layout,
             entries: &[
@@ -87,11 +92,25 @@ impl TextureProvider {
             ],
             label: Some(self.current_id.to_string().as_str()),
         });
-
         self.bind_group_layout = Some(bind_group_layout);
         self.bind_group = Some(bind_group);
         self.current_id += 1;
         self.current_id - 1
+    }
+
+    pub fn create_texture(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        path: &Path,
+        label: Option<&str>,
+    ) -> u32 {
+        if let Some(index) = self.get_texture_index(label) {
+            return index as u32;
+        }
+        let texture = Texture::new(device, queue, path, label);
+
+        self.register_texture(device, texture, label)
     }
 }
 
@@ -99,25 +118,19 @@ pub struct Texture {
     pub texture: wgpu::Texture,
     pub view: wgpu::TextureView,
     pub sampler: wgpu::Sampler,
-    label: String,
+    label: Option<String>,
 }
 
 impl Texture {
-    pub fn new(device: &wgpu::Device, queue: &wgpu::Queue, path: &Path, label: &str) -> Self {
-        let bytes = fs::read(path).expect(&format!("Could not read: '{:?}'", path));
-        let img =
-            image::load_from_memory(&bytes).expect(&format!("Could not load image: '{:?}", path));
-
-        let rgba = img.to_rgba8();
-        let dimensions = img.dimensions();
-
-        let size = wgpu::Extent3d {
-            width: dimensions.0,
-            height: dimensions.1,
-            depth_or_array_layers: 1,
-        };
+    fn from_bytes(
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        bytes: &[u8],
+        size: wgpu::Extent3d,
+        label: Option<&str>,
+    ) -> Self {
         let texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some(label),
+            label,
             size,
             mip_level_count: 1,
             sample_count: 1,
@@ -134,11 +147,11 @@ impl Texture {
                 mip_level: 0,
                 origin: wgpu::Origin3d::ZERO,
             },
-            &rgba,
+            bytes,
             wgpu::ImageDataLayout {
                 offset: 0,
-                bytes_per_row: Some(4 * dimensions.0),
-                rows_per_image: Some(dimensions.1),
+                bytes_per_row: Some(4 * size.width),
+                rows_per_image: Some(size.height),
             },
             size,
         );
@@ -158,7 +171,23 @@ impl Texture {
             texture,
             view,
             sampler,
-            label: label.to_string(),
+            label: label.map(|l| l.to_string()),
         }
+    }
+
+    fn new(device: &wgpu::Device, queue: &wgpu::Queue, path: &Path, label: Option<&str>) -> Self {
+        let bytes = fs::read(path).expect(&format!("Could not read: '{:?}'", path));
+        let img =
+            image::load_from_memory(&bytes).expect(&format!("Could not load image: '{:?}", path));
+
+        let rgba = img.to_rgba8();
+        let dimensions = img.dimensions();
+
+        let size = wgpu::Extent3d {
+            width: dimensions.0,
+            height: dimensions.1,
+            depth_or_array_layers: 1,
+        };
+        Self::from_bytes(device, queue, &rgba, size, label)
     }
 }

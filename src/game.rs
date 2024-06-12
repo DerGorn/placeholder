@@ -6,7 +6,7 @@ use std::{
 use log::warn;
 use placeholder::{
     app::{EventManager, WindowManager},
-    graphics::{GraphicsProvider, UniformBufferName},
+    graphics::{GraphicsProvider, RenderSceneName, UniformBufferName},
 };
 use winit::{dpi::PhysicalSize, event::WindowEvent, window::WindowId};
 
@@ -78,22 +78,21 @@ impl<T: EntityType> Game<T> {
             }
         }
         for window_name in needed_windows {
-            let (window_descriptor, shader_descriptor) = &self
+            let window_descriptor = &self
                 .ressources
                 .get_window(&window_name)
                 .expect(&format!("No ressources provided for {:?}", window_name));
             window_manager.send_event(GameEvent::RequestNewWindow(
                 window_descriptor.clone(),
-                shader_descriptor.clone(),
                 window_name.clone(),
             ));
         }
-        self.active_scenes.append(&mut self.pending_scenes);
     }
 
     fn request_sprite_sheet(
         &self,
         name: &SpriteSheetName,
+        render_scenes: Vec<RenderSceneName>,
         window_manager: &mut WindowManager<GameEvent>,
     ) {
         let path = &self
@@ -104,7 +103,11 @@ impl<T: EntityType> Game<T> {
                 name
             ))
             .0;
-        window_manager.send_event(GameEvent::RequestNewSpriteSheet(name.clone(), path.clone()));
+        window_manager.send_event(GameEvent::RequestNewSpriteSheet(
+            name.clone(),
+            path.clone(),
+            render_scenes,
+        ));
     }
 
     fn get_window_name(&self, id: &WindowId) -> Option<&WindowName> {
@@ -114,12 +117,12 @@ impl<T: EntityType> Game<T> {
             .map(|(name, _)| name)
     }
 
-    fn get_scenes(&self, window_name: &WindowName) -> Vec<&Scene<T>> {
-        self.active_scenes
-            .iter()
-            .filter(|scene| scene.target_window == *window_name)
-            .collect()
-    }
+    // fn get_scenes(&self, window_name: &WindowName) -> Vec<&Scene<T>> {
+    //     self.active_scenes
+    //         .iter()
+    //         .filter(|scene| scene.target_window == *window_name)
+    //         .collect()
+    // }
 
     fn get_scenes_mut(&mut self, window_name: &WindowName) -> Vec<&mut Scene<T>> {
         self.active_scenes
@@ -201,23 +204,25 @@ impl<T: EntityType> EventManager<GameEvent, Index, Vertex> for Game<T> {
             }
             GameEvent::NewWindow(id, name) => {
                 self.window_ids.push((name.clone(), id.clone()));
-                let mut needed_sprite_sheets = Vec::new();
-                for scene in self.get_scenes(name) {
-                    for entity in &scene.entities {
-                        let sprite_sheet = entity.sprite_sheet();
-                        if self
-                            .sprite_sheets
-                            .iter()
-                            .find(|(name, _)| name == sprite_sheet)
-                            .is_none()
-                            && !needed_sprite_sheets.contains(sprite_sheet)
-                        {
-                            needed_sprite_sheets.push(sprite_sheet.clone())
-                        }
-                    }
-                }
-                for sprite_sheet in needed_sprite_sheets {
-                    self.request_sprite_sheet(&sprite_sheet, window_manager);
+                println!("New window with id {:?} and name {:?}", id, name);
+                println!(
+                    "Pending scenes: {:?}",
+                    self.pending_scenes
+                        .iter()
+                        .map(|s| &s.render_scene)
+                        .collect::<Vec<_>>()
+                );
+                for scene in self
+                    .pending_scenes
+                    .iter()
+                    .filter(|scene| &scene.target_window == name)
+                {
+                    println!("Requesting Scene {:?}", scene.render_scene);
+                    window_manager.send_event(GameEvent::RequestNewRenderScene(
+                        id.clone(),
+                        scene.render_scene.clone(),
+                        scene.shader_descriptor.clone(),
+                    ));
                 }
                 if let Some(camera_descriptor) = &self.ressources.get_camera(name) {
                     let camera: Camera = camera_descriptor.into();
@@ -230,8 +235,30 @@ impl<T: EntityType> EventManager<GameEvent, Index, Vertex> for Game<T> {
                         .push((name.clone(), camera, name.as_str().into()));
                 }
             }
+            GameEvent::NewRenderScene(render_scene) => {
+                let index = self
+                    .pending_scenes
+                    .iter()
+                    .position(|scene| scene.render_scene == *render_scene)
+                    .expect("Scene Vanished before getting created fully");
+                println!("New Render Scene: {:?}", render_scene);
+                for sprite_sheet in self.pending_scenes[index]
+                    .entities
+                    .iter()
+                    .map(|e| e.sprite_sheet())
+                {
+                    self.request_sprite_sheet(
+                        &sprite_sheet,
+                        vec![render_scene.clone()],
+                        window_manager,
+                    );
+                }
+                let scene = self.pending_scenes.remove(index);
+                self.active_scenes.push(scene);
+            }
             GameEvent::NewSpriteSheet(label, None) => {
-                self.request_sprite_sheet(label, window_manager)
+                panic!("Could not load SpriteSheet '{:?}'", label)
+                // self.request_sprite_sheet(label, window_manager)
             }
             GameEvent::NewSpriteSheet(label, Some(id)) => {
                 let dimensions = &self
@@ -246,24 +273,15 @@ impl<T: EntityType> EventManager<GameEvent, Index, Vertex> for Game<T> {
                 self.sprite_sheets.push((label.clone(), sprite_sheet));
             }
             GameEvent::Timer(delta_t) => {
-                for (name, id) in &self.window_ids {
+                for scene in self.active_scenes.iter_mut() {
                     let mut vertices = Vec::new();
                     let mut indices = Vec::new();
-                    let mut entities = self
-                        .active_scenes
-                        .iter_mut()
-                        .filter(|scene| scene.target_window == *name)
-                        .fold(Vec::new(), |mut entities, scene| {
-                            for entity in scene.entities.iter_mut() {
-                                entities.push(entity);
-                            }
-                            entities
-                        });
+                    let entities = &mut scene.entities;
                     entities.sort_by(|a, b| a.z().partial_cmp(&b.z()).expect("NaN NaN NaN"));
                     for i in 0..entities.len() {
                         let (left, right) = entities.split_at_mut(i);
                         let (entity, right) = right.split_first_mut().unwrap();
-                        let interactions = left.iter().chain(right.iter()).map(|e| &**e).collect();
+                        let interactions = left.iter().chain(right.iter()).map(|e| &*e).collect();
                         entity.update(&interactions, delta_t);
                         let entity_sprite_sheet = entity.sprite_sheet();
                         if let Some((_, sprite_sheet)) = &self
@@ -274,13 +292,19 @@ impl<T: EntityType> EventManager<GameEvent, Index, Vertex> for Game<T> {
                             entity.render(&mut vertices, &mut indices, sprite_sheet);
                         }
                     }
-                    if let Some((_, camera, camera_name)) =
-                        self.cameras.iter_mut().find(|(n, _, _)| n == name)
+                    if let Some((_, camera, camera_name)) = self
+                        .cameras
+                        .iter_mut()
+                        .find(|(n, _, _)| n == &scene.target_window)
                     {
-                        camera.update(entities.iter().map(|e| &**e).collect(), delta_t);
+                        camera.update(entities.iter().map(|e| &*e).collect(), delta_t);
                         graphics_provider.update_uniform_buffer(camera_name, &camera.as_bytes());
                     }
-                    window_manager.send_event(GameEvent::RenderUpdate(*id, vertices, indices));
+                    window_manager.send_event(GameEvent::RenderUpdate(
+                        scene.render_scene.clone(),
+                        vertices,
+                        indices,
+                    ));
                 }
             }
             _ => {}

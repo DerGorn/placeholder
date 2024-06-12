@@ -16,7 +16,9 @@ pub use event_manager::EventManager;
 mod window_manager;
 pub use window_manager::WindowManager;
 
-use crate::graphics_provider::{GraphicsProvider, Index, ShaderDescriptor, Vertex};
+use crate::graphics_provider::{
+    GraphicsProvider, Index, RenderSceneName, ShaderDescriptor, Vertex,
+};
 
 pub struct ManagerApplication<
     E: ApplicationEvent<I, V> + 'static,
@@ -90,27 +92,46 @@ impl<'a, E: ApplicationEvent<I, V> + 'static, M: EventManager<E, I, V>, I: Index
 
     fn user_event(&mut self, event_loop: &ActiveEventLoop, event: E) {
         match event.is_request_new_window() {
-            Some((window_descriptor, shader_descriptor, name)) => {
-                self.create_window(window_descriptor, shader_descriptor, event_loop, name)
+            Some((window_descriptor, name)) => {
+                self.create_window(window_descriptor, event_loop, name)
             }
             None => {}
         };
         match event.is_render_update() {
             Some((_, None, None)) | None => {}
-            Some((id, indices, vertices)) => {
-                self.graphics_provider.update_buffers(id, vertices, indices)
+            Some((render_scene, indices, vertices)) => {
+                self.graphics_provider
+                    .update_buffers(render_scene, vertices, indices)
             }
         }
         match event.is_request_new_texture() {
-            Some((path, label)) => {
-                let id = self.graphics_provider.create_texture(path, label);
+            Some((path, label, render_scenes)) => {
+                let id = self
+                    .graphics_provider
+                    .create_texture(path, label, render_scenes);
                 self.window_manager.send_event(E::new_texture(label, id));
             }
             None => {}
         }
+        match event.is_request_new_render_scene() {
+            Some((window_id, render_scene, shader_descriptor)) => {
+                self.graphics_provider.add_render_scene(
+                    window_id,
+                    render_scene.clone(),
+                    shader_descriptor.clone(),
+                );
+                self.window_manager
+                    .send_event(E::new_render_scene(render_scene))
+            }
+            None => {}
+        }
 
-        self.event_manager
-            .user_event(&mut self.window_manager, &mut self.graphics_provider, event_loop, &event);
+        self.event_manager.user_event(
+            &mut self.window_manager,
+            &mut self.graphics_provider,
+            event_loop,
+            &event,
+        );
     }
 }
 
@@ -128,7 +149,6 @@ impl<'a, E: ApplicationEvent<I, V> + 'static, M: EventManager<E, I, V>, I: Index
     fn create_window(
         &mut self,
         descriptor: &WindowDescriptor,
-        shader_descriptor: &ShaderDescriptor,
         active_loop: &ActiveEventLoop,
         name: &str,
     ) {
@@ -137,8 +157,7 @@ impl<'a, E: ApplicationEvent<I, V> + 'static, M: EventManager<E, I, V>, I: Index
             .expect("OS says: 'No more windows for you'");
         self.window_manager
             .send_event(E::new_window(&window.id(), name));
-        self.graphics_provider
-            .init_window(&window, shader_descriptor);
+        self.graphics_provider.init_window(&window);
         // window.request_redraw();
         self.window_manager.add_window(window);
     }
@@ -160,9 +179,13 @@ pub trait ApplicationEvent<I: Index, V: Vertex>: Debug {
     fn app_resumed() -> Self;
     fn new_window(id: &WindowId, name: &str) -> Self;
     fn new_texture(label: &str, id: Option<u32>) -> Self;
-    fn is_request_new_window<'a>(
+    fn new_render_scene(render_scene: &RenderSceneName) -> Self;
+    fn is_request_new_window<'a>(&'a self) -> Option<(&'a WindowDescriptor, &'a str)>;
+    fn is_render_update<'a>(
         &'a self,
-    ) -> Option<(&'a WindowDescriptor, &'a ShaderDescriptor, &'a str)>;
-    fn is_render_update<'a>(&'a self) -> Option<(&'a WindowId, Option<&'a [I]>, Option<&'a [V]>)>;
-    fn is_request_new_texture<'a>(&'a self) -> Option<(&'a Path, &'a str)>;
+    ) -> Option<(&'a RenderSceneName, Option<&'a [I]>, Option<&'a [V]>)>;
+    fn is_request_new_texture<'a>(&'a self) -> Option<(&'a Path, &'a str, &[RenderSceneName])>;
+    fn is_request_new_render_scene<'a>(
+        &'a self,
+    ) -> Option<(&'a WindowId, &'a RenderSceneName, &'a ShaderDescriptor)>;
 }

@@ -1,3 +1,5 @@
+use crate::create_name_struct;
+
 use super::{Index, ShaderDescriptor, Vertex};
 use std::fmt::Debug;
 use wgpu::util::DeviceExt;
@@ -18,22 +20,18 @@ pub trait WindowSurface<I: Index, V: Vertex>: Debug {
         self.config_mut().height = new_size.height;
         self.surface().configure(device, self.config());
     }
-    fn update(
-        &mut self,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        vertices: Option<&[V]>,
-        indices: Option<&[I]>,
-    );
     fn create_render_pipeline(
-        &mut self,
+        &self,
         device: &wgpu::Device,
         bind_group_layout: &[&wgpu::BindGroupLayout],
-    );
+        shader: &wgpu::ShaderModule,
+        shader_descriptor: &ShaderDescriptor,
+    ) -> wgpu::RenderPipeline;
     fn render(
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
+        render_scenes: &[&RenderScene<V, I>],
         bind_groups: &[&wgpu::BindGroup],
     );
 }
@@ -42,13 +40,6 @@ pub struct Surface<'a, I: Index, V: Vertex> {
     pub wgpu_surface: wgpu::Surface<'a>,
     pub size: winit::dpi::PhysicalSize<u32>,
     pub config: wgpu::SurfaceConfiguration,
-    pub vertex_buffer: wgpu::Buffer,
-    pub index_buffer: wgpu::Buffer,
-    pub num_vertices: u32,
-    pub num_indices: u32,
-    pub shader: wgpu::ShaderModule,
-    pub shader_descriptor: ShaderDescriptor,
-    pub render_pipeline: Option<wgpu::RenderPipeline>,
     pub _phantom: std::marker::PhantomData<(I, V)>,
 }
 impl<I: Index, V: Vertex> Debug for Surface<'_, I, V> {
@@ -80,7 +71,141 @@ impl<'a, I: Index, V: Vertex> WindowSurface<I, V> for Surface<'a, I, V> {
         &mut self.config
     }
 
-    fn update(
+    fn create_render_pipeline(
+        &self,
+        device: &wgpu::Device,
+        bind_group_layouts: &[&wgpu::BindGroupLayout],
+        shader: &wgpu::ShaderModule,
+        shader_descriptor: &ShaderDescriptor,
+    ) -> wgpu::RenderPipeline {
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("Pipeline Layout"),
+            bind_group_layouts,
+            push_constant_ranges: &[],
+        });
+        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("Render Pipeline"),
+            layout: Some(&pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: shader,
+                entry_point: shader_descriptor.vertex_shader,
+                buffers: &[V::describe_buffer_layout()],
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: shader,
+                entry_point: shader_descriptor.fragment_shader,
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: self.config.format,
+                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                strip_index_format: None,
+                front_face: wgpu::FrontFace::Ccw,
+                // cull_mode: Some(wgpu::Face::Back),
+                cull_mode: None,
+                polygon_mode: wgpu::PolygonMode::Fill,
+                unclipped_depth: false,
+                conservative: false,
+            },
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState {
+                count: 1,
+                mask: !0,
+                alpha_to_coverage_enabled: false,
+            },
+            multiview: None,
+        });
+
+        render_pipeline
+    }
+
+    fn render(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        render_scenes: &[&RenderScene<V, I>],
+        bind_groups: &[&wgpu::BindGroup],
+    ) {
+        let output = self
+            .surface()
+            .get_current_texture()
+            .expect("Our food has no texture");
+        let view = output
+            .texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
+        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("Render Encoder"),
+        });
+
+        {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Render Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color::RED),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                occlusion_query_set: None,
+                timestamp_writes: None,
+            });
+
+            for render_scene in render_scenes {
+                render_scene.write_render_pass(&mut render_pass, bind_groups);
+            }
+        }
+
+        queue.submit(std::iter::once(encoder.finish()));
+        output.present();
+    }
+}
+
+create_name_struct!(RenderSceneName);
+
+pub struct RenderScene<V: Vertex, I: Index> {
+    name: RenderSceneName,
+    render_pipeline: wgpu::RenderPipeline,
+    vertex_buffer: wgpu::Buffer,
+    index_buffer: wgpu::Buffer,
+    num_indices: u32,
+    num_vertices: u32,
+    _phantom: std::marker::PhantomData<(V, I)>,
+}
+impl<V: Vertex, I: Index> RenderScene<V, I> {
+    pub fn new(
+        name: RenderSceneName,
+        render_pipeline: wgpu::RenderPipeline,
+        vertex_buffer: wgpu::Buffer,
+        index_buffer: wgpu::Buffer,
+        num_indices: u32,
+        num_vertices: u32,
+    ) -> Self {
+        Self {
+            name,
+            render_pipeline,
+            vertex_buffer,
+            index_buffer,
+            num_indices,
+            num_vertices,
+            _phantom: std::marker::PhantomData,
+        }
+    }
+
+    pub fn update_pipeline(&mut self, render_pipeline: wgpu::RenderPipeline) {
+        self.render_pipeline = render_pipeline;
+    }
+
+    pub fn name(&self) -> &RenderSceneName {
+        &self.name
+    }
+
+    pub fn update(
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
@@ -117,100 +242,17 @@ impl<'a, I: Index, V: Vertex> WindowSurface<I, V> for Surface<'a, I, V> {
         }
     }
 
-    fn create_render_pipeline(
-        &mut self,
-        device: &wgpu::Device,
-        bind_group_layouts: &[&wgpu::BindGroupLayout],
+    fn write_render_pass<'a>(
+        &'a self,
+        render_pass: &mut wgpu::RenderPass<'a>,
+        bind_groups: &[&'a wgpu::BindGroup],
     ) {
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("Pipeline Layout"),
-            bind_group_layouts,
-            push_constant_ranges: &[],
-        });
-        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Render Pipeline"),
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &self.shader,
-                entry_point: self.shader_descriptor.vertex_shader,
-                buffers: &[V::describe_buffer_layout()],
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &self.shader,
-                entry_point: self.shader_descriptor.fragment_shader,
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: self.config.format,
-                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList,
-                strip_index_format: None,
-                front_face: wgpu::FrontFace::Ccw,
-                // cull_mode: Some(wgpu::Face::Back),
-                cull_mode: None,
-                polygon_mode: wgpu::PolygonMode::Fill,
-                unclipped_depth: false,
-                conservative: false,
-            },
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState {
-                count: 1,
-                mask: !0,
-                alpha_to_coverage_enabled: false,
-            },
-            multiview: None,
-        });
-
-        self.render_pipeline = Some(render_pipeline);
-    }
-
-    fn render(
-        &mut self,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        bind_groups: &[&wgpu::BindGroup],
-    ) {
-        let output = self
-            .surface()
-            .get_current_texture()
-            .expect("Our food has no texture");
-        let view = output
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
-        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Render Encoder"),
-        });
-
-        {
-            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("Render Pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::RED),
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                occlusion_query_set: None,
-                timestamp_writes: None,
-            });
-
-            if let Some(render_pipeline) = self.render_pipeline.as_ref() {
-                render_pass.set_pipeline(render_pipeline);
-            }
-            for (i, bind_group) in bind_groups.iter().enumerate() {
-                render_pass.set_bind_group(i as u32, bind_group, &[]);
-            }
-            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-            render_pass.set_index_buffer(self.index_buffer.slice(..), I::index_format());
-            render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
+        render_pass.set_pipeline(&self.render_pipeline);
+        for (i, bind_group) in bind_groups.iter().enumerate() {
+            render_pass.set_bind_group(i as u32, bind_group, &[]);
         }
-
-        queue.submit(std::iter::once(encoder.finish()));
-        output.present();
+        render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+        render_pass.set_index_buffer(self.index_buffer.slice(..), I::index_format());
+        render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
     }
 }

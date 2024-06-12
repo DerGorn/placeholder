@@ -1,8 +1,14 @@
+use placeholder::graphics::{RenderSceneName, ShaderDescriptor};
 use winit::event::KeyEvent;
 
-use super::{entity::{Entity, EntityType}, ressource_descriptor::WindowName};
+use super::{
+    entity::{Entity, EntityType},
+    ressource_descriptor::WindowName,
+};
 
 pub struct Scene<T: EntityType> {
+    pub shader_descriptor: ShaderDescriptor,
+    pub render_scene: RenderSceneName,
     pub target_window: WindowName,
     pub entities: Vec<Box<dyn Entity<T>>>,
 }
