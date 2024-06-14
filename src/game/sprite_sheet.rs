@@ -1,6 +1,14 @@
-use crate::vertex::TextureCoordinates;
+use super::vertex::TextureCoordinates;
 
-use super::sprite::SpritePosition;
+pub struct SpritePosition {
+    pub x: u8,
+    pub y: u8,
+}
+impl SpritePosition {
+    pub const fn new(x: u8, y: u8) -> Self {
+        SpritePosition { x, y }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct SpriteSheetDimensions {

@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 
-use placeholder::app::WindowDescriptor;
-use placeholder::create_name_struct;
+use crate::app::WindowDescriptor;
+use crate::create_name_struct;
 
-use crate::CameraDescriptor;
+use crate::game_engine::CameraDescriptor;
 
 use super::sprite_sheet::SpriteSheetDimensions;
 

@@ -12,44 +12,17 @@ use winit::{
     window::WindowAttributes,
 };
 
-mod vertex;
-use vertex::Vertex;
-
-mod game;
-use game::{
-    BoundingBox, CameraDescriptor, Direction, Entity, EntityName, EntityType, Game, Index,
-    RessourceDescriptor, Scene, SpritePosition, SpriteSheet, SpriteSheetDimensions,
-    SpriteSheetName, VelocityController,
+use placeholder::game_engine::{
+    BoundingBox, CameraDescriptor, Direction, Entity, EntityName, EntityType, ExternalEvent, Game,
+    Index, RessourceDescriptor, Scene, SceneName, SpritePosition, SpriteSheet,
+    SpriteSheetDimensions, SpriteSheetName, VelocityController, Vertex,
 };
 
-struct Animation<T> {
-    sprite_sheet: SpriteSheetName,
-    keyframes: Vec<(Duration, T)>,
-    current_keyframe: usize,
-    time_since_frame_start: Duration,
-}
-impl<T> Animation<T> {
-    fn new(sprite_sheet: SpriteSheetName, keyframes: Vec<(Duration, T)>) -> Self {
-        Self {
-            sprite_sheet,
-            keyframes,
-            current_keyframe: 0,
-            time_since_frame_start: Duration::from_millis(0),
-        }
-    }
+mod animation;
+use animation::Animation;
 
-    fn update(&mut self, delta_t: &Duration) {
-        self.time_since_frame_start += *delta_t;
-        if self.time_since_frame_start >= self.keyframes[self.current_keyframe].0 {
-            self.current_keyframe = (self.current_keyframe + 1) % self.keyframes.len();
-            self.time_since_frame_start = Duration::from_millis(0);
-        }
-    }
-
-    fn keyframe(&self) -> &T {
-        &self.keyframes[self.current_keyframe].1
-    }
-}
+mod background;
+use background::Background;
 
 #[derive(Debug, PartialEq)]
 enum Type {
@@ -59,93 +32,35 @@ enum Type {
 }
 impl EntityType for Type {}
 
-struct Background {
-    name: EntityName,
-    sprite_sheet: SpriteSheetName,
-    size: PhysicalSize<u16>,
+#[derive(Debug)]
+enum Event {
+    RequestNewScenes(Vec<Scene<Self>>),
+    NewScene(SceneName),
 }
-impl Debug for Background {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Background")
-            .field("z", &self.z())
-            .field("sprite", &self.sprite_sheet())
-            .finish()
-    }
-}
-impl Entity<Type> for Background {
-    fn entity_type(&self) -> Type {
-        Type::Background
-    }
-    fn update(&mut self, _entities: &Vec<&Box<dyn Entity<Type>>>, _delta_t: &Duration) {}
-    fn sprite_sheet(&self) -> &SpriteSheetName {
-        &self.sprite_sheet
-    }
-    fn name(&self) -> &EntityName {
-        &self.name
-    }
-    fn position(&self) -> Vector<f32> {
-        Vector::new(0.0, 0.0, 0.0)
-    }
-    fn bounding_box(&self) -> BoundingBox {
-        BoundingBox {
-            anchor: Vector::new(0.0, 0.0, 0.0),
-            size: PhysicalSize::new(self.size.width as f32, self.size.height as f32),
+impl ExternalEvent for Event {
+    type EntityType = Type;
+    fn is_request_new_scenes<'a>(&'a self) -> bool {
+        match self {
+            Event::RequestNewScenes(_) => true,
+            _ => false,
         }
     }
-    fn z(&self) -> f32 {
-        -1000.0
-    }
-    fn handle_key_input(&mut self, _input: &KeyEvent) {}
-    fn render(
-        &self,
-        vertices: &mut Vec<Vertex>,
-        indices: &mut Vec<Index>,
-        sprite_sheet: &SpriteSheet,
-    ) {
-        self.render_sprite(vertices, indices, sprite_sheet, &SpritePosition::new(0, 0))
-    }
-}
 
-struct Transition {
-    name: EntityName,
-    animation: Animation<(Vec<Vertex>, Vec<Index>)>,
-}
-impl Debug for Transition {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Transition")
-            .field("name", &self.name)
-            .finish()
-    }
-}
-impl Entity<Type> for Transition {
-    fn update(&mut self, _entities: &Vec<&Box<dyn Entity<Type>>>, delta_t: &Duration) {
-        self.animation.update(delta_t);
-    }
-    fn sprite_sheet(&self) -> &SpriteSheetName {
-        todo!()
-    }
-    fn render(
-        &self,
-        vertices: &mut Vec<Vertex>,
-        indices: &mut Vec<Index>,
-        _sprite_sheet: &SpriteSheet,
-    ) {
-        let (new_vertices, new_indices) = self.animation.keyframe();
-        vertices.extend(new_vertices.iter());
-        indices.extend(new_indices.iter());
-    }
-    fn name(&self) -> &EntityName {
-        &self.name
-    }
-    fn entity_type(&self) -> Type {
-        Type::Background
-    }
-    fn handle_key_input(&mut self, _input: &KeyEvent) {}
-    fn bounding_box(&self) -> BoundingBox {
-        BoundingBox {
-            anchor: Vector::new(0.0, 0.0, 0.0),
-            size: PhysicalSize::new(10000.0, 10000.0),
+    fn consume_scenes_request(self) -> Option<Vec<Scene<Self>>>
+    where
+        Self: Sized,
+    {
+        match self {
+            Event::RequestNewScenes(scenes) => Some(scenes),
+            _ => None,
         }
+    }
+
+    fn new_scene(scene: &Scene<Self>) -> Self
+    where
+        Self: Sized,
+    {
+        Self::NewScene(scene.name.clone())
     }
 }
 
@@ -163,21 +78,52 @@ impl Debug for Enemy {
             .finish()
     }
 }
-impl Entity<Type> for Enemy {
-    fn update(&mut self, entities: &Vec<&Box<dyn Entity<Type>>>, delta_t: &Duration) {
+impl Entity<Type, Event> for Enemy {
+    fn update(
+        &mut self,
+        entities: &Vec<&Box<dyn Entity<Type, Event>>>,
+        delta_t: &Duration,
+    ) -> Vec<Event> {
         self.animation.update(delta_t);
         let players = entities.iter().filter(|e| e.entity_type() == Type::Player);
         let own_bounding_box = self.bounding_box();
         for player in players {
             let bounding_box = player.bounding_box();
             if own_bounding_box.intersects(&bounding_box) {
-                println!(
-                    "Player {:?} collided with enemy {:?}",
-                    player.name(),
-                    self.name()
-                );
+                let shader_descriptor = ShaderDescriptor {
+                    file: "res/shader/shader.wgsl",
+                    vertex_shader: "vs_main",
+                    fragment_shader: "fs_main",
+                };
+                return vec![Event::RequestNewScenes(vec![Scene {
+                    name: "BattleScene".into(),
+                    render_scene: "BattleScene".into(),
+                    target_window: MAIN_WINDOW.into(),
+                    z_index: 1,
+                    entities: vec![Box::new(Enemy {
+                        name: FROG.into(),
+                        size: PhysicalSize::new(64, 64),
+                        position: Vector::new(-100.0, -100.0, 0.0),
+                        animation: Animation::new(
+                            FROG.into(),
+                            vec![
+                                (Duration::from_millis(240), SpritePosition::new(0, 0)),
+                                (Duration::from_millis(240), SpritePosition::new(1, 0)),
+                                (Duration::from_millis(240), SpritePosition::new(2, 0)),
+                                (Duration::from_millis(240), SpritePosition::new(3, 0)),
+                            ],
+                        ),
+                    })],
+                    shader_descriptor,
+                }])];
+                // println!(
+                //     "Player {:?} collided with enemy {:?}",
+                //     player.name(),
+                //     self.name()
+                // );
             }
         }
+        vec![]
     }
     fn render(
         &self,
@@ -188,7 +134,7 @@ impl Entity<Type> for Enemy {
         self.render_sprite(vertices, indices, sprite_sheet, self.animation.keyframe())
     }
     fn sprite_sheet(&self) -> &SpriteSheetName {
-        &self.animation.sprite_sheet
+        &self.animation.sprite_sheet()
     }
     fn handle_key_input(&mut self, _input: &KeyEvent) {}
     fn name(&self) -> &EntityName {
@@ -220,11 +166,15 @@ impl Debug for Player {
             .finish()
     }
 }
-impl Entity<Type> for Player {
+impl Entity<Type, Event> for Player {
     fn entity_type(&self) -> Type {
         Type::Player
     }
-    fn update(&mut self, entities: &Vec<&Box<dyn Entity<Type>>>, delta_t: &Duration) {
+    fn update(
+        &mut self,
+        entities: &Vec<&Box<dyn Entity<Type, Event>>>,
+        delta_t: &Duration,
+    ) -> Vec<Event> {
         self.position += self.velocity.get_velocity();
         let background = entities
             .iter()
@@ -238,6 +188,7 @@ impl Entity<Type> for Player {
             self.position = new_position;
         }
         self.animation.update(delta_t);
+        vec![]
     }
 
     fn name(&self) -> &EntityName {
@@ -256,7 +207,7 @@ impl Entity<Type> for Player {
     }
 
     fn sprite_sheet(&self) -> &SpriteSheetName {
-        &self.animation.sprite_sheet
+        &self.animation.sprite_sheet()
     }
 
     fn z(&self) -> f32 {
@@ -319,6 +270,8 @@ impl Entity<Type> for Player {
     }
 }
 
+const MAIN_WINDOW: &str = "MainWindow";
+const FROG: &str = "Frog";
 fn main() {
     env_logger::Builder::from_env(Env::default().default_filter_or("warn")).init();
     let target_fps = 60;
@@ -331,9 +284,7 @@ fn main() {
         vertex_shader: "vs_main",
         fragment_shader: "fs_main",
     };
-    let frog_name = "Frog";
     let protaginist_name = "Protagonist";
-    let main_window = "MainWindow";
     let player_sprite_sheet = "PlayerSpriteSheet";
     let background = "Background";
     let camera_descriptor = CameraDescriptor {
@@ -346,7 +297,7 @@ fn main() {
     };
     let ressources = RessourceDescriptor {
         windows: vec![(
-            main_window.into(),
+            MAIN_WINDOW.into(),
             main_window_descriptor,
             camera_descriptor,
         )],
@@ -362,16 +313,18 @@ fn main() {
                 SpriteSheetDimensions::new(1, 1),
             ),
             (
-                frog_name.into(),
+                FROG.into(),
                 PathBuf::from("res/images/spriteSheets/frog.png"),
                 SpriteSheetDimensions::new(4, 1),
             ),
         ],
     };
     let scene = Scene {
+        z_index: 0,
         shader_descriptor,
+        name: "MainScene".into(),
         render_scene: "MainScene".into(),
-        target_window: main_window.into(),
+        target_window: MAIN_WINDOW.into(),
         entities: vec![
             Box::new(Player {
                 name: protaginist_name.into(),
@@ -394,11 +347,11 @@ fn main() {
                 sprite_sheet: background.into(),
             }),
             Box::new(Enemy {
-                name: frog_name.into(),
+                name: FROG.into(),
                 size: PhysicalSize::new(64, 64),
                 position: Vector::new(100.0, 100.0, 0.0),
                 animation: Animation::new(
-                    frog_name.into(),
+                    FROG.into(),
                     vec![
                         (Duration::from_millis(240), SpritePosition::new(0, 0)),
                         (Duration::from_millis(240), SpritePosition::new(1, 0)),

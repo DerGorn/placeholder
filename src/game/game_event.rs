@@ -1,15 +1,16 @@
+use std::fmt::Debug;
 use std::{
     path::{Path, PathBuf},
     time::Duration,
 };
 
-use placeholder::{
+use crate::{
     app::{ApplicationEvent, WindowDescriptor},
     graphics::{RenderSceneName, ShaderDescriptor},
 };
 use winit::window::WindowId;
 
-use crate::vertex::Vertex;
+use super::{EntityType, Scene, Vertex};
 
 use super::{
     ressource_descriptor::{SpriteSheetName, WindowName},
@@ -17,7 +18,7 @@ use super::{
 };
 
 #[derive(Debug)]
-pub enum GameEvent {
+pub enum GameEvent<E: ExternalEvent> {
     Timer(Duration),
     Resumed,
     NewWindow(WindowId, WindowName),
@@ -27,8 +28,9 @@ pub enum GameEvent {
     RequestNewSpriteSheet(SpriteSheetName, PathBuf, Vec<RenderSceneName>),
     NewRenderScene(RenderSceneName),
     RequestNewRenderScene(WindowId, RenderSceneName, ShaderDescriptor),
+    External(E),
 }
-impl ApplicationEvent<Index, Vertex> for GameEvent {
+impl<E: ExternalEvent> ApplicationEvent<Index, Vertex> for GameEvent<E> {
     fn app_resumed() -> Self {
         Self::Resumed
     }
@@ -96,4 +98,16 @@ impl ApplicationEvent<Index, Vertex> for GameEvent {
     fn new_window(id: &WindowId, name: &str) -> Self {
         Self::NewWindow(id.clone(), name.into())
     }
+}
+
+pub trait ExternalEvent: Debug + Send {
+    type EntityType: EntityType;
+    fn is_request_new_scenes<'a>(&'a self) -> bool;
+    /// Should only be called if is_request_new_scene returns true
+    fn consume_scenes_request(self) -> Option<Vec<Scene<Self>>>
+    where
+        Self: Sized;
+    fn new_scene(scene: &Scene<Self>) -> Self
+    where
+        Self: Sized;
 }

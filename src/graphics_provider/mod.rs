@@ -65,6 +65,13 @@ impl<I: Index, V: Vertex> GraphicsProvider<I, V> {
         }
     }
 
+    pub fn get_window(&self, render_scene: &RenderSceneName) -> Option<&WindowId> {
+        self.render_scenes
+            .iter()
+            .find(|(_, scene, _, _)| render_scene == scene.name())
+            .map(|(window_id, _, _, _)| window_id)
+    }
+
     fn init(&mut self, surface: &wgpu::Surface) {
         let adapter = futures::executor::block_on(self.instance.request_adapter(
             &wgpu::RequestAdapterOptions {
@@ -272,9 +279,6 @@ impl<I: Index, V: Vertex> GraphicsProvider<I, V> {
         if let (Some(device), Some(queue), Some(texture_provider)) =
             (&self.device, &self.queue, &mut self.texture_provider)
         {
-            if let Some(index) = texture_provider.get_texture_index(Some(label)) {
-                return Some(index);
-            }
             let index = texture_provider.create_texture(device, queue, path, Some(label));
             let mut bind_groups_layouts = vec![texture_provider
                 .bind_group_layout

@@ -23,7 +23,7 @@ pub trait EventManager<E: 'static + Debug, I: Index, V: Vertex> {
         _window_manager: &mut WindowManager<E>,
         _graphics_provider: &mut GraphicsProvider<I, V>,
         _event_loop: &ActiveEventLoop,
-        _event: &E,
+        _event: E,
     ) where
         Self: Sized,
     {

@@ -1,4 +1,4 @@
-use placeholder::graphics::Vertex as Vert;
+use crate::graphics::Vertex as Vert;
 use repr_trait::C;
 use threed::Vector;
 

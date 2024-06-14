@@ -1,21 +1,23 @@
-use placeholder::create_name_struct;
+use crate::create_name_struct;
 use std::{fmt::Debug, time::Duration};
 use threed::Vector;
 use winit::event::KeyEvent;
 
-use crate::vertex::Vertex;
+use crate::game::Vertex;
 
 use super::{
-    ressource_descriptor::SpriteSheetName, sprite_sheet::SpriteSheet, BoundingBox, Index,
-    SpritePosition,
+    ressource_descriptor::SpriteSheetName, sprite_sheet::SpriteSheet, BoundingBox, ExternalEvent,
+    Index, SpritePosition,
 };
 
 create_name_struct!(EntityName);
 
 pub trait EntityType: PartialEq + Debug {}
 
-pub trait Entity<T: EntityType>: Debug {
-    fn update(&mut self, entities: &Vec<&Box<dyn Entity<T>>>, delta_t: &Duration);
+pub trait Entity<T: EntityType, E: ExternalEvent>: Debug + Send {
+    fn update(&mut self, _entities: &Vec<&Box<dyn Entity<T, E>>>, _delta_t: &Duration) -> Vec<E> {
+        vec![]
+    }
     fn render(
         &self,
         vertices: &mut Vec<Vertex>,

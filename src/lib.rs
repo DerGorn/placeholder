@@ -12,6 +12,15 @@ pub mod app {
     };
 }
 
+mod game;
+pub mod game_engine {
+    pub use super::game::{
+        BoundingBox, CameraDescriptor, Direction, Entity, EntityName, EntityType, ExternalEvent,
+        Game, Index, RessourceDescriptor, Scene, SceneName, SpritePosition, SpriteSheet,
+        SpriteSheetDimensions, SpriteSheetName, VelocityController, Vertex,
+    };
+}
+
 #[macro_export]
 macro_rules! create_name_struct {
     ($name: ident) => {

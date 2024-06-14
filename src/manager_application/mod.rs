@@ -101,7 +101,7 @@ impl<'a, E: ApplicationEvent<I, V> + 'static, M: EventManager<E, I, V>, I: Index
             Some((_, None, None)) | None => {}
             Some((render_scene, indices, vertices)) => {
                 self.graphics_provider
-                    .update_buffers(render_scene, vertices, indices)
+                    .update_buffers(render_scene, vertices, indices);
             }
         }
         match event.is_request_new_texture() {
@@ -130,7 +130,7 @@ impl<'a, E: ApplicationEvent<I, V> + 'static, M: EventManager<E, I, V>, I: Index
             &mut self.window_manager,
             &mut self.graphics_provider,
             event_loop,
-            &event,
+            event,
         );
     }
 }

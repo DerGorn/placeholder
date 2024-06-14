@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{error::Error, fmt::Display, time::Duration};
 
 use threed::Vector;
 use winit::{
@@ -7,10 +7,11 @@ use winit::{
     keyboard::{KeyCode, PhysicalKey},
 };
 
-use crate::BoundingBox;
+use crate::game_engine::BoundingBox;
 
 use super::{
-    entity::{EntityName, EntityType}, Direction, Entity, VelocityController
+    entity::{EntityName, EntityType},
+    Direction, Entity, ExternalEvent, VelocityController,
 };
 
 #[repr(C)]
@@ -54,6 +55,29 @@ impl From<&CameraDescriptor> for Camera {
     }
 }
 
+#[derive(Debug)]
+pub enum CameraUpdateFailed {
+    NoTargetEntity(EntityName),
+    NOBoundEntity(EntityName),
+}
+impl Display for CameraUpdateFailed {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CameraUpdateFailed::NoTargetEntity(name) => {
+                write!(
+                    f,
+                    "No target entity with name: {:?} a found for camera",
+                    name
+                )
+            }
+            CameraUpdateFailed::NOBoundEntity(name) => {
+                write!(f, "No bound entity with name: {:?} found for camera", name)
+            }
+        }
+    }
+}
+impl Error for CameraUpdateFailed {}
+
 pub struct Camera {
     position: Vector<f32>,
     offset_position: Vector<f32>,
@@ -80,18 +104,22 @@ impl Camera {
         }
     }
 
-    pub fn update<T: EntityType>(
+    pub fn update<T: EntityType, E: ExternalEvent>(
         &mut self,
-        entities: Vec<&Box<dyn Entity<T>>>,
+        entities: Vec<&Box<dyn Entity<T, E>>>,
         _delta_t: &Duration,
-    ) {
-        let target_entity = entities
+    ) -> Result<(), CameraUpdateFailed> {
+        let target_entity = match entities
             .iter()
             .find(|entity| entity.name() == &self.target_entity)
-            .expect(&format!(
-                "Target entity '{:?}' for the camera could not be found",
-                self.target_entity
-            ));
+        {
+            Some(entity) => entity,
+            None => {
+                return Err(CameraUpdateFailed::NoTargetEntity(
+                    self.target_entity.clone(),
+                ))
+            }
+        };
         let velocity = self.velocity.get_velocity();
         if velocity.x.abs() <= 1e-4 {
             self.offset_position.x *= self.decceleration_factor;
@@ -105,13 +133,10 @@ impl Camera {
         }
         self.position = target_entity.position();
         if let Some(bound_entity) = &self.bound_entity {
-            let bound_entity = entities
-                .iter()
-                .find(|entity| entity.name() == bound_entity)
-                .expect(&format!(
-                    "Bound entity '{:?}' for the camera could not be found",
-                    bound_entity
-                ));
+            let bound_entity = match entities.iter().find(|entity| entity.name() == bound_entity) {
+                Some(entity) => entity,
+                None => return Err(CameraUpdateFailed::NOBoundEntity(bound_entity.clone())),
+            };
             match bound_entity.bounding_box().clamp_box_inside(&BoundingBox {
                 anchor: &self.position + &self.offset_position,
                 size: self.view_size,
@@ -120,6 +145,7 @@ impl Camera {
                 Some(new_offset) => self.position = new_offset - &self.offset_position,
             };
         }
+        Ok(())
     }
 
     pub fn as_bytes(&self) -> Vec<u8> {
