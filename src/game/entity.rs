@@ -22,7 +22,7 @@ pub trait Entity<T: EntityType, E: ExternalEvent>: Debug + Send {
         &self,
         vertices: &mut Vec<Vertex>,
         indices: &mut Vec<Index>,
-        sprite_sheet: &SpriteSheet,
+        sprite_sheet: Option<&SpriteSheet>,
     );
     fn render_sprite(
         &self,
@@ -71,8 +71,10 @@ pub trait Entity<T: EntityType, E: ExternalEvent>: Debug + Send {
         vertices.extend_from_slice(&new_vertices);
         indices.extend_from_slice(&new_indices);
     }
-    fn sprite_sheet(&self) -> &SpriteSheetName;
-    fn handle_key_input(&mut self, input: &KeyEvent);
+    fn sprite_sheet(&self) -> Option<&SpriteSheetName> {
+        None
+    }
+    fn handle_key_input(&mut self, _input: &KeyEvent) {}
     fn name(&self) -> &EntityName;
     fn bounding_box(&self) -> BoundingBox;
     fn entity_type(&self) -> T;

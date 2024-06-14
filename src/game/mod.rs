@@ -10,8 +10,6 @@ use super::{
 use log::{info, warn};
 use winit::{dpi::PhysicalSize, event::WindowEvent, window::WindowId};
 
-pub use self::vertex::Vertex;
-
 use self::camera::Camera;
 pub use self::{
     bounding_box::BoundingBox,
@@ -22,6 +20,7 @@ pub use self::{
     scene::{Scene, SceneName},
     sprite_sheet::{SpritePosition, SpriteSheet, SpriteSheetDimensions},
     velocity_controller::{Direction, VelocityController},
+    vertex::{TextureCoordinates, Vertex},
 };
 
 mod bounding_box;
@@ -260,7 +259,7 @@ impl<E: ExternalEvent + 'static> EventManager<GameEvent<E>, Index, Vertex> for G
                 for sprite_sheet in self.pending_scenes[index]
                     .entities
                     .iter()
-                    .map(|e| e.sprite_sheet())
+                    .filter_map(|e| e.sprite_sheet())
                 {
                     self.request_sprite_sheet(
                         &sprite_sheet,
@@ -298,7 +297,6 @@ impl<E: ExternalEvent + 'static> EventManager<GameEvent<E>, Index, Vertex> for G
             }
             GameEvent::Timer(delta_t) => {
                 for scene in self.active_scenes.iter_mut() {
-                    println!("Rendering Scene {:?}", scene.name);
                     let mut vertices = Vec::new();
                     let mut indices = Vec::new();
                     let entities = &mut scene.entities;
@@ -311,14 +309,16 @@ impl<E: ExternalEvent + 'static> EventManager<GameEvent<E>, Index, Vertex> for G
                         for event in events {
                             window_manager.send_event(GameEvent::External(event))
                         }
-                        let entity_sprite_sheet = entity.sprite_sheet();
-                        if let Some((_, sprite_sheet)) = &self
-                            .sprite_sheets
-                            .iter()
-                            .find(|(l, _)| l == entity_sprite_sheet)
+                        let sprite_sheet = if let Some(entity_sprite_sheet) = entity.sprite_sheet()
                         {
-                            entity.render(&mut vertices, &mut indices, sprite_sheet);
-                        }
+                            self.sprite_sheets
+                                .iter()
+                                .find(|(l, _)| l == entity_sprite_sheet)
+                                .map(|(_, s)| s)
+                        } else {
+                            None
+                        };
+                        entity.render(&mut vertices, &mut indices, sprite_sheet);
                     }
                     if let Some((_, camera, camera_name)) = self
                         .cameras

@@ -1,10 +1,11 @@
+use placeholder::game_engine::{
+    BoundingBox, Entity, EntityName, Index, SpritePosition, SpriteSheet, SpriteSheetName, Vertex,
+};
 use std::fmt::Debug;
-use placeholder::game_engine::{BoundingBox, Entity, EntityName, Index, SpritePosition, SpriteSheet, SpriteSheetName, Vertex};
 use threed::Vector;
 use winit::{dpi::PhysicalSize, event::KeyEvent};
 
 use crate::{Event, Type};
-
 
 pub struct Background {
     pub name: EntityName,
@@ -23,8 +24,8 @@ impl Entity<Type, Event> for Background {
     fn entity_type(&self) -> Type {
         Type::Background
     }
-    fn sprite_sheet(&self) -> &SpriteSheetName {
-        &self.sprite_sheet
+    fn sprite_sheet(&self) -> Option<&SpriteSheetName> {
+        Some(&self.sprite_sheet)
     }
     fn name(&self) -> &EntityName {
         &self.name
@@ -46,9 +47,10 @@ impl Entity<Type, Event> for Background {
         &self,
         vertices: &mut Vec<Vertex>,
         indices: &mut Vec<Index>,
-        sprite_sheet: &SpriteSheet,
+        sprite_sheet: Option<&SpriteSheet>,
     ) {
-        self.render_sprite(vertices, indices, sprite_sheet, &SpritePosition::new(0, 0))
+        if let Some(sprite_sheet) = sprite_sheet {
+            self.render_sprite(vertices, indices, sprite_sheet, &SpritePosition::new(0, 0));
+        }
     }
 }
-

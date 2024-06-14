@@ -15,7 +15,7 @@ use winit::{
 use placeholder::game_engine::{
     BoundingBox, CameraDescriptor, Direction, Entity, EntityName, EntityType, ExternalEvent, Game,
     Index, RessourceDescriptor, Scene, SceneName, SpritePosition, SpriteSheet,
-    SpriteSheetDimensions, SpriteSheetName, VelocityController, Vertex,
+    SpriteSheetDimensions, SpriteSheetName, TextureCoordinates, VelocityController, Vertex,
 };
 
 mod animation;
@@ -64,6 +64,51 @@ impl ExternalEvent for Event {
     }
 }
 
+struct Transition {
+    name: EntityName,
+    animation: Animation<(Vec<Vertex>, Vec<Index>)>,
+}
+impl Debug for Transition {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Transition")
+            .field("name", &self.name)
+            .finish()
+    }
+}
+impl Entity<Type, Event> for Transition {
+    fn render(
+        &self,
+        vertices: &mut Vec<Vertex>,
+        indices: &mut Vec<Index>,
+        _sprite_sheet: Option<&SpriteSheet>,
+    ) {
+        let (new_vertices, new_indices) = self.animation.keyframe();
+        let start_index = vertices.len() as u16;
+        vertices.extend(new_vertices);
+        indices.extend(new_indices.iter().map(|i| i + start_index));
+    }
+
+    fn update(&mut self, _entities: &Vec<&Box<dyn Entity<Type, Event>>>, delta_t: &Duration) -> Vec<Event> {
+        self.animation.update(delta_t);
+        vec![]
+    }
+
+    fn name(&self) -> &EntityName {
+        &self.name
+    }
+
+    fn bounding_box(&self) -> BoundingBox {
+        BoundingBox {
+            anchor: Vector::scalar(0.0),
+            size: PhysicalSize::new(1e5, 1e5),
+        }
+    }
+
+    fn entity_type(&self) -> Type {
+        Type::Background
+    }
+}
+
 struct Enemy {
     name: EntityName,
     size: PhysicalSize<u16>,
@@ -91,36 +136,130 @@ impl Entity<Type, Event> for Enemy {
             let bounding_box = player.bounding_box();
             if own_bounding_box.intersects(&bounding_box) {
                 let shader_descriptor = ShaderDescriptor {
-                    file: "res/shader/shader.wgsl",
+                    file: "res/shader/transition.wgsl",
                     vertex_shader: "vs_main",
                     fragment_shader: "fs_main",
                 };
+                let tex_coords = TextureCoordinates { u: 0.0, v: 0.0 };
                 return vec![Event::RequestNewScenes(vec![Scene {
                     name: "BattleScene".into(),
                     render_scene: "BattleScene".into(),
                     target_window: MAIN_WINDOW.into(),
                     z_index: 1,
-                    entities: vec![Box::new(Enemy {
-                        name: FROG.into(),
-                        size: PhysicalSize::new(64, 64),
-                        position: Vector::new(-100.0, -100.0, 0.0),
+                    entities: vec![Box::new(Transition {
+                        name: "BattleTransition".into(),
                         animation: Animation::new(
-                            FROG.into(),
+                            "BattleTransition".into(),
                             vec![
-                                (Duration::from_millis(240), SpritePosition::new(0, 0)),
-                                (Duration::from_millis(240), SpritePosition::new(1, 0)),
-                                (Duration::from_millis(240), SpritePosition::new(2, 0)),
-                                (Duration::from_millis(240), SpritePosition::new(3, 0)),
+                                (
+                                    Duration::from_millis(24),
+                                    (
+                                        vec![
+                                            Vertex::new(Vector::new(-0.5, 0.5, 0.0), &tex_coords, 0),
+                                            Vertex::new(
+                                                Vector::new(0.5, 0.5, 0.0),
+                                                &tex_coords,
+                                                0,
+                                            ),
+                                            Vertex::new(
+                                                Vector::new(0.5, -0.5, 0.0),
+                                                &tex_coords,
+                                                0,
+                                            ),
+                                            Vertex::new(
+                                                Vector::new(-0.5, -0.5, 0.0),
+                                                &tex_coords,
+                                                0,
+                                            ),
+                                        ],
+                                        vec![0, 1, 2, 0, 2, 3],
+                                    ),
+                                ),
+                                (
+                                    Duration::from_millis(24),
+                                    (
+                                        vec![
+                                            Vertex::new(
+                                                Vector::new(-0.75, 0.75, 0.0),
+                                                &tex_coords,
+                                                0,
+                                            ),
+                                            Vertex::new(
+                                                Vector::new(0.75, 0.75, 0.0),
+                                                &tex_coords,
+                                                0,
+                                            ),
+                                            Vertex::new(
+                                                Vector::new(0.75, -0.75, 0.0),
+                                                &tex_coords,
+                                                0,
+                                            ),
+                                            Vertex::new(
+                                                Vector::new(-0.75, -0.75, 0.0),
+                                                &tex_coords,
+                                                0,
+                                            ),
+                                        ],
+                                        vec![0, 1, 2, 0, 2, 3],
+                                    ),
+                                ),
+                                (
+                                    Duration::from_millis(24),
+                                    (
+                                        vec![
+                                            Vertex::new(Vector::new(-1.0, 1.0, 0.0), &tex_coords, 0),
+                                            Vertex::new(
+                                                Vector::new(1.0, 1.0, 0.0),
+                                                &tex_coords,
+                                                0,
+                                            ),
+                                            Vertex::new(
+                                                Vector::new(1.0, -1.0, 0.0),
+                                                &tex_coords,
+                                                0,
+                                            ),
+                                            Vertex::new(
+                                                Vector::new(-1.0, -1.0, 0.0),
+                                                &tex_coords,
+                                                0,
+                                            ),
+                                        ],
+                                        vec![0, 1, 2, 0, 2, 3],
+                                    ),
+                                ),
+                                (
+                                    Duration::from_millis(24),
+                                    (
+                                        vec![
+                                            Vertex::new(
+                                                Vector::new(-0.75, 0.75, 0.0),
+                                                &tex_coords,
+                                                0,
+                                            ),
+                                            Vertex::new(
+                                                Vector::new(0.75, 0.75, 0.0),
+                                                &tex_coords,
+                                                0,
+                                            ),
+                                            Vertex::new(
+                                                Vector::new(0.75, -0.75, 0.0),
+                                                &tex_coords,
+                                                0,
+                                            ),
+                                            Vertex::new(
+                                                Vector::new(-0.75, -0.75, 0.0),
+                                                &tex_coords,
+                                                0,
+                                            ),
+                                        ],
+                                        vec![0, 1, 2, 0, 2, 3],
+                                    ),
+                                ),
                             ],
                         ),
                     })],
                     shader_descriptor,
                 }])];
-                // println!(
-                //     "Player {:?} collided with enemy {:?}",
-                //     player.name(),
-                //     self.name()
-                // );
             }
         }
         vec![]
@@ -129,12 +268,14 @@ impl Entity<Type, Event> for Enemy {
         &self,
         vertices: &mut Vec<Vertex>,
         indices: &mut Vec<Index>,
-        sprite_sheet: &SpriteSheet,
+        sprite_sheet: Option<&SpriteSheet>,
     ) {
-        self.render_sprite(vertices, indices, sprite_sheet, self.animation.keyframe())
+        if let Some(sprite_sheet) = sprite_sheet {
+            self.render_sprite(vertices, indices, sprite_sheet, self.animation.keyframe());
+        }
     }
-    fn sprite_sheet(&self) -> &SpriteSheetName {
-        &self.animation.sprite_sheet()
+    fn sprite_sheet(&self) -> Option<&SpriteSheetName> {
+        Some(&self.animation.sprite_sheet())
     }
     fn handle_key_input(&mut self, _input: &KeyEvent) {}
     fn name(&self) -> &EntityName {
@@ -206,8 +347,8 @@ impl Entity<Type, Event> for Player {
         }
     }
 
-    fn sprite_sheet(&self) -> &SpriteSheetName {
-        &self.animation.sprite_sheet()
+    fn sprite_sheet(&self) -> Option<&SpriteSheetName> {
+        Some(&self.animation.sprite_sheet())
     }
 
     fn z(&self) -> f32 {
@@ -218,9 +359,11 @@ impl Entity<Type, Event> for Player {
         &self,
         vertices: &mut Vec<Vertex>,
         indices: &mut Vec<Index>,
-        sprite_sheet: &SpriteSheet,
+        sprite_sheet: Option<&SpriteSheet>,
     ) {
-        self.render_sprite(vertices, indices, sprite_sheet, self.animation.keyframe());
+        if let Some(sprite_sheet) = sprite_sheet {
+            self.render_sprite(vertices, indices, sprite_sheet, self.animation.keyframe());
+        }
     }
 
     fn handle_key_input(&mut self, input: &KeyEvent) {
@@ -280,7 +423,7 @@ fn main() {
     let main_window = WindowAttributes::default().with_title("Wispers in the Void - Dark Dynasty");
     let main_window_descriptor = WindowDescriptor::new(main_window).with_cursor(cursor_path);
     let shader_descriptor = ShaderDescriptor {
-        file: "res/shader/shader.wgsl",
+        file: "res/shader/texture_array.wgsl",
         vertex_shader: "vs_main",
         fragment_shader: "fs_main",
     };
