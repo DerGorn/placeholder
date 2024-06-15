@@ -12,6 +12,7 @@ pub struct RenderScene {
     num_indices: u32,
     num_vertices: u32,
     index_format: wgpu::IndexFormat,
+    vertex_buffer_layout: wgpu::VertexBufferLayout<'static>,
 }
 impl RenderScene {
     pub fn new(
@@ -22,6 +23,7 @@ impl RenderScene {
         num_indices: u32,
         num_vertices: u32,
         index_format: wgpu::IndexFormat,
+        vertex_buffer_layout: wgpu::VertexBufferLayout<'static>,
     ) -> Self {
         Self {
             name,
@@ -31,7 +33,12 @@ impl RenderScene {
             num_indices,
             num_vertices,
             index_format,
+            vertex_buffer_layout,
         }
+    }
+
+    pub fn vertex_buffer_layout(&self) -> &wgpu::VertexBufferLayout {
+        &self.vertex_buffer_layout
     }
 
     pub fn update_pipeline(&mut self, render_pipeline: wgpu::RenderPipeline) {

@@ -114,6 +114,8 @@ impl<E: ExternalEvent> Game<E> {
             target_window.clone(),
             scene.render_scene.clone(),
             scene.shader_descriptor.clone(),
+           scene.index_format.clone(),
+            scene.vertex_buffer_layout.clone(),
         ));
     }
 
@@ -205,7 +207,7 @@ impl<E: ExternalEvent + 'static> EventManager<GameEvent<E>, Index, Vertex> for G
     fn user_event(
         &mut self,
         window_manager: &mut WindowManager<GameEvent<E>>,
-        graphics_provider: &mut GraphicsProvider<Index, Vertex>,
+        graphics_provider: &mut GraphicsProvider,
         _event_loop: &winit::event_loop::ActiveEventLoop,
         event: GameEvent<E>,
     ) where

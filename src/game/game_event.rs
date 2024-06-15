@@ -27,7 +27,13 @@ pub enum GameEvent<E: ExternalEvent> {
     NewSpriteSheet(SpriteSheetName, Option<u32>),
     RequestNewSpriteSheet(SpriteSheetName, PathBuf, Vec<RenderSceneName>),
     NewRenderScene(RenderSceneName),
-    RequestNewRenderScene(WindowId, RenderSceneName, ShaderDescriptor),
+    RequestNewRenderScene(
+        WindowId,
+        RenderSceneName,
+        ShaderDescriptor,
+        wgpu::IndexFormat,
+        wgpu::VertexBufferLayout<'static>,
+    ),
     External(E),
 }
 impl<E: ExternalEvent> ApplicationEvent<Index, Vertex> for GameEvent<E> {
@@ -79,9 +85,28 @@ impl<E: ExternalEvent> ApplicationEvent<Index, Vertex> for GameEvent<E> {
 
     fn is_request_new_render_scene<'a>(
         &'a self,
-    ) -> Option<(&'a WindowId, &'a RenderSceneName, &'a ShaderDescriptor)> {
-        if let Self::RequestNewRenderScene(window_id, render_scene, shader_descriptor) = self {
-            Some((window_id, render_scene, shader_descriptor))
+    ) -> Option<(
+        &'a WindowId,
+        &'a RenderSceneName,
+        &'a ShaderDescriptor,
+        &'a wgpu::IndexFormat,
+        &'a wgpu::VertexBufferLayout<'static>,
+    )> {
+        if let Self::RequestNewRenderScene(
+            window_id,
+            render_scene,
+            shader_descriptor,
+            index_format,
+            vertex_buffer_layout,
+        ) = self
+        {
+            Some((
+                window_id,
+                render_scene,
+                shader_descriptor,
+                index_format,
+                vertex_buffer_layout,
+            ))
         } else {
             None
         }

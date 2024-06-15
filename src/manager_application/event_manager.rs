@@ -21,7 +21,7 @@ pub trait EventManager<E: 'static + Debug, I: Index, V: Vertex> {
     fn user_event(
         &mut self,
         _window_manager: &mut WindowManager<E>,
-        _graphics_provider: &mut GraphicsProvider<I, V>,
+        _graphics_provider: &mut GraphicsProvider,
         _event_loop: &ActiveEventLoop,
         _event: E,
     ) where

@@ -12,6 +12,8 @@ use winit::{
     window::WindowAttributes,
 };
 
+use placeholder::graphics::{Index as I, Vertex as V};
+
 use placeholder::game_engine::{
     BoundingBox, CameraDescriptor, Direction, Entity, EntityName, EntityType, ExternalEvent, Game,
     Index, RessourceDescriptor, Scene, SceneName, SpritePosition, SpriteSheet,
@@ -146,6 +148,8 @@ impl Entity<Type, Event> for Enemy {
                 };
                 let tex_coords = TextureCoordinates { u: 0.0, v: 0.0 };
                 return vec![Event::RequestNewScenes(vec![Scene {
+                    index_format: Index::index_format(),
+                    vertex_buffer_layout: Vertex::describe_buffer_layout(),
                     name: "BattleScene".into(),
                     render_scene: "BattleScene".into(),
                     target_window: MAIN_WINDOW.into(),
@@ -467,6 +471,8 @@ fn main() {
         ],
     };
     let scene = Scene {
+        index_format: Index::index_format(),
+        vertex_buffer_layout: Vertex::describe_buffer_layout(),
         z_index: 0,
         shader_descriptor,
         name: "MainScene".into(),

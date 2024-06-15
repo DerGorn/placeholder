@@ -25,7 +25,7 @@ pub use self::surface::RenderSceneName;
 
 create_name_struct!(UniformBufferName);
 
-pub struct GraphicsProvider<I: Index, V: Vertex> {
+pub struct GraphicsProvider {
     instance: wgpu::Instance,
     adapter: Option<wgpu::Adapter>,
     device: Option<wgpu::Device>,
@@ -41,9 +41,8 @@ pub struct GraphicsProvider<I: Index, V: Vertex> {
         wgpu::BindGroup,
     )>,
     texture_provider: Option<TextureProvider>,
-    _phantom: std::marker::PhantomData<(I, V)>,
 }
-impl<I: Index, V: Vertex> GraphicsProvider<I, V> {
+impl GraphicsProvider {
     pub fn new() -> Self {
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: wgpu::Backends::PRIMARY,
@@ -58,7 +57,6 @@ impl<I: Index, V: Vertex> GraphicsProvider<I, V> {
             render_scenes: Vec::new(),
             uniform_buffers: Vec::new(),
             texture_provider: None,
-            _phantom: std::marker::PhantomData,
         }
     }
 
@@ -179,7 +177,7 @@ impl<I: Index, V: Vertex> GraphicsProvider<I, V> {
     }
 
     /// Update the vertex and index buffers of a window
-    pub fn update_buffers(
+    pub fn update_buffers<I: Index, V: Vertex>(
         &mut self,
         render_scene: &RenderSceneName,
         vertices: Option<&[V]>,
@@ -203,6 +201,8 @@ impl<I: Index, V: Vertex> GraphicsProvider<I, V> {
         window_id: &WindowId,
         render_scene: RenderSceneName,
         shader_descriptor: ShaderDescriptor,
+        index_format: wgpu::IndexFormat,
+        vertex_buffer_layout: wgpu::VertexBufferLayout<'static>,
     ) {
         let device = self.device.as_ref().expect("The device vanished");
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -245,7 +245,7 @@ impl<I: Index, V: Vertex> GraphicsProvider<I, V> {
                 &bind_groups_layouts,
                 &shader,
                 &shader_descriptor,
-                V::describe_buffer_layout(),
+                vertex_buffer_layout.clone(),
             );
             let render_scene = RenderScene::new(
                 render_scene,
@@ -254,7 +254,8 @@ impl<I: Index, V: Vertex> GraphicsProvider<I, V> {
                 index_buffer,
                 num_vertices,
                 num_indices,
-                I::index_format(),
+                index_format,
+                vertex_buffer_layout,
             );
             self.render_scenes
                 .push((window_id.clone(), render_scene, shader, shader_descriptor));
@@ -298,7 +299,7 @@ impl<I: Index, V: Vertex> GraphicsProvider<I, V> {
                             &bind_groups_layouts,
                             shader,
                             shader_descriptor,
-                            V::describe_buffer_layout(),
+                            render_scene.vertex_buffer_layout().clone(),
                         );
                         render_scene.update_pipeline(render_pipeline);
                     }

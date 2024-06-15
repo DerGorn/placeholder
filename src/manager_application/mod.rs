@@ -28,7 +28,8 @@ pub struct ManagerApplication<
 > {
     event_manager: M,
     window_manager: WindowManager<E>,
-    graphics_provider: GraphicsProvider<I, V>,
+    graphics_provider: GraphicsProvider,
+    _phantom: std::marker::PhantomData<(I, V)>,
 }
 
 impl<'a, E: ApplicationEvent<I, V> + 'static, M: EventManager<E, I, V>, I: Index, V: Vertex>
@@ -114,11 +115,19 @@ impl<'a, E: ApplicationEvent<I, V> + 'static, M: EventManager<E, I, V>, I: Index
             None => {}
         }
         match event.is_request_new_render_scene() {
-            Some((window_id, render_scene, shader_descriptor)) => {
+            Some((
+                window_id,
+                render_scene,
+                shader_descriptor,
+                index_format,
+                vertex_buffer_layout,
+            )) => {
                 self.graphics_provider.add_render_scene(
                     window_id,
                     render_scene.clone(),
                     shader_descriptor.clone(),
+                    index_format.clone(),
+                    vertex_buffer_layout.clone(),
                 );
                 self.window_manager
                     .send_event(E::new_render_scene(render_scene))
@@ -143,6 +152,7 @@ impl<'a, E: ApplicationEvent<I, V> + 'static, M: EventManager<E, I, V>, I: Index
             event_manager,
             window_manager: Default::default(),
             graphics_provider: GraphicsProvider::new(),
+            _phantom: std::marker::PhantomData,
         }
     }
 
@@ -187,5 +197,11 @@ pub trait ApplicationEvent<I: Index, V: Vertex>: Debug {
     fn is_request_new_texture<'a>(&'a self) -> Option<(&'a Path, &'a str, &[RenderSceneName])>;
     fn is_request_new_render_scene<'a>(
         &'a self,
-    ) -> Option<(&'a WindowId, &'a RenderSceneName, &'a ShaderDescriptor)>;
+    ) -> Option<(
+        &'a WindowId,
+        &'a RenderSceneName,
+        &'a ShaderDescriptor,
+        &'a wgpu::IndexFormat,
+        &'a wgpu::VertexBufferLayout<'static>
+    )>;
 }
