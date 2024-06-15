@@ -1,6 +1,6 @@
 use crate::create_name_struct;
 
-use super::{Index, ShaderDescriptor, Vertex};
+use super::ShaderDescriptor;
 use std::fmt::Debug;
 use wgpu::util::DeviceExt;
 
@@ -207,41 +207,33 @@ impl RenderScene {
         &self.name
     }
 
-    pub fn update<V: Vertex, I: Index>(
+    pub fn update(
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-        vertices: Option<&[V]>,
-        indices: Option<&[I]>,
+        vertices: &dyn BufferWriter,
+        indices: &dyn BufferWriter,
     ) {
-        if let Some(indices) = indices {
-            if self.num_indices < indices.len() as u32 {
-                let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("Index Buffer"),
-                    contents: bytemuck::cast_slice(indices),
-                    usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
-                });
-                self.index_buffer = index_buffer;
-                self.num_indices = indices.len() as u32;
-            } else {
-                let indices = bytemuck::cast_slice(indices);
-                queue.write_buffer(&self.index_buffer, 0, indices);
-            }
-        }
-        if let Some(vertices) = vertices {
-            if self.num_vertices < vertices.len() as u32 {
-                let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("Vertex Buffer"),
-                    contents: bytemuck::cast_slice(vertices),
-                    usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-                });
-                self.vertex_buffer = vertex_buffer;
-                self.num_vertices = vertices.len() as u32;
-            } else {
-                let vertices = bytemuck::cast_slice(vertices);
-                queue.write_buffer(&self.vertex_buffer, 0, vertices);
-            }
-        }
+        if let Some((index_buffer, num_indices)) = indices.write_buffer(
+            device,
+            queue,
+            &self.index_buffer,
+            self.num_indices,
+            wgpu::BufferUsages::INDEX,
+        ) {
+            self.index_buffer = index_buffer;
+            self.num_indices = num_indices;
+        };
+        if let Some((vertex_buffer, num_vertices)) = vertices.write_buffer(
+            device,
+            queue,
+            &self.vertex_buffer,
+            self.num_vertices,
+            wgpu::BufferUsages::VERTEX,
+        ) {
+            self.vertex_buffer = vertex_buffer;
+            self.num_vertices = num_vertices;
+        };
     }
 
     fn write_render_pass<'a>(
@@ -256,5 +248,46 @@ impl RenderScene {
         render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
         render_pass.set_index_buffer(self.index_buffer.slice(..), self.index_format);
         render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
+    }
+}
+pub trait BufferWriter {
+    fn buffer_data<'a>(&'a self) -> Option<&'a [u8]>;
+    fn buffer_len(&self) -> u32;
+
+    fn write_buffer(
+        &self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        buffer: &wgpu::Buffer,
+        buffer_len: u32,
+        usage: wgpu::BufferUsages,
+    ) -> Option<(wgpu::Buffer, u32)> {
+        if let Some(buffer_data) = self.buffer_data() {
+            let new_len = self.buffer_len();
+            if buffer_len < new_len {
+                let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some(&format!("{:?} Buffer", usage)),
+                    contents: buffer_data,
+                    usage: usage | wgpu::BufferUsages::COPY_DST,
+                });
+                Some((buffer, new_len))
+            } else {
+                queue.write_buffer(buffer, 0, buffer_data);
+                None
+            }
+        } else {
+            None
+        }
+    }
+}
+impl<T> BufferWriter for Option<&[T]>
+where
+    T: bytemuck::Pod,
+{
+    fn buffer_len(&self) -> u32 {
+        self.unwrap_or_else(|| &[]).len() as u32
+    }
+    fn buffer_data<'a>(&'a self) -> Option<&'a [u8]> {
+        self.map(|s| bytemuck::cast_slice(s))
     }
 }

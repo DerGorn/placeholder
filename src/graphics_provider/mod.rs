@@ -193,7 +193,7 @@ impl<I: Index, V: Vertex> GraphicsProvider<I, V> {
                     None
                 }
             }) {
-                render_scene.update(device, queue, vertices, indices)
+                render_scene.update(device, queue, &vertices, &indices)
             }
         }
     }
