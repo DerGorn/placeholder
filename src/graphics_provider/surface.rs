@@ -4,7 +4,7 @@ use super::{Index, ShaderDescriptor, Vertex};
 use std::fmt::Debug;
 use wgpu::util::DeviceExt;
 
-pub trait WindowSurface<I: Index, V: Vertex>: Debug {
+pub trait WindowSurface: Debug {
     fn surface<'a, 'b: 'a>(&'b self) -> &'a wgpu::Surface<'a>;
     fn size(&self) -> &winit::dpi::PhysicalSize<u32>;
     fn size_mut(&mut self) -> &mut winit::dpi::PhysicalSize<u32>;
@@ -20,29 +20,29 @@ pub trait WindowSurface<I: Index, V: Vertex>: Debug {
         self.config_mut().height = new_size.height;
         self.surface().configure(device, self.config());
     }
-    fn create_render_pipeline(
+    fn create_render_pipeline<'a>(
         &self,
         device: &wgpu::Device,
         bind_group_layout: &[&wgpu::BindGroupLayout],
         shader: &wgpu::ShaderModule,
         shader_descriptor: &ShaderDescriptor,
+        vertex_buffer_layout: wgpu::VertexBufferLayout<'a>,
     ) -> wgpu::RenderPipeline;
     fn render(
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-        render_scenes: &[&RenderScene<V, I>],
+        render_scenes: &[&RenderScene],
         bind_groups: &[&wgpu::BindGroup],
     );
 }
 
-pub struct Surface<'a, I: Index, V: Vertex> {
+pub struct Surface<'a> {
     pub wgpu_surface: wgpu::Surface<'a>,
     pub size: winit::dpi::PhysicalSize<u32>,
     pub config: wgpu::SurfaceConfiguration,
-    pub _phantom: std::marker::PhantomData<(I, V)>,
 }
-impl<I: Index, V: Vertex> Debug for Surface<'_, I, V> {
+impl Debug for Surface<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Surface")
             .field("size", &self.size)
@@ -50,7 +50,7 @@ impl<I: Index, V: Vertex> Debug for Surface<'_, I, V> {
             .finish()
     }
 }
-impl<'a, I: Index, V: Vertex> WindowSurface<I, V> for Surface<'a, I, V> {
+impl<'a> WindowSurface for Surface<'a> {
     fn surface<'b, 'c: 'b>(&'c self) -> &'b wgpu::Surface<'b> {
         &self.wgpu_surface
     }
@@ -71,12 +71,13 @@ impl<'a, I: Index, V: Vertex> WindowSurface<I, V> for Surface<'a, I, V> {
         &mut self.config
     }
 
-    fn create_render_pipeline(
+    fn create_render_pipeline<'b>(
         &self,
         device: &wgpu::Device,
         bind_group_layouts: &[&wgpu::BindGroupLayout],
         shader: &wgpu::ShaderModule,
         shader_descriptor: &ShaderDescriptor,
+        vertex_buffer_layout: wgpu::VertexBufferLayout<'b>,
     ) -> wgpu::RenderPipeline {
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Pipeline Layout"),
@@ -89,7 +90,7 @@ impl<'a, I: Index, V: Vertex> WindowSurface<I, V> for Surface<'a, I, V> {
             vertex: wgpu::VertexState {
                 module: shader,
                 entry_point: shader_descriptor.vertex_shader,
-                buffers: &[V::describe_buffer_layout()],
+                buffers: &[vertex_buffer_layout],
             },
             fragment: Some(wgpu::FragmentState {
                 module: shader,
@@ -126,7 +127,7 @@ impl<'a, I: Index, V: Vertex> WindowSurface<I, V> for Surface<'a, I, V> {
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-        render_scenes: &[&RenderScene<V, I>],
+        render_scenes: &[&RenderScene],
         bind_groups: &[&wgpu::BindGroup],
     ) {
         let output = self
@@ -168,16 +169,16 @@ impl<'a, I: Index, V: Vertex> WindowSurface<I, V> for Surface<'a, I, V> {
 
 create_name_struct!(RenderSceneName);
 
-pub struct RenderScene<V: Vertex, I: Index> {
+pub struct RenderScene {
     name: RenderSceneName,
     render_pipeline: wgpu::RenderPipeline,
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
     num_indices: u32,
     num_vertices: u32,
-    _phantom: std::marker::PhantomData<(V, I)>,
+    index_format: wgpu::IndexFormat,
 }
-impl<V: Vertex, I: Index> RenderScene<V, I> {
+impl RenderScene {
     pub fn new(
         name: RenderSceneName,
         render_pipeline: wgpu::RenderPipeline,
@@ -185,6 +186,7 @@ impl<V: Vertex, I: Index> RenderScene<V, I> {
         index_buffer: wgpu::Buffer,
         num_indices: u32,
         num_vertices: u32,
+        index_format: wgpu::IndexFormat,
     ) -> Self {
         Self {
             name,
@@ -193,7 +195,7 @@ impl<V: Vertex, I: Index> RenderScene<V, I> {
             index_buffer,
             num_indices,
             num_vertices,
-            _phantom: std::marker::PhantomData,
+            index_format,
         }
     }
 
@@ -205,7 +207,7 @@ impl<V: Vertex, I: Index> RenderScene<V, I> {
         &self.name
     }
 
-    pub fn update(
+    pub fn update<V: Vertex, I: Index>(
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
@@ -252,7 +254,7 @@ impl<V: Vertex, I: Index> RenderScene<V, I> {
             render_pass.set_bind_group(i as u32, bind_group, &[]);
         }
         render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-        render_pass.set_index_buffer(self.index_buffer.slice(..), I::index_format());
+        render_pass.set_index_buffer(self.index_buffer.slice(..), self.index_format);
         render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
     }
 }

@@ -31,14 +31,9 @@ pub struct GraphicsProvider<I: Index, V: Vertex> {
     device: Option<wgpu::Device>,
     queue: Option<wgpu::Queue>,
     ///One to one relationship
-    surfaces: Vec<(WindowId, Box<dyn WindowSurface<I, V>>)>,
+    surfaces: Vec<(WindowId, Box<dyn WindowSurface>)>,
     ///One to many relationship
-    render_scenes: Vec<(
-        WindowId,
-        RenderScene<V, I>,
-        wgpu::ShaderModule,
-        ShaderDescriptor,
-    )>,
+    render_scenes: Vec<(WindowId, RenderScene, wgpu::ShaderModule, ShaderDescriptor)>,
     uniform_buffers: Vec<(
         UniformBufferName,
         wgpu::Buffer,
@@ -46,6 +41,7 @@ pub struct GraphicsProvider<I: Index, V: Vertex> {
         wgpu::BindGroup,
     )>,
     texture_provider: Option<TextureProvider>,
+    _phantom: std::marker::PhantomData<(I, V)>,
 }
 impl<I: Index, V: Vertex> GraphicsProvider<I, V> {
     pub fn new() -> Self {
@@ -62,6 +58,7 @@ impl<I: Index, V: Vertex> GraphicsProvider<I, V> {
             render_scenes: Vec::new(),
             uniform_buffers: Vec::new(),
             texture_provider: None,
+            _phantom: std::marker::PhantomData,
         }
     }
 
@@ -151,7 +148,6 @@ impl<I: Index, V: Vertex> GraphicsProvider<I, V> {
                 wgpu_surface: surface,
                 size,
                 config,
-                _phantom: std::marker::PhantomData,
             }),
         ));
     }
@@ -249,6 +245,7 @@ impl<I: Index, V: Vertex> GraphicsProvider<I, V> {
                 &bind_groups_layouts,
                 &shader,
                 &shader_descriptor,
+                V::describe_buffer_layout(),
             );
             let render_scene = RenderScene::new(
                 render_scene,
@@ -257,6 +254,7 @@ impl<I: Index, V: Vertex> GraphicsProvider<I, V> {
                 index_buffer,
                 num_vertices,
                 num_indices,
+                I::index_format(),
             );
             self.render_scenes
                 .push((window_id.clone(), render_scene, shader, shader_descriptor));
@@ -300,6 +298,7 @@ impl<I: Index, V: Vertex> GraphicsProvider<I, V> {
                             &bind_groups_layouts,
                             shader,
                             shader_descriptor,
+                            V::describe_buffer_layout(),
                         );
                         render_scene.update_pipeline(render_pipeline);
                     }

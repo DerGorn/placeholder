@@ -88,7 +88,11 @@ impl Entity<Type, Event> for Transition {
         indices.extend(new_indices.iter().map(|i| i + start_index));
     }
 
-    fn update(&mut self, _entities: &Vec<&Box<dyn Entity<Type, Event>>>, delta_t: &Duration) -> Vec<Event> {
+    fn update(
+        &mut self,
+        _entities: &Vec<&Box<dyn Entity<Type, Event>>>,
+        delta_t: &Duration,
+    ) -> Vec<Event> {
         self.animation.update(delta_t);
         vec![]
     }
@@ -155,12 +159,12 @@ impl Entity<Type, Event> for Enemy {
                                     Duration::from_millis(24),
                                     (
                                         vec![
-                                            Vertex::new(Vector::new(-0.5, 0.5, 0.0), &tex_coords, 0),
                                             Vertex::new(
-                                                Vector::new(0.5, 0.5, 0.0),
+                                                Vector::new(-0.5, 0.5, 0.0),
                                                 &tex_coords,
                                                 0,
                                             ),
+                                            Vertex::new(Vector::new(0.5, 0.5, 0.0), &tex_coords, 0),
                                             Vertex::new(
                                                 Vector::new(0.5, -0.5, 0.0),
                                                 &tex_coords,
@@ -207,12 +211,12 @@ impl Entity<Type, Event> for Enemy {
                                     Duration::from_millis(24),
                                     (
                                         vec![
-                                            Vertex::new(Vector::new(-1.0, 1.0, 0.0), &tex_coords, 0),
                                             Vertex::new(
-                                                Vector::new(1.0, 1.0, 0.0),
+                                                Vector::new(-1.0, 1.0, 0.0),
                                                 &tex_coords,
                                                 0,
                                             ),
+                                            Vertex::new(Vector::new(1.0, 1.0, 0.0), &tex_coords, 0),
                                             Vertex::new(
                                                 Vector::new(1.0, -1.0, 0.0),
                                                 &tex_coords,
