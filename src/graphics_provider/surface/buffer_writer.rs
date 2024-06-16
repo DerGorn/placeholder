@@ -1,5 +1,7 @@
 use wgpu::util::DeviceExt;
 
+use crate::graphics_provider::{Index, Vertex};
+
 pub trait BufferWriter {
     fn buffer_data<'a>(&'a self) -> Option<&'a [u8]>;
     fn buffer_len(&self) -> u32;
@@ -41,3 +43,9 @@ where
         self.map(|s| bytemuck::cast_slice(s))
     }
 }
+
+pub trait IndexBufferWriter: BufferWriter {}
+impl<I: Index> IndexBufferWriter for Option<&[I]> {}
+
+pub trait VertexBufferWriter: BufferWriter {}
+impl<V: Vertex> VertexBufferWriter for Option<&[V]> {}

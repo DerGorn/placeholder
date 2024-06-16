@@ -4,7 +4,7 @@ use std::{
     time::Duration,
 };
 
-use crate::graphics_provider::BufferWriter;
+use crate::graphics_provider::{IndexBufferWriter, VertexBufferWriter};
 use crate::{
     app::{ApplicationEvent, WindowDescriptor},
     graphics::{RenderSceneName, ShaderDescriptor},
@@ -52,19 +52,23 @@ impl<E: ExternalEvent> ApplicationEvent for GameEvent<E> {
 
     fn is_render_update<'a>(
         &'a self,
-    ) -> Option<(&'a RenderSceneName, impl BufferWriter, impl BufferWriter)> {
+    ) -> Option<(
+        &'a RenderSceneName,
+        impl VertexBufferWriter,
+        impl IndexBufferWriter,
+    )> {
         if let Self::RenderUpdate(render_scene, vertices, indices) = self {
             Some((
                 &render_scene,
                 if vertices.len() > 0 {
-                    Some(indices.as_slice())
-                } else {
-                    None::<&[Index]>
-                },
-                if indices.len() > 0 {
                     Some(vertices.as_slice())
                 } else {
                     None::<&[Vertex]>
+                },
+                if indices.len() > 0 {
+                    Some(indices.as_slice())
+                } else {
+                    None::<&[Index]>
                 },
             ))
         } else {

@@ -17,7 +17,8 @@ mod window_manager;
 pub use window_manager::WindowManager;
 
 use crate::graphics_provider::{
-    BufferWriter, GraphicsProvider, Index, RenderSceneName, ShaderDescriptor, Vertex,
+    GraphicsProvider, Index, IndexBufferWriter, RenderSceneName, ShaderDescriptor, Vertex,
+    VertexBufferWriter,
 };
 
 pub struct ManagerApplication<
@@ -100,7 +101,7 @@ impl<'a, E: ApplicationEvent + 'static, M: EventManager<E, I, V>, I: Index, V: V
         };
         match event.is_render_update() {
             None => {}
-            Some((render_scene, indices, vertices)) => {
+            Some((render_scene, vertices, indices)) => {
                 self.graphics_provider
                     .update_buffers(render_scene, &vertices, &indices);
             }
@@ -191,10 +192,13 @@ pub trait ApplicationEvent: Debug {
     fn new_texture(label: &str, id: Option<u32>) -> Self;
     fn new_render_scene(render_scene: &RenderSceneName) -> Self;
     fn is_request_new_window<'a>(&'a self) -> Option<(&'a WindowDescriptor, &'a str)>;
-    ///Returns Option<(RenderSceneName, Vertices, Indices)>
     fn is_render_update<'a>(
         &'a self,
-    ) -> Option<(&'a RenderSceneName, impl BufferWriter, impl BufferWriter)>;
+    ) -> Option<(
+        &'a RenderSceneName,
+        impl VertexBufferWriter,
+        impl IndexBufferWriter,
+    )>;
     fn is_request_new_texture<'a>(&'a self) -> Option<(&'a Path, &'a str, &[RenderSceneName])>;
     fn is_request_new_render_scene<'a>(
         &'a self,

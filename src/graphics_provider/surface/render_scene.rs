@@ -1,6 +1,6 @@
 use crate::create_name_struct;
 
-use super::BufferWriter;
+use super::{IndexBufferWriter, VertexBufferWriter};
 
 create_name_struct!(RenderSceneName);
 
@@ -53,8 +53,8 @@ impl RenderScene {
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-        vertices: &dyn BufferWriter,
-        indices: &dyn BufferWriter,
+        vertices: &dyn VertexBufferWriter,
+        indices: &dyn IndexBufferWriter,
     ) {
         if let Some((index_buffer, num_indices)) = indices.write_buffer(
             device,
