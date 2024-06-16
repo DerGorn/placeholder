@@ -23,18 +23,15 @@ use crate::graphics_provider::{
 
 pub struct ManagerApplication<
     E: ApplicationEvent + 'static,
-    M: EventManager<E, I, V>,
-    I: Index,
-    V: Vertex,
+    M: EventManager<E>,
 > {
     event_manager: M,
     window_manager: WindowManager<E>,
     graphics_provider: GraphicsProvider,
-    _phantom: std::marker::PhantomData<(I, V)>,
 }
 
-impl<'a, E: ApplicationEvent + 'static, M: EventManager<E, I, V>, I: Index, V: Vertex>
-    ApplicationHandler<E> for ManagerApplication<E, M, I, V>
+impl<'a, E: ApplicationEvent + 'static, M: EventManager<E>>
+    ApplicationHandler<E> for ManagerApplication<E, M>
 {
     fn resumed(&mut self, _active_loop: &ActiveEventLoop) {
         self.window_manager.send_event(E::app_resumed());
@@ -145,15 +142,14 @@ impl<'a, E: ApplicationEvent + 'static, M: EventManager<E, I, V>, I: Index, V: V
     }
 }
 
-impl<'a, E: ApplicationEvent + 'static, M: EventManager<E, I, V>, I: Index, V: Vertex>
-    ManagerApplication<E, M, I, V>
+impl<'a, E: ApplicationEvent + 'static, M: EventManager<E>>
+    ManagerApplication<E, M>
 {
     pub fn new(event_manager: M) -> Self {
         Self {
             event_manager,
             window_manager: Default::default(),
             graphics_provider: GraphicsProvider::new(),
-            _phantom: std::marker::PhantomData,
         }
     }
 

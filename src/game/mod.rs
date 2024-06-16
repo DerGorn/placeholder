@@ -161,7 +161,7 @@ impl<E: ExternalEvent> Game<E> {
             .collect()
     }
 }
-impl<E: ExternalEvent + 'static> EventManager<GameEvent<E>, Index, Vertex> for Game<E> {
+impl<E: ExternalEvent + 'static> EventManager<GameEvent<E>> for Game<E> {
     fn window_event(
         &mut self,
         _window_manager: &mut WindowManager<GameEvent<E>>,
