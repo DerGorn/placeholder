@@ -4,6 +4,7 @@ use std::{
     time::Duration,
 };
 
+use crate::graphics_provider::BufferWriter;
 use crate::{
     app::{ApplicationEvent, WindowDescriptor},
     graphics::{RenderSceneName, ShaderDescriptor},
@@ -36,7 +37,7 @@ pub enum GameEvent<E: ExternalEvent> {
     ),
     External(E),
 }
-impl<E: ExternalEvent> ApplicationEvent<Index, Vertex> for GameEvent<E> {
+impl<E: ExternalEvent> ApplicationEvent for GameEvent<E> {
     fn app_resumed() -> Self {
         Self::Resumed
     }
@@ -51,23 +52,19 @@ impl<E: ExternalEvent> ApplicationEvent<Index, Vertex> for GameEvent<E> {
 
     fn is_render_update<'a>(
         &'a self,
-    ) -> Option<(
-        &'a RenderSceneName,
-        Option<&'a [Index]>,
-        Option<&'a [Vertex]>,
-    )> {
+    ) -> Option<(&'a RenderSceneName, impl BufferWriter, impl BufferWriter)> {
         if let Self::RenderUpdate(render_scene, vertices, indices) = self {
             Some((
                 &render_scene,
                 if vertices.len() > 0 {
                     Some(indices.as_slice())
                 } else {
-                    None
+                    None::<&[Index]>
                 },
                 if indices.len() > 0 {
                     Some(vertices.as_slice())
                 } else {
-                    None
+                    None::<&[Vertex]>
                 },
             ))
         } else {

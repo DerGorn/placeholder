@@ -17,11 +17,11 @@ mod window_manager;
 pub use window_manager::WindowManager;
 
 use crate::graphics_provider::{
-    GraphicsProvider, Index, RenderSceneName, ShaderDescriptor, Vertex,
+    BufferWriter, GraphicsProvider, Index, RenderSceneName, ShaderDescriptor, Vertex,
 };
 
 pub struct ManagerApplication<
-    E: ApplicationEvent<I, V> + 'static,
+    E: ApplicationEvent + 'static,
     M: EventManager<E, I, V>,
     I: Index,
     V: Vertex,
@@ -32,7 +32,7 @@ pub struct ManagerApplication<
     _phantom: std::marker::PhantomData<(I, V)>,
 }
 
-impl<'a, E: ApplicationEvent<I, V> + 'static, M: EventManager<E, I, V>, I: Index, V: Vertex>
+impl<'a, E: ApplicationEvent + 'static, M: EventManager<E, I, V>, I: Index, V: Vertex>
     ApplicationHandler<E> for ManagerApplication<E, M, I, V>
 {
     fn resumed(&mut self, _active_loop: &ActiveEventLoop) {
@@ -99,10 +99,10 @@ impl<'a, E: ApplicationEvent<I, V> + 'static, M: EventManager<E, I, V>, I: Index
             None => {}
         };
         match event.is_render_update() {
-            Some((_, None, None)) | None => {}
+            None => {}
             Some((render_scene, indices, vertices)) => {
                 self.graphics_provider
-                    .update_buffers(render_scene, vertices, indices);
+                    .update_buffers(render_scene, &vertices, &indices);
             }
         }
         match event.is_request_new_texture() {
@@ -144,7 +144,7 @@ impl<'a, E: ApplicationEvent<I, V> + 'static, M: EventManager<E, I, V>, I: Index
     }
 }
 
-impl<'a, E: ApplicationEvent<I, V> + 'static, M: EventManager<E, I, V>, I: Index, V: Vertex>
+impl<'a, E: ApplicationEvent + 'static, M: EventManager<E, I, V>, I: Index, V: Vertex>
     ManagerApplication<E, M, I, V>
 {
     pub fn new(event_manager: M) -> Self {
@@ -185,15 +185,16 @@ impl<'a, E: ApplicationEvent<I, V> + 'static, M: EventManager<E, I, V>, I: Index
     }
 }
 
-pub trait ApplicationEvent<I: Index, V: Vertex>: Debug {
+pub trait ApplicationEvent: Debug {
     fn app_resumed() -> Self;
     fn new_window(id: &WindowId, name: &str) -> Self;
     fn new_texture(label: &str, id: Option<u32>) -> Self;
     fn new_render_scene(render_scene: &RenderSceneName) -> Self;
     fn is_request_new_window<'a>(&'a self) -> Option<(&'a WindowDescriptor, &'a str)>;
+    ///Returns Option<(RenderSceneName, Vertices, Indices)>
     fn is_render_update<'a>(
         &'a self,
-    ) -> Option<(&'a RenderSceneName, Option<&'a [I]>, Option<&'a [V]>)>;
+    ) -> Option<(&'a RenderSceneName, impl BufferWriter, impl BufferWriter)>;
     fn is_request_new_texture<'a>(&'a self) -> Option<(&'a Path, &'a str, &[RenderSceneName])>;
     fn is_request_new_render_scene<'a>(
         &'a self,
@@ -202,6 +203,6 @@ pub trait ApplicationEvent<I: Index, V: Vertex>: Debug {
         &'a RenderSceneName,
         &'a ShaderDescriptor,
         &'a wgpu::IndexFormat,
-        &'a wgpu::VertexBufferLayout<'static>
+        &'a wgpu::VertexBufferLayout<'static>,
     )>;
 }

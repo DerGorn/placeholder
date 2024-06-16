@@ -21,7 +21,7 @@ use texture::TextureProvider;
 use crate::create_name_struct;
 
 use self::surface::RenderScene;
-pub use self::surface::RenderSceneName;
+pub use self::surface::{BufferWriter, RenderSceneName};
 
 create_name_struct!(UniformBufferName);
 
@@ -177,11 +177,11 @@ impl GraphicsProvider {
     }
 
     /// Update the vertex and index buffers of a window
-    pub fn update_buffers<I: Index, V: Vertex>(
+    pub fn update_buffers(
         &mut self,
         render_scene: &RenderSceneName,
-        vertices: Option<&[V]>,
-        indices: Option<&[I]>,
+        vertices: &dyn BufferWriter,
+        indices: &dyn BufferWriter,
     ) {
         if let (Some(device), Some(queue)) = (&self.device, &self.queue) {
             for render_scene in self.render_scenes.iter_mut().filter_map(|(_, s, _, _)| {
@@ -191,7 +191,7 @@ impl GraphicsProvider {
                     None
                 }
             }) {
-                render_scene.update(device, queue, &vertices, &indices)
+                render_scene.update(device, queue, vertices, indices)
             }
         }
     }
