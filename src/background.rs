@@ -1,11 +1,11 @@
-use placeholder::game_engine::{
-    BoundingBox, Entity, EntityName, Index, SpritePosition, SpriteSheet, SpriteSheetName, Vertex,
-};
+use placeholder::{app::{IndexBuffer, VertexBuffer}, game_engine::{
+    BoundingBox, Entity, EntityName, SpritePosition, SpriteSheet, SpriteSheetName,
+}};
 use std::fmt::Debug;
 use threed::Vector;
 use winit::{dpi::PhysicalSize, event::KeyEvent};
 
-use crate::{Event, Type};
+use crate::{vertex::render_sprite, Event, Type};
 
 pub struct Background {
     pub name: EntityName,
@@ -45,12 +45,12 @@ impl Entity<Type, Event> for Background {
     fn handle_key_input(&mut self, _input: &KeyEvent) {}
     fn render(
         &self,
-        vertices: &mut Vec<Vertex>,
-        indices: &mut Vec<Index>,
+        vertices: &mut VertexBuffer,
+        indices: &mut IndexBuffer,
         sprite_sheet: Option<&SpriteSheet>,
     ) {
         if let Some(sprite_sheet) = sprite_sheet {
-            self.render_sprite(vertices, indices, sprite_sheet, &SpritePosition::new(0, 0));
+            render_sprite(&self.bounding_box(), vertices, indices, sprite_sheet, &SpritePosition::new(0, 0));
         }
     }
 }

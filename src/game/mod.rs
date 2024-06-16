@@ -3,6 +3,8 @@ use std::{
     time::{Duration, Instant},
 };
 
+use crate::app::{IndexBuffer, VertexBuffer};
+
 use super::{
     app::{EventManager, WindowManager},
     graphics::{GraphicsProvider, RenderSceneName, UniformBufferName},
@@ -10,7 +12,6 @@ use super::{
 use log::{info, warn};
 use winit::{dpi::PhysicalSize, event::WindowEvent, window::WindowId};
 
-use self::camera::Camera;
 pub use self::{
     bounding_box::BoundingBox,
     camera::CameraDescriptor,
@@ -22,6 +23,7 @@ pub use self::{
     velocity_controller::{Direction, VelocityController},
     vertex::{TextureCoordinates, Vertex},
 };
+use self::camera::Camera;
 
 mod bounding_box;
 mod camera;
@@ -114,7 +116,7 @@ impl<E: ExternalEvent> Game<E> {
             target_window.clone(),
             scene.render_scene.clone(),
             scene.shader_descriptor.clone(),
-           scene.index_format.clone(),
+            scene.index_format.clone(),
             scene.vertex_buffer_layout.clone(),
         ));
     }
@@ -299,8 +301,8 @@ impl<E: ExternalEvent + 'static> EventManager<GameEvent<E>> for Game<E> {
             }
             GameEvent::Timer(delta_t) => {
                 for scene in self.active_scenes.iter_mut() {
-                    let mut vertices = Vec::new();
-                    let mut indices = Vec::new();
+                    let mut vertices = VertexBuffer::new();
+                    let mut indices = IndexBuffer::new();
                     let entities = &mut scene.entities;
                     entities.sort_by(|a, b| a.z().partial_cmp(&b.z()).expect("NaN NaN NaN"));
                     for i in 0..entities.len() {

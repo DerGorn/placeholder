@@ -4,6 +4,7 @@ use std::{
     time::Duration,
 };
 
+use crate::app::{IndexBuffer, VertexBuffer};
 use crate::graphics_provider::{IndexBufferWriter, VertexBufferWriter};
 use crate::{
     app::{ApplicationEvent, WindowDescriptor},
@@ -24,7 +25,7 @@ pub enum GameEvent<E: ExternalEvent> {
     Resumed,
     NewWindow(WindowId, WindowName),
     RequestNewWindow(WindowDescriptor, WindowName),
-    RenderUpdate(RenderSceneName, Vec<Vertex>, Vec<Index>),
+    RenderUpdate(RenderSceneName, VertexBuffer, IndexBuffer),
     NewSpriteSheet(SpriteSheetName, Option<u32>),
     RequestNewSpriteSheet(SpriteSheetName, PathBuf, Vec<RenderSceneName>),
     NewRenderScene(RenderSceneName),
@@ -50,29 +51,18 @@ impl<E: ExternalEvent> ApplicationEvent for GameEvent<E> {
         }
     }
 
-    fn is_render_update<'a>(
-        &'a self,
-    ) -> Option<(
-        &'a RenderSceneName,
-        impl VertexBufferWriter,
-        impl IndexBufferWriter,
-    )> {
+    fn is_render_update(&self) -> bool {
+        match self {
+            Self::RenderUpdate(_, _, _) => true,
+            _ => false,
+        }
+    }
+
+    fn consume_render_update(self) -> (RenderSceneName, VertexBuffer, IndexBuffer) {
         if let Self::RenderUpdate(render_scene, vertices, indices) = self {
-            Some((
-                &render_scene,
-                if vertices.len() > 0 {
-                    Some(vertices.as_slice())
-                } else {
-                    None::<&[Vertex]>
-                },
-                if indices.len() > 0 {
-                    Some(indices.as_slice())
-                } else {
-                    None::<&[Index]>
-                },
-            ))
+            (render_scene, vertices, indices)
         } else {
-            None
+            panic!("You Idiot! Test if it is a render update, before trying to consume the event as one")
         }
     }
 

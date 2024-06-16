@@ -8,7 +8,7 @@ pub mod graphics {
 mod manager_application;
 pub mod app {
     pub use super::manager_application::{
-        ApplicationEvent, EventManager, ManagerApplication, WindowDescriptor, WindowManager,
+        ApplicationEvent, EventManager, ManagerApplication, WindowDescriptor, WindowManager, IndexBuffer, VertexBuffer,
     };
 }
 

@@ -2,7 +2,7 @@ use super::ShaderDescriptor;
 use std::fmt::Debug;
 
 mod buffer_writer;
-pub use buffer_writer::{IndexBufferWriter, VertexBufferWriter};
+pub use buffer_writer::{BufferWriter, IndexBufferWriter, VertexBufferWriter};
 
 mod render_scene;
 pub use render_scene::{RenderScene, RenderSceneName};

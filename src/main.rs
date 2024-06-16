@@ -1,5 +1,5 @@
 use env_logger::Env;
-use placeholder::app::{ManagerApplication, WindowDescriptor};
+use placeholder::app::{IndexBuffer, ManagerApplication, VertexBuffer, WindowDescriptor};
 use placeholder::graphics::ShaderDescriptor;
 use std::fmt::Debug;
 use std::path::PathBuf;
@@ -17,7 +17,7 @@ use placeholder::graphics::{Index as I, Vertex as V};
 use placeholder::game_engine::{
     BoundingBox, CameraDescriptor, Direction, Entity, EntityName, EntityType, ExternalEvent, Game,
     Index, RessourceDescriptor, Scene, SceneName, SpritePosition, SpriteSheet,
-    SpriteSheetDimensions, SpriteSheetName, TextureCoordinates, VelocityController, Vertex,
+    SpriteSheetDimensions, SpriteSheetName, TextureCoordinates, VelocityController,
 };
 
 mod animation;
@@ -25,6 +25,9 @@ use animation::Animation;
 
 mod background;
 use background::Background;
+
+mod vertex;
+use vertex::{render_sprite, Vertex};
 
 #[derive(Debug, PartialEq)]
 enum Type {
@@ -80,14 +83,20 @@ impl Debug for Transition {
 impl Entity<Type, Event> for Transition {
     fn render(
         &self,
-        vertices: &mut Vec<Vertex>,
-        indices: &mut Vec<Index>,
+        vertices: &mut VertexBuffer,
+        indices: &mut IndexBuffer,
         _sprite_sheet: Option<&SpriteSheet>,
     ) {
         let (new_vertices, new_indices) = self.animation.keyframe();
         let start_index = vertices.len() as u16;
-        vertices.extend(new_vertices);
-        indices.extend(new_indices.iter().map(|i| i + start_index));
+        vertices.extend_from_slice(new_vertices);
+        indices.extend_from_slice(
+            new_indices
+                .iter()
+                .map(|i| i + start_index)
+                .collect::<Vec<_>>()
+                .as_slice(),
+        );
     }
 
     fn update(
@@ -274,12 +283,18 @@ impl Entity<Type, Event> for Enemy {
     }
     fn render(
         &self,
-        vertices: &mut Vec<Vertex>,
-        indices: &mut Vec<Index>,
+        vertices: &mut VertexBuffer,
+        indices: &mut IndexBuffer,
         sprite_sheet: Option<&SpriteSheet>,
     ) {
         if let Some(sprite_sheet) = sprite_sheet {
-            self.render_sprite(vertices, indices, sprite_sheet, self.animation.keyframe());
+            render_sprite(
+                &self.bounding_box(),
+                vertices,
+                indices,
+                sprite_sheet,
+                self.animation.keyframe(),
+            );
         }
     }
     fn sprite_sheet(&self) -> Option<&SpriteSheetName> {
@@ -365,12 +380,18 @@ impl Entity<Type, Event> for Player {
 
     fn render(
         &self,
-        vertices: &mut Vec<Vertex>,
-        indices: &mut Vec<Index>,
+        vertices: &mut VertexBuffer,
+        indices: &mut IndexBuffer,
         sprite_sheet: Option<&SpriteSheet>,
     ) {
         if let Some(sprite_sheet) = sprite_sheet {
-            self.render_sprite(vertices, indices, sprite_sheet, self.animation.keyframe());
+            render_sprite(
+                &self.bounding_box(),
+                vertices,
+                indices,
+                sprite_sheet,
+                self.animation.keyframe(),
+            );
         }
     }
 

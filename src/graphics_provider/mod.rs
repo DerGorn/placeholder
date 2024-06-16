@@ -21,7 +21,7 @@ use texture::TextureProvider;
 use crate::create_name_struct;
 
 use self::surface::RenderScene;
-pub use self::surface::{IndexBufferWriter, VertexBufferWriter, RenderSceneName};
+pub use self::surface::{IndexBufferWriter, VertexBufferWriter, RenderSceneName, BufferWriter};
 
 create_name_struct!(UniformBufferName);
 
