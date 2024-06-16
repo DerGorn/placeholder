@@ -5,19 +5,15 @@ use std::{
 };
 
 use crate::app::{IndexBuffer, VertexBuffer};
-use crate::graphics_provider::{IndexBufferWriter, VertexBufferWriter};
 use crate::{
     app::{ApplicationEvent, WindowDescriptor},
     graphics::{RenderSceneName, ShaderDescriptor},
 };
 use winit::window::WindowId;
 
-use super::{EntityType, Scene, Vertex};
+use super::{EntityType, Scene};
 
-use super::{
-    ressource_descriptor::{SpriteSheetName, WindowName},
-    Index,
-};
+use super::ressource_descriptor::{SpriteSheetName, WindowName};
 
 #[derive(Debug)]
 pub enum GameEvent<E: ExternalEvent> {

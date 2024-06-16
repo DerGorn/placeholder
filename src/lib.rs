@@ -8,7 +8,8 @@ pub mod graphics {
 mod manager_application;
 pub mod app {
     pub use super::manager_application::{
-        ApplicationEvent, EventManager, ManagerApplication, WindowDescriptor, WindowManager, IndexBuffer, VertexBuffer,
+        ApplicationEvent, EventManager, IndexBuffer, ManagerApplication, VertexBuffer,
+        WindowDescriptor, WindowManager,
     };
 }
 
@@ -17,7 +18,7 @@ pub mod game_engine {
     pub use super::game::{
         BoundingBox, CameraDescriptor, Direction, Entity, EntityName, EntityType, ExternalEvent,
         Game, Index, RessourceDescriptor, Scene, SceneName, SpritePosition, SpriteSheet,
-        SpriteSheetDimensions, SpriteSheetName, TextureCoordinates, VelocityController, Vertex,
+        SpriteSheetDimensions, SpriteSheetName, TextureCoordinates, VelocityController,
     };
 }
 

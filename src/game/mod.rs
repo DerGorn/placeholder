@@ -19,9 +19,8 @@ pub use self::{
     game_event::{ExternalEvent, GameEvent},
     ressource_descriptor::{RessourceDescriptor, SpriteSheetName, WindowName},
     scene::{Scene, SceneName},
-    sprite_sheet::{SpritePosition, SpriteSheet, SpriteSheetDimensions},
+    sprite_sheet::{TextureCoordinates, SpritePosition, SpriteSheet, SpriteSheetDimensions},
     velocity_controller::{Direction, VelocityController},
-    vertex::{TextureCoordinates, Vertex},
 };
 use self::camera::Camera;
 
@@ -34,7 +33,6 @@ mod scene;
 mod sprite;
 mod sprite_sheet;
 mod velocity_controller;
-mod vertex;
 
 pub type Index = u16;
 

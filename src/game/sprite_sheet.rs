@@ -1,4 +1,7 @@
-use super::vertex::TextureCoordinates;
+pub struct TextureCoordinates {
+    pub u: f32,
+    pub v: f32,
+}
 
 pub struct SpritePosition {
     pub x: u8,
