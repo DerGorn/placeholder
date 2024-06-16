@@ -17,7 +17,7 @@ use placeholder::graphics::{Index as I, Vertex as V};
 use placeholder::game_engine::{
     BoundingBox, CameraDescriptor, Direction, Entity, EntityName, EntityType, ExternalEvent, Game,
     Index, RessourceDescriptor, Scene, SceneName, SpritePosition, SpriteSheet,
-    SpriteSheetDimensions, SpriteSheetName, TextureCoordinates, VelocityController,
+    SpriteSheetDimensions, SpriteSheetName, VelocityController,
 };
 
 mod animation;
@@ -69,9 +69,36 @@ impl ExternalEvent for Event {
     }
 }
 
+use repr_trait::C;
+#[repr(C)]
+#[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable, repr_trait::C)]
+struct SimpleVertex {
+    position: [f32; 2],
+}
+impl SimpleVertex {
+    fn new(position: Vector<f32>) -> Self {
+        Self {
+            position: [position.x, position.y],
+        }
+    }
+}
+impl V for SimpleVertex {
+    fn describe_buffer_layout() -> wgpu::VertexBufferLayout<'static> {
+        wgpu::VertexBufferLayout {
+            array_stride: std::mem::size_of::<Self>() as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Vertex,
+            attributes: &[wgpu::VertexAttribute {
+                offset: 0,
+                format: wgpu::VertexFormat::Float32x2,
+                shader_location: 0,
+            }],
+        }
+    }
+}
+
 struct Transition {
     name: EntityName,
-    animation: Animation<(Vec<Vertex>, Vec<Index>)>,
+    animation: Animation<(Vec<SimpleVertex>, Vec<Index>)>,
 }
 impl Debug for Transition {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -155,10 +182,9 @@ impl Entity<Type, Event> for Enemy {
                     vertex_shader: "vs_main",
                     fragment_shader: "fs_main",
                 };
-                let tex_coords = TextureCoordinates { u: 0.0, v: 0.0 };
                 return vec![Event::RequestNewScenes(vec![Scene {
                     index_format: Index::index_format(),
-                    vertex_buffer_layout: Vertex::describe_buffer_layout(),
+                    vertex_buffer_layout: SimpleVertex::describe_buffer_layout(),
                     name: "BattleScene".into(),
                     render_scene: "BattleScene".into(),
                     target_window: MAIN_WINDOW.into(),
@@ -172,21 +198,15 @@ impl Entity<Type, Event> for Enemy {
                                     Duration::from_millis(24),
                                     (
                                         vec![
-                                            Vertex::new(
+                                            SimpleVertex::new(
                                                 Vector::new(-0.5, 0.5, 0.0),
-                                                &tex_coords,
-                                                0,
                                             ),
-                                            Vertex::new(Vector::new(0.5, 0.5, 0.0), &tex_coords, 0),
-                                            Vertex::new(
+                                            SimpleVertex::new(Vector::new(0.5, 0.5, 0.0)),
+                                            SimpleVertex::new(
                                                 Vector::new(0.5, -0.5, 0.0),
-                                                &tex_coords,
-                                                0,
                                             ),
-                                            Vertex::new(
+                                            SimpleVertex::new(
                                                 Vector::new(-0.5, -0.5, 0.0),
-                                                &tex_coords,
-                                                0,
                                             ),
                                         ],
                                         vec![0, 1, 2, 0, 2, 3],
@@ -196,25 +216,17 @@ impl Entity<Type, Event> for Enemy {
                                     Duration::from_millis(24),
                                     (
                                         vec![
-                                            Vertex::new(
+                                            SimpleVertex::new(
                                                 Vector::new(-0.75, 0.75, 0.0),
-                                                &tex_coords,
-                                                0,
                                             ),
-                                            Vertex::new(
+                                            SimpleVertex::new(
                                                 Vector::new(0.75, 0.75, 0.0),
-                                                &tex_coords,
-                                                0,
                                             ),
-                                            Vertex::new(
+                                            SimpleVertex::new(
                                                 Vector::new(0.75, -0.75, 0.0),
-                                                &tex_coords,
-                                                0,
                                             ),
-                                            Vertex::new(
+                                            SimpleVertex::new(
                                                 Vector::new(-0.75, -0.75, 0.0),
-                                                &tex_coords,
-                                                0,
                                             ),
                                         ],
                                         vec![0, 1, 2, 0, 2, 3],
@@ -224,21 +236,15 @@ impl Entity<Type, Event> for Enemy {
                                     Duration::from_millis(24),
                                     (
                                         vec![
-                                            Vertex::new(
+                                            SimpleVertex::new(
                                                 Vector::new(-1.0, 1.0, 0.0),
-                                                &tex_coords,
-                                                0,
                                             ),
-                                            Vertex::new(Vector::new(1.0, 1.0, 0.0), &tex_coords, 0),
-                                            Vertex::new(
+                                            SimpleVertex::new(Vector::new(1.0, 1.0, 0.0)),
+                                            SimpleVertex::new(
                                                 Vector::new(1.0, -1.0, 0.0),
-                                                &tex_coords,
-                                                0,
                                             ),
-                                            Vertex::new(
+                                            SimpleVertex::new(
                                                 Vector::new(-1.0, -1.0, 0.0),
-                                                &tex_coords,
-                                                0,
                                             ),
                                         ],
                                         vec![0, 1, 2, 0, 2, 3],
@@ -248,25 +254,17 @@ impl Entity<Type, Event> for Enemy {
                                     Duration::from_millis(24),
                                     (
                                         vec![
-                                            Vertex::new(
+                                            SimpleVertex::new(
                                                 Vector::new(-0.75, 0.75, 0.0),
-                                                &tex_coords,
-                                                0,
                                             ),
-                                            Vertex::new(
+                                            SimpleVertex::new(
                                                 Vector::new(0.75, 0.75, 0.0),
-                                                &tex_coords,
-                                                0,
                                             ),
-                                            Vertex::new(
+                                            SimpleVertex::new(
                                                 Vector::new(0.75, -0.75, 0.0),
-                                                &tex_coords,
-                                                0,
                                             ),
-                                            Vertex::new(
+                                            SimpleVertex::new(
                                                 Vector::new(-0.75, -0.75, 0.0),
-                                                &tex_coords,
-                                                0,
                                             ),
                                         ],
                                         vec![0, 1, 2, 0, 2, 3],
