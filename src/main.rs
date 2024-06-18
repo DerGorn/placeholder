@@ -198,16 +198,10 @@ impl Entity<Type, Event> for Enemy {
                                     Duration::from_millis(24),
                                     (
                                         vec![
-                                            SimpleVertex::new(
-                                                Vector::new(-0.5, 0.5, 0.0),
-                                            ),
+                                            SimpleVertex::new(Vector::new(-0.5, 0.5, 0.0)),
                                             SimpleVertex::new(Vector::new(0.5, 0.5, 0.0)),
-                                            SimpleVertex::new(
-                                                Vector::new(0.5, -0.5, 0.0),
-                                            ),
-                                            SimpleVertex::new(
-                                                Vector::new(-0.5, -0.5, 0.0),
-                                            ),
+                                            SimpleVertex::new(Vector::new(0.5, -0.5, 0.0)),
+                                            SimpleVertex::new(Vector::new(-0.5, -0.5, 0.0)),
                                         ],
                                         vec![0, 1, 2, 0, 2, 3],
                                     ),
@@ -216,18 +210,10 @@ impl Entity<Type, Event> for Enemy {
                                     Duration::from_millis(24),
                                     (
                                         vec![
-                                            SimpleVertex::new(
-                                                Vector::new(-0.75, 0.75, 0.0),
-                                            ),
-                                            SimpleVertex::new(
-                                                Vector::new(0.75, 0.75, 0.0),
-                                            ),
-                                            SimpleVertex::new(
-                                                Vector::new(0.75, -0.75, 0.0),
-                                            ),
-                                            SimpleVertex::new(
-                                                Vector::new(-0.75, -0.75, 0.0),
-                                            ),
+                                            SimpleVertex::new(Vector::new(-0.75, 0.75, 0.0)),
+                                            SimpleVertex::new(Vector::new(0.75, 0.75, 0.0)),
+                                            SimpleVertex::new(Vector::new(0.75, -0.75, 0.0)),
+                                            SimpleVertex::new(Vector::new(-0.75, -0.75, 0.0)),
                                         ],
                                         vec![0, 1, 2, 0, 2, 3],
                                     ),
@@ -236,16 +222,10 @@ impl Entity<Type, Event> for Enemy {
                                     Duration::from_millis(24),
                                     (
                                         vec![
-                                            SimpleVertex::new(
-                                                Vector::new(-1.0, 1.0, 0.0),
-                                            ),
+                                            SimpleVertex::new(Vector::new(-1.0, 1.0, 0.0)),
                                             SimpleVertex::new(Vector::new(1.0, 1.0, 0.0)),
-                                            SimpleVertex::new(
-                                                Vector::new(1.0, -1.0, 0.0),
-                                            ),
-                                            SimpleVertex::new(
-                                                Vector::new(-1.0, -1.0, 0.0),
-                                            ),
+                                            SimpleVertex::new(Vector::new(1.0, -1.0, 0.0)),
+                                            SimpleVertex::new(Vector::new(-1.0, -1.0, 0.0)),
                                         ],
                                         vec![0, 1, 2, 0, 2, 3],
                                     ),
@@ -254,18 +234,10 @@ impl Entity<Type, Event> for Enemy {
                                     Duration::from_millis(24),
                                     (
                                         vec![
-                                            SimpleVertex::new(
-                                                Vector::new(-0.75, 0.75, 0.0),
-                                            ),
-                                            SimpleVertex::new(
-                                                Vector::new(0.75, 0.75, 0.0),
-                                            ),
-                                            SimpleVertex::new(
-                                                Vector::new(0.75, -0.75, 0.0),
-                                            ),
-                                            SimpleVertex::new(
-                                                Vector::new(-0.75, -0.75, 0.0),
-                                            ),
+                                            SimpleVertex::new(Vector::new(-0.75, 0.75, 0.0)),
+                                            SimpleVertex::new(Vector::new(0.75, 0.75, 0.0)),
+                                            SimpleVertex::new(Vector::new(0.75, -0.75, 0.0)),
+                                            SimpleVertex::new(Vector::new(-0.75, -0.75, 0.0)),
                                         ],
                                         vec![0, 1, 2, 0, 2, 3],
                                     ),
@@ -465,12 +437,10 @@ fn main() {
         bound_entity: Some(background.into()),
         max_offset_position: 100.0,
     };
+    let main_scene = "MainScene";
     let ressources = RessourceDescriptor {
-        windows: vec![(
-            MAIN_WINDOW.into(),
-            main_window_descriptor,
-            camera_descriptor,
-        )],
+        windows: vec![(MAIN_WINDOW.into(), main_window_descriptor)],
+        render_scenes: vec![(main_scene.into(), camera_descriptor)],
         sprite_sheets: vec![
             (
                 player_sprite_sheet.into(),
@@ -494,8 +464,8 @@ fn main() {
         vertex_buffer_layout: Vertex::describe_buffer_layout(),
         z_index: 0,
         shader_descriptor,
-        name: "MainScene".into(),
-        render_scene: "MainScene".into(),
+        name: main_scene.into(),
+        render_scene: main_scene.into(),
         target_window: MAIN_WINDOW.into(),
         entities: vec![
             Box::new(Player {

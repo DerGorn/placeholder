@@ -3,7 +3,6 @@ use std::fs;
 use std::path::Path;
 
 use wgpu::rwh::{HasRawDisplayHandle, HasRawWindowHandle};
-use wgpu::util::DeviceExt;
 use winit::window::{Window, WindowId};
 
 mod buffer_primitives;
@@ -23,12 +22,7 @@ pub use buffer_writer::{BufferWriter, IndexBufferWriter, VertexBufferWriter};
 
 mod render_scene;
 use render_scene::RenderScene;
-pub use render_scene::RenderSceneName;
-
-
-use crate::create_name_struct;
-
-create_name_struct!(UniformBufferName);
+pub use render_scene::{RenderSceneName, UniformBufferName};
 
 pub struct GraphicsProvider {
     instance: wgpu::Instance,
@@ -39,13 +33,8 @@ pub struct GraphicsProvider {
     surfaces: Vec<(WindowId, Box<dyn WindowSurface>)>,
     ///One to many relationship
     render_scenes: Vec<(WindowId, RenderScene, wgpu::ShaderModule, ShaderDescriptor)>,
-    uniform_buffers: Vec<(
-        UniformBufferName,
-        wgpu::Buffer,
-        wgpu::BindGroupLayout,
-        wgpu::BindGroup,
-    )>,
     texture_provider: Option<TextureProvider>,
+    uniform_buffers: Vec<(RenderSceneName, UniformBufferName)>,
 }
 impl GraphicsProvider {
     pub fn new() -> Self {
@@ -167,21 +156,20 @@ impl GraphicsProvider {
             if let (Some(device), Some(queue), Some(texture_provider)) =
                 (&self.device, &self.queue, &self.texture_provider)
             {
-                let mut bind_groups =
-                    vec![texture_provider.bind_group.as_ref().expect("No bind group")];
-                bind_groups.extend(self.uniform_buffers.iter().map(|(_, _, _, bg)| bg));
+                let texture_bind_group =
+                    texture_provider.bind_group.as_ref().expect("No bind group");
                 let render_scenes = self
                     .render_scenes
                     .iter()
                     .filter_map(|(i, s, _, _)| if i == id { Some(s) } else { None })
                     .collect::<Vec<_>>();
-                surface.render(device, queue, &render_scenes, &bind_groups)
+                surface.render(device, queue, &render_scenes, texture_bind_group);
             }
         }
     }
 
     /// Update the vertex and index buffers of a window
-    pub fn update_buffers(
+    pub fn update_scene(
         &mut self,
         render_scene: &RenderSceneName,
         vertices: &impl VertexBufferWriter,
@@ -203,65 +191,58 @@ impl GraphicsProvider {
     pub fn add_render_scene(
         &mut self,
         window_id: &WindowId,
-        render_scene: RenderSceneName,
+        render_scene_name: RenderSceneName,
         shader_descriptor: ShaderDescriptor,
         index_format: wgpu::IndexFormat,
         vertex_buffer_layout: wgpu::VertexBufferLayout<'static>,
+        use_textures: bool,
+        initial_uniforms: &[(UniformBufferName, Vec<u8>, wgpu::ShaderStages)],
     ) {
         let device = self.device.as_ref().expect("The device vanished");
-        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some(&format!("Vertex Buffer {:?}", render_scene)),
-            contents: &[],
-            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-        });
-        let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some(&format!("Index Buffer {:?}", render_scene)),
-            contents: &[],
-            usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
-        });
-        let num_vertices = 0;
-        let num_indices = 0;
-
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some(&format!("Shader Module {:?}", shader_descriptor.file)),
-            source: wgpu::ShaderSource::Wgsl(
-                fs::read_to_string(shader_descriptor.file)
-                    .expect(&format!("Could not load '{}'\n", shader_descriptor.file))
-                    .into(),
-            ),
-        });
 
         if let (Some((_, surface)), Some(texture_provider)) = (
             self.surfaces.iter().find(|(id, _)| id == window_id),
             &self.texture_provider,
         ) {
-            let mut bind_groups_layouts = vec![texture_provider
-                .bind_group_layout
-                .as_ref()
-                .expect("Default Texture vanished")];
-            bind_groups_layouts.extend(
+            let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: Some(&format!("Shader Module {:?}", shader_descriptor.file)),
+                source: wgpu::ShaderSource::Wgsl(
+                    fs::read_to_string(shader_descriptor.file)
+                        .expect(&format!("Could not load '{}'\n", shader_descriptor.file))
+                        .into(),
+                ),
+            });
+            let mut render_scene = RenderScene::new(
+                render_scene_name.clone(),
+                device,
+                index_format,
+                vertex_buffer_layout.clone(),
+                use_textures,
+            );
+            for (uniform, content, visibility) in initial_uniforms {
+                render_scene.create_uniform_buffer(
+                    device,
+                    uniform.clone(),
+                    content,
+                    visibility.clone(),
+                );
                 self.uniform_buffers
-                    .iter()
-                    .map(|(_, _, bind_group_layout, _)| bind_group_layout),
+                    .push((render_scene_name.clone(), uniform.clone()));
+            }
+            let bind_groups_layouts = render_scene.bind_group_layouts(
+                texture_provider
+                    .bind_group_layout
+                    .as_ref()
+                    .expect("Default Texture vanished"),
             );
             let render_pipeline = surface.create_render_pipeline(
                 device,
                 &bind_groups_layouts,
                 &shader,
                 &shader_descriptor,
-                vertex_buffer_layout.clone(),
-            );
-            let render_scene = RenderScene::new(
-                render_scene,
-                render_pipeline,
-                vertex_buffer,
-                index_buffer,
-                num_vertices,
-                num_indices,
-                index_format,
                 vertex_buffer_layout,
-                true,
             );
+            render_scene.update_pipeline(render_pipeline);
             self.render_scenes
                 .push((window_id.clone(), render_scene, shader, shader_descriptor));
         } else {
@@ -274,31 +255,23 @@ impl GraphicsProvider {
         self.render_scenes.retain(|(i, _, _, _)| i != id);
     }
 
-    pub fn create_texture(
-        &mut self,
-        path: &Path,
-        label: &str,
-        render_scenes: &[RenderSceneName],
-    ) -> Option<u32> {
+    pub fn create_texture(&mut self, path: &Path, label: &str) -> Option<u32> {
         if let (Some(device), Some(queue), Some(texture_provider)) =
             (&self.device, &self.queue, &mut self.texture_provider)
         {
             let index = texture_provider.create_texture(device, queue, path, Some(label));
-            let mut bind_groups_layouts = vec![texture_provider
+            let texture_bind_group_layout = texture_provider
                 .bind_group_layout
                 .as_ref()
-                .expect("No texture bind group layout")];
-            bind_groups_layouts.extend(
-                self.uniform_buffers
-                    .iter()
-                    .map(|(_, _, bind_group_layout, _)| bind_group_layout),
-            );
+                .expect("No texture bind group layout");
             self.render_scenes
                 .iter_mut()
-                .filter(|(_, s, _, _)| render_scenes.contains(&s.name()))
+                .filter(|(_, s, _, _)| s.use_textures())
                 .for_each(|(window_id, render_scene, shader, shader_descriptor)| {
                     if let Some((_, surface)) = self.surfaces.iter().find(|(id, _)| id == window_id)
                     {
+                        let bind_groups_layouts =
+                            render_scene.bind_group_layouts(texture_bind_group_layout);
                         let render_pipeline = surface.create_render_pipeline(
                             device,
                             &bind_groups_layouts,
@@ -320,44 +293,38 @@ impl GraphicsProvider {
         label: impl Into<UniformBufferName>,
         contents: &[u8],
         visibility: wgpu::ShaderStages,
+        target_render_scene: &RenderSceneName,
     ) {
-        let label: UniformBufferName = label.into();
         let device = self.device.as_ref().expect("The device vanished");
-        let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some(label.as_str()),
-            contents,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
-        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some(label.as_str()),
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            }],
-        });
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some(label.as_str()),
-            layout: &bind_group_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: buffer.as_entire_binding(),
-            }],
-        });
-        self.uniform_buffers
-            .push((label.clone(), buffer, bind_group_layout, bind_group));
+        if let Some((_, render_scene, _, _)) = self
+            .render_scenes
+            .iter_mut()
+            .find(|(_, s, _, _)| s.name() == target_render_scene)
+        {
+            let label = label.into();
+            render_scene.create_uniform_buffer(device, label.clone(), contents, visibility);
+            self.uniform_buffers
+                .push((target_render_scene.clone(), label));
+        } else {
+            panic!(
+                "Could not find any {:?} to attach {:?} to",
+                target_render_scene,
+                label.into()
+            );
+        }
     }
 
     pub fn update_uniform_buffer(&self, label: &UniformBufferName, contents: &[u8]) {
-        if let Some((_, buffer, _, _)) = self.uniform_buffers.iter().find(|(l, _, _, _)| l == label)
+        if let Some((target_render_scene, _)) =
+            self.uniform_buffers.iter().find(|(_, u)| u == label)
         {
+            let (_, render_scene, _, _) = self
+                .render_scenes
+                .iter()
+                .find(|(_, s, _, _)| s.name() == target_render_scene)
+                .expect(&format!("RenderScene {:?} vanished", target_render_scene));
             let queue = self.queue.as_ref().expect("The queue vanished");
-            queue.write_buffer(buffer, 0, contents);
+            render_scene.update_uniform_buffer(queue, label, contents);
         }
     }
 }

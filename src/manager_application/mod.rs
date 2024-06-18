@@ -17,8 +17,7 @@ mod window_manager;
 pub use window_manager::WindowManager;
 
 use crate::graphics_provider::{
-    BufferWriter, GraphicsProvider, Index, IndexBufferWriter, RenderSceneName, ShaderDescriptor,
-    Vertex, VertexBufferWriter,
+    BufferWriter, GraphicsProvider, Index, IndexBufferWriter, RenderSceneName, ShaderDescriptor, UniformBufferName, Vertex, VertexBufferWriter
 };
 
 pub struct ManagerApplication<E: ApplicationEvent + 'static, M: EventManager<E>> {
@@ -96,14 +95,14 @@ impl<'a, E: ApplicationEvent + 'static, M: EventManager<E>> ApplicationHandler<E
         if event.is_render_update() {
             let (render_scene, vertices, indices) = event.consume_render_update();
             self.graphics_provider
-                .update_buffers(&render_scene, &vertices, &indices);
+                .update_scene(&render_scene, &vertices, &indices);
             return;
         }
         match event.is_request_new_texture() {
             Some((path, label, render_scenes)) => {
                 let id = self
                     .graphics_provider
-                    .create_texture(path, label, render_scenes);
+                    .create_texture(path, label);
                 self.window_manager.send_event(E::new_texture(label, id));
             }
             None => {}
@@ -115,6 +114,7 @@ impl<'a, E: ApplicationEvent + 'static, M: EventManager<E>> ApplicationHandler<E
                 shader_descriptor,
                 index_format,
                 vertex_buffer_layout,
+                initial_uniforms,
             )) => {
                 self.graphics_provider.add_render_scene(
                     window_id,
@@ -122,6 +122,8 @@ impl<'a, E: ApplicationEvent + 'static, M: EventManager<E>> ApplicationHandler<E
                     shader_descriptor.clone(),
                     index_format.clone(),
                     vertex_buffer_layout.clone(),
+                    true,
+                    initial_uniforms,
                 );
                 self.window_manager
                     .send_event(E::new_render_scene(render_scene))
@@ -257,5 +259,6 @@ pub trait ApplicationEvent: Debug {
         &'a ShaderDescriptor,
         &'a wgpu::IndexFormat,
         &'a wgpu::VertexBufferLayout<'static>,
+        &'a [(UniformBufferName, Vec<u8>, wgpu::ShaderStages)],
     )>;
 }

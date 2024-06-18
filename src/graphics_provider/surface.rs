@@ -28,7 +28,7 @@ pub trait WindowSurface: Debug {
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         render_scenes: &[&RenderScene],
-        bind_groups: &[&wgpu::BindGroup],
+        texture_bind_group: &wgpu::BindGroup,
     );
 }
 
@@ -113,7 +113,7 @@ impl<'a> WindowSurface for Surface<'a> {
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         render_scenes: &[&RenderScene],
-        bind_groups: &[&wgpu::BindGroup],
+        texture_bind_group: &wgpu::BindGroup,
     ) {
         let output = self
             .surface()
@@ -143,7 +143,7 @@ impl<'a> WindowSurface for Surface<'a> {
             });
 
             for render_scene in render_scenes {
-                render_scene.write_render_pass(&mut render_pass, bind_groups);
+                render_scene.write_render_pass(&mut render_pass, texture_bind_group);
             }
         }
 

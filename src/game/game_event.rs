@@ -5,6 +5,7 @@ use std::{
 };
 
 use crate::app::{IndexBuffer, VertexBuffer};
+use crate::graphics_provider::UniformBufferName;
 use crate::{
     app::{ApplicationEvent, WindowDescriptor},
     graphics::{RenderSceneName, ShaderDescriptor},
@@ -31,6 +32,8 @@ pub enum GameEvent<E: ExternalEvent> {
         ShaderDescriptor,
         wgpu::IndexFormat,
         wgpu::VertexBufferLayout<'static>,
+        ///Initial uniforms for the render scene
+        Vec<(UniformBufferName, Vec<u8>, wgpu::ShaderStages)>,
     ),
     External(E),
 }
@@ -78,6 +81,7 @@ impl<E: ExternalEvent> ApplicationEvent for GameEvent<E> {
         &'a ShaderDescriptor,
         &'a wgpu::IndexFormat,
         &'a wgpu::VertexBufferLayout<'static>,
+        &'a [(UniformBufferName, Vec<u8>, wgpu::ShaderStages)],
     )> {
         if let Self::RequestNewRenderScene(
             window_id,
@@ -85,6 +89,7 @@ impl<E: ExternalEvent> ApplicationEvent for GameEvent<E> {
             shader_descriptor,
             index_format,
             vertex_buffer_layout,
+            initial_uniforms,
         ) = self
         {
             Some((
@@ -93,6 +98,7 @@ impl<E: ExternalEvent> ApplicationEvent for GameEvent<E> {
                 shader_descriptor,
                 index_format,
                 vertex_buffer_layout,
+                initial_uniforms,
             ))
         } else {
             None

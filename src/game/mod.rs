@@ -3,7 +3,10 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::app::{IndexBuffer, VertexBuffer};
+use crate::{
+    app::{IndexBuffer, VertexBuffer},
+    graphics_provider::ShaderDescriptor,
+};
 
 use super::{
     app::{EventManager, WindowManager},
@@ -12,6 +15,7 @@ use super::{
 use log::{info, warn};
 use winit::{dpi::PhysicalSize, event::WindowEvent, window::WindowId};
 
+use self::camera::Camera;
 pub use self::{
     bounding_box::BoundingBox,
     camera::CameraDescriptor,
@@ -19,10 +23,9 @@ pub use self::{
     game_event::{ExternalEvent, GameEvent},
     ressource_descriptor::{RessourceDescriptor, SpriteSheetName, WindowName},
     scene::{Scene, SceneName},
-    sprite_sheet::{TextureCoordinates, SpritePosition, SpriteSheet, SpriteSheetDimensions},
+    sprite_sheet::{SpritePosition, SpriteSheet, SpriteSheetDimensions, TextureCoordinates},
     velocity_controller::{Direction, VelocityController},
 };
-use self::camera::Camera;
 
 mod bounding_box;
 mod camera;
@@ -43,7 +46,7 @@ pub struct Game<E: ExternalEvent> {
     window_ids: Vec<(WindowName, WindowId)>,
     window_sizes: Vec<(WindowId, PhysicalSize<u32>)>,
     sprite_sheets: Vec<(SpriteSheetName, SpriteSheet)>,
-    cameras: Vec<(WindowName, Camera, UniformBufferName)>,
+    cameras: Vec<(SceneName, Camera, UniformBufferName)>,
     target_fps: u8,
 }
 impl<E: ExternalEvent> Game<E> {
@@ -67,6 +70,7 @@ impl<E: ExternalEvent> Game<E> {
     fn activate_scenes(&mut self, window_manager: &mut WindowManager<GameEvent<E>>) {
         let mut needed_windows = Vec::new();
         let mut scenes_to_discard = Vec::new();
+        let mut scenes_to_reques = Vec::new();
         for scene in self.pending_scenes.iter() {
             if self
                 .active_scenes
@@ -83,12 +87,38 @@ impl<E: ExternalEvent> Game<E> {
                 .iter()
                 .find(|(existing_window, _)| scene.target_window == *existing_window)
             {
-                self.request_render_scene(id, window_manager, scene)
+                scenes_to_reques.push((
+                    id.clone(),
+                    scene.render_scene.clone(),
+                    scene.name.clone(),
+                    scene.shader_descriptor.clone(),
+                    scene.index_format,
+                    scene.vertex_buffer_layout.clone(),
+                ));
             } else {
                 if !needed_windows.contains(&scene.target_window) {
                     needed_windows.push(scene.target_window.clone());
                 }
             }
+        }
+        for (
+            window_id,
+            render_scene,
+            scene,
+            shader_descriptor,
+            index_format,
+            vertex_buffer_layout,
+        ) in scenes_to_reques
+        {
+            self.request_render_scene(
+                &window_id,
+                window_manager,
+                render_scene,
+                scene,
+                shader_descriptor,
+                index_format,
+                vertex_buffer_layout,
+            );
         }
         for window_name in needed_windows.iter() {
             let window_descriptor = &self
@@ -105,17 +135,39 @@ impl<E: ExternalEvent> Game<E> {
     }
 
     fn request_render_scene(
-        &self,
+        &mut self,
         target_window: &WindowId,
         window_manager: &mut WindowManager<GameEvent<E>>,
-        scene: &Scene<E>,
+        render_scene: RenderSceneName,
+        scene: SceneName,
+        shader_descriptor: ShaderDescriptor,
+        index_format: wgpu::IndexFormat,
+        vertex_buffer_layout: wgpu::VertexBufferLayout<'static>,
     ) {
+        let uniform_buffers =
+            if let Some(camera_descriptor) = &self.ressources.get_camera(&render_scene) {
+                let camera: Camera = camera_descriptor.into();
+                let uniform_name = &format!("{:?} camera", render_scene.as_str());
+                // graphics_provider.create_uniform_buffer(
+                //     uniform_name,
+                //     &camera.as_bytes(),
+                //     wgpu::ShaderStages::VERTEX,
+                //     &scene.render_scene,
+                // );
+                let bytes = camera.as_bytes();
+                self.cameras
+                    .push((scene.clone(), camera, uniform_name.into()));
+                vec![(uniform_name.into(), bytes, wgpu::ShaderStages::VERTEX)]
+            } else {
+                vec![]
+            };
         window_manager.send_event(GameEvent::RequestNewRenderScene(
             target_window.clone(),
-            scene.render_scene.clone(),
-            scene.shader_descriptor.clone(),
-            scene.index_format.clone(),
-            scene.vertex_buffer_layout.clone(),
+            render_scene,
+            shader_descriptor,
+            index_format,
+            vertex_buffer_layout,
+            uniform_buffers,
         ));
     }
 
@@ -154,12 +206,12 @@ impl<E: ExternalEvent> Game<E> {
     //         .collect()
     // }
 
-    fn get_scenes_mut(&mut self, window_name: &WindowName) -> Vec<&mut Scene<E>> {
-        self.active_scenes
-            .iter_mut()
-            .filter(|scene| scene.target_window == *window_name)
-            .collect()
-    }
+    // fn get_scenes_mut(&mut self, window_name: &WindowName) -> Vec<&mut Scene<E>> {
+    //     self.active_scenes
+    //         .iter_mut()
+    //         .filter(|scene| scene.target_window == *window_name)
+    //         .collect()
+    // }
 }
 impl<E: ExternalEvent + 'static> EventManager<GameEvent<E>> for Game<E> {
     fn window_event(
@@ -185,13 +237,17 @@ impl<E: ExternalEvent + 'static> EventManager<GameEvent<E>> for Game<E> {
                 match self.get_window_name(id) {
                     Some(window_name) => {
                         let window_name = window_name.clone();
-                        for scene in self.get_scenes_mut(&window_name) {
-                            scene.handle_key_input(event);
-                        }
-                        if let Some((_, camera, _)) =
-                            self.cameras.iter_mut().find(|(n, _, _)| n == &window_name)
+                        for scene in self
+                            .active_scenes
+                            .iter_mut()
+                            .filter(|scene| scene.target_window == window_name)
                         {
-                            camera.handle_key_input(event);
+                            scene.handle_key_input(event);
+                            if let Some((_, camera, _)) =
+                                self.cameras.iter_mut().find(|(n, _, _)| n == &scene.name)
+                            {
+                                camera.handle_key_input(event);
+                            }
                         }
                     }
                     None => {
@@ -234,22 +290,19 @@ impl<E: ExternalEvent + 'static> EventManager<GameEvent<E>> for Game<E> {
             }
             GameEvent::NewWindow(id, name) => {
                 self.window_ids.push((name.clone(), id.clone()));
-                for scene in self
-                    .pending_scenes
-                    .iter()
-                    .filter(|s| s.target_window == name)
-                {
-                    self.request_render_scene(&id, window_manager, scene);
-                }
-                if let Some(camera_descriptor) = &self.ressources.get_camera(&name) {
-                    let camera: Camera = camera_descriptor.into();
-                    graphics_provider.create_uniform_buffer(
-                        name.as_str(),
-                        &camera.as_bytes(),
-                        wgpu::ShaderStages::VERTEX,
-                    );
-                    self.cameras
-                        .push((name.clone(), camera, name.as_str().into()));
+                for i in 0..self.pending_scenes.len() {
+                    let scene = &self.pending_scenes[i];
+                    if scene.target_window == name {
+                        self.request_render_scene(
+                            &id,
+                            window_manager,
+                            scene.render_scene.clone(),
+                            scene.name.clone(),
+                            scene.shader_descriptor.clone(),
+                            scene.index_format,
+                            scene.vertex_buffer_layout.clone(),
+                        );
+                    }
                 }
             }
             GameEvent::NewRenderScene(render_scene) => {
@@ -322,10 +375,8 @@ impl<E: ExternalEvent + 'static> EventManager<GameEvent<E>> for Game<E> {
                         };
                         entity.render(&mut vertices, &mut indices, sprite_sheet);
                     }
-                    if let Some((_, camera, camera_name)) = self
-                        .cameras
-                        .iter_mut()
-                        .find(|(n, _, _)| n == &scene.target_window)
+                    if let Some((_, camera, camera_name)) =
+                        self.cameras.iter_mut().find(|(n, _, _)| n == &scene.name)
                     {
                         match camera.update(entities.iter().map(|e| &*e).collect(), &delta_t) {
                             Ok(()) => {}
