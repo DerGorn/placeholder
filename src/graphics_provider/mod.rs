@@ -18,10 +18,15 @@ pub use shader_descriptor::ShaderDescriptor;
 mod texture;
 use texture::TextureProvider;
 
-use crate::create_name_struct;
+mod buffer_writer;
+pub use buffer_writer::{BufferWriter, IndexBufferWriter, VertexBufferWriter};
 
-use self::surface::RenderScene;
-pub use self::surface::{IndexBufferWriter, VertexBufferWriter, RenderSceneName, BufferWriter};
+mod render_scene;
+use render_scene::RenderScene;
+pub use render_scene::RenderSceneName;
+
+
+use crate::create_name_struct;
 
 create_name_struct!(UniformBufferName);
 
@@ -144,7 +149,6 @@ impl GraphicsProvider {
             window.id(),
             Box::new(Surface {
                 wgpu_surface: surface,
-                size,
                 config,
             }),
         ));
@@ -180,8 +184,8 @@ impl GraphicsProvider {
     pub fn update_buffers(
         &mut self,
         render_scene: &RenderSceneName,
-        vertices: &dyn VertexBufferWriter,
-        indices: &dyn IndexBufferWriter,
+        vertices: &impl VertexBufferWriter,
+        indices: &impl IndexBufferWriter,
     ) {
         if let (Some(device), Some(queue)) = (&self.device, &self.queue) {
             for render_scene in self.render_scenes.iter_mut().filter_map(|(_, s, _, _)| {
@@ -256,6 +260,7 @@ impl GraphicsProvider {
                 num_indices,
                 index_format,
                 vertex_buffer_layout,
+                true,
             );
             self.render_scenes
                 .push((window_id.clone(), render_scene, shader, shader_descriptor));

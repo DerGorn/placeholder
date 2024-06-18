@@ -1,24 +1,16 @@
 use super::ShaderDescriptor;
 use std::fmt::Debug;
 
-mod buffer_writer;
-pub use buffer_writer::{BufferWriter, IndexBufferWriter, VertexBufferWriter};
-
-mod render_scene;
-pub use render_scene::{RenderScene, RenderSceneName};
+use super::RenderScene;
 
 pub trait WindowSurface: Debug {
     fn surface<'a, 'b: 'a>(&'b self) -> &'a wgpu::Surface<'a>;
-    fn size(&self) -> &winit::dpi::PhysicalSize<u32>;
-    fn size_mut(&mut self) -> &mut winit::dpi::PhysicalSize<u32>;
     fn config(&self) -> &wgpu::SurfaceConfiguration;
     fn config_mut(&mut self) -> &mut wgpu::SurfaceConfiguration;
     fn resize(&mut self, new_size: &winit::dpi::PhysicalSize<u32>, device: &wgpu::Device) {
         if new_size.width == 0 || new_size.height == 0 {
             return;
         }
-        self.size_mut().width = new_size.width;
-        self.size_mut().height = new_size.height;
         self.config_mut().width = new_size.width;
         self.config_mut().height = new_size.height;
         self.surface().configure(device, self.config());
@@ -42,13 +34,11 @@ pub trait WindowSurface: Debug {
 
 pub struct Surface<'a> {
     pub wgpu_surface: wgpu::Surface<'a>,
-    pub size: winit::dpi::PhysicalSize<u32>,
     pub config: wgpu::SurfaceConfiguration,
 }
 impl Debug for Surface<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Surface")
-            .field("size", &self.size)
             .field("config", &self.config)
             .finish()
     }
@@ -56,14 +46,6 @@ impl Debug for Surface<'_> {
 impl<'a> WindowSurface for Surface<'a> {
     fn surface<'b, 'c: 'b>(&'c self) -> &'b wgpu::Surface<'b> {
         &self.wgpu_surface
-    }
-
-    fn size_mut(&mut self) -> &mut winit::dpi::PhysicalSize<u32> {
-        &mut self.size
-    }
-
-    fn size(&self) -> &winit::dpi::PhysicalSize<u32> {
-        &self.size
     }
 
     fn config(&self) -> &wgpu::SurfaceConfiguration {

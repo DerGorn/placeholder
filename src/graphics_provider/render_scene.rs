@@ -13,6 +13,7 @@ pub struct RenderScene {
     num_vertices: u32,
     index_format: wgpu::IndexFormat,
     vertex_buffer_layout: wgpu::VertexBufferLayout<'static>,
+    use_textures: bool,
 }
 impl RenderScene {
     pub fn new(
@@ -24,6 +25,7 @@ impl RenderScene {
         num_vertices: u32,
         index_format: wgpu::IndexFormat,
         vertex_buffer_layout: wgpu::VertexBufferLayout<'static>,
+        use_textures: bool,
     ) -> Self {
         Self {
             name,
@@ -34,6 +36,7 @@ impl RenderScene {
             num_vertices,
             index_format,
             vertex_buffer_layout,
+            use_textures,
         }
     }
 
@@ -53,8 +56,8 @@ impl RenderScene {
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-        vertices: &dyn VertexBufferWriter,
-        indices: &dyn IndexBufferWriter,
+        vertices: &impl VertexBufferWriter,
+        indices: &impl IndexBufferWriter,
     ) {
         if let Some((index_buffer, num_indices)) = indices.write_buffer(
             device,
