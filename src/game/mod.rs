@@ -5,7 +5,7 @@ use std::{
 
 use crate::{
     app::{IndexBuffer, VertexBuffer},
-    graphics_provider::{RenderSceneDescriptor, ShaderDescriptor},
+    graphics_provider::ShaderDescriptor,
 };
 
 use super::{
@@ -33,11 +33,8 @@ mod entity;
 mod game_event;
 mod ressource_descriptor;
 mod scene;
-mod sprite;
 mod sprite_sheet;
 mod velocity_controller;
-
-pub type Index = u16;
 
 pub struct Game<E: ExternalEvent> {
     ressources: RessourceDescriptor,
@@ -92,7 +89,6 @@ impl<E: ExternalEvent> Game<E> {
                     scene.render_scene.clone(),
                     scene.name.clone(),
                     scene.shader_descriptor.clone(),
-                    scene.render_scene_descriptor.clone(),
                 ));
             } else {
                 if !needed_windows.contains(&scene.target_window) {
@@ -100,13 +96,8 @@ impl<E: ExternalEvent> Game<E> {
                 }
             }
         }
-        for (
-            window_id,
-            render_scene,
-            scene,
-            shader_descriptor,
-            render_scene_descriptor,
-        ) in scenes_to_request
+        for (window_id, render_scene, scene, shader_descriptor) in
+            scenes_to_request
         {
             self.request_render_scene(
                 &window_id,
@@ -114,7 +105,6 @@ impl<E: ExternalEvent> Game<E> {
                 render_scene,
                 scene,
                 shader_descriptor,
-                render_scene_descriptor,
             );
         }
         for window_name in needed_windows.iter() {
@@ -138,25 +128,24 @@ impl<E: ExternalEvent> Game<E> {
         render_scene: RenderSceneName,
         scene: SceneName,
         shader_descriptor: ShaderDescriptor,
-        render_scene_descriptor: RenderSceneDescriptor,
     ) {
-        let uniform_buffers =
-            if let Some(camera_descriptor) = &self.ressources.get_camera(&render_scene) {
-                let camera: Camera = camera_descriptor.into();
-                let uniform_name = &format!("{:?} camera", render_scene.as_str());
-                // graphics_provider.create_uniform_buffer(
-                //     uniform_name,
-                //     &camera.as_bytes(),
-                //     wgpu::ShaderStages::VERTEX,
-                //     &scene.render_scene,
-                // );
-                let bytes = camera.as_bytes();
-                self.cameras
-                    .push((scene.clone(), camera, uniform_name.into()));
-                vec![(uniform_name.into(), bytes, wgpu::ShaderStages::VERTEX)]
-            } else {
-                vec![]
-            };
+        let (camera, render_scene_descriptor) = self
+            .ressources
+            .get_render_scene(&render_scene)
+            .expect(&format!(
+                "No Ressources defined for RenderScene {:?}",
+                render_scene
+            ));
+        let uniform_buffers = if let Some(camera_descriptor) = camera {
+            let camera: Camera = (&camera_descriptor).into();
+            let uniform_name = &format!("{:?} camera", render_scene.as_str());
+            let bytes = camera.as_bytes();
+            self.cameras
+                .push((scene.clone(), camera, uniform_name.into()));
+            vec![(uniform_name.into(), bytes, wgpu::ShaderStages::VERTEX)]
+        } else {
+            vec![]
+        };
         window_manager.send_event(GameEvent::RequestNewRenderScene(
             target_window.clone(),
             render_scene,
@@ -179,10 +168,7 @@ impl<E: ExternalEvent> Game<E> {
                 name
             ))
             .0;
-        window_manager.send_event(GameEvent::RequestNewSpriteSheet(
-            name.clone(),
-            path.clone(),
-        ));
+        window_manager.send_event(GameEvent::RequestNewSpriteSheet(name.clone(), path.clone()));
     }
 
     fn get_window_name(&self, id: &WindowId) -> Option<&WindowName> {
@@ -292,7 +278,6 @@ impl<E: ExternalEvent + 'static> EventManager<GameEvent<E>> for Game<E> {
                             scene.render_scene.clone(),
                             scene.name.clone(),
                             scene.shader_descriptor.clone(),
-                            scene.render_scene_descriptor.clone(),
                         );
                     }
                 }
@@ -308,10 +293,7 @@ impl<E: ExternalEvent + 'static> EventManager<GameEvent<E>> for Game<E> {
                     .iter()
                     .filter_map(|e| e.sprite_sheet())
                 {
-                    self.request_sprite_sheet(
-                        &sprite_sheet,
-                        window_manager,
-                    );
+                    self.request_sprite_sheet(&sprite_sheet, window_manager);
                 }
                 let scene = self.pending_scenes.remove(index);
                 window_manager.send_event(GameEvent::External(E::new_scene(&scene)));

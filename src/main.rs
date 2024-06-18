@@ -1,5 +1,5 @@
 use env_logger::Env;
-use placeholder::app::{IndexBuffer, ManagerApplication, VertexBuffer, WindowDescriptor};
+use placeholder::app::{ManagerApplication, WindowDescriptor};
 use placeholder::graphics::{RenderSceneDescriptor, ShaderDescriptor};
 use std::fmt::Debug;
 use std::path::PathBuf;
@@ -7,17 +7,15 @@ use std::time::Duration;
 use threed::Vector;
 use winit::{
     dpi::PhysicalSize,
-    event::KeyEvent,
-    keyboard::{KeyCode, PhysicalKey},
     window::WindowAttributes,
 };
 
 use placeholder::graphics::{Index as I, Vertex as V};
 
 use placeholder::game_engine::{
-    BoundingBox, CameraDescriptor, Direction, Entity, EntityName, EntityType, ExternalEvent, Game,
-    Index, RessourceDescriptor, Scene, SceneName, SpritePosition, SpriteSheet,
-    SpriteSheetDimensions, SpriteSheetName, VelocityController,
+    CameraDescriptor, EntityType, ExternalEvent, Game,
+    RessourceDescriptor, Scene, SceneName, SpritePosition, SpriteSheetDimensions,
+    VelocityController,
 };
 
 mod animation;
@@ -26,8 +24,18 @@ use animation::Animation;
 mod background;
 use background::Background;
 
+mod transition;
+
+mod enemy;
+use enemy::Enemy;
+
+mod player;
+use player::Player;
+
 mod vertex;
-use vertex::{render_sprite, Vertex};
+use vertex::{SimpleVertex, Vertex};
+
+type Index = u16;
 
 #[derive(Debug, PartialEq)]
 enum Type {
@@ -69,353 +77,8 @@ impl ExternalEvent for Event {
     }
 }
 
-use repr_trait::C;
-#[repr(C)]
-#[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable, repr_trait::C)]
-struct SimpleVertex {
-    position: [f32; 2],
-}
-impl SimpleVertex {
-    fn new(position: Vector<f32>) -> Self {
-        Self {
-            position: [position.x, position.y],
-        }
-    }
-}
-impl V for SimpleVertex {
-    fn describe_buffer_layout() -> wgpu::VertexBufferLayout<'static> {
-        wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<Self>() as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &[wgpu::VertexAttribute {
-                offset: 0,
-                format: wgpu::VertexFormat::Float32x2,
-                shader_location: 0,
-            }],
-        }
-    }
-}
-
-struct Transition {
-    name: EntityName,
-    animation: Animation<(Vec<SimpleVertex>, Vec<Index>)>,
-}
-impl Debug for Transition {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Transition")
-            .field("name", &self.name)
-            .finish()
-    }
-}
-impl Entity<Type, Event> for Transition {
-    fn render(
-        &self,
-        vertices: &mut VertexBuffer,
-        indices: &mut IndexBuffer,
-        _sprite_sheet: Option<&SpriteSheet>,
-    ) {
-        let (new_vertices, new_indices) = self.animation.keyframe();
-        let start_index = vertices.len() as u16;
-        vertices.extend_from_slice(new_vertices);
-        indices.extend_from_slice(
-            new_indices
-                .iter()
-                .map(|i| i + start_index)
-                .collect::<Vec<_>>()
-                .as_slice(),
-        );
-    }
-
-    fn update(
-        &mut self,
-        _entities: &Vec<&Box<dyn Entity<Type, Event>>>,
-        delta_t: &Duration,
-    ) -> Vec<Event> {
-        self.animation.update(delta_t);
-        vec![]
-    }
-
-    fn name(&self) -> &EntityName {
-        &self.name
-    }
-
-    fn bounding_box(&self) -> BoundingBox {
-        BoundingBox {
-            anchor: Vector::scalar(0.0),
-            size: PhysicalSize::new(1e5, 1e5),
-        }
-    }
-
-    fn entity_type(&self) -> Type {
-        Type::Background
-    }
-}
-
-struct Enemy {
-    name: EntityName,
-    size: PhysicalSize<u16>,
-    position: Vector<f32>,
-    animation: Animation<SpritePosition>,
-}
-impl Debug for Enemy {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Enemy")
-            .field("z", &self.z())
-            .field("sprite", &self.sprite_sheet())
-            .finish()
-    }
-}
-impl Entity<Type, Event> for Enemy {
-    fn update(
-        &mut self,
-        entities: &Vec<&Box<dyn Entity<Type, Event>>>,
-        delta_t: &Duration,
-    ) -> Vec<Event> {
-        self.animation.update(delta_t);
-        let players = entities.iter().filter(|e| e.entity_type() == Type::Player);
-        let own_bounding_box = self.bounding_box();
-        for player in players {
-            let bounding_box = player.bounding_box();
-            if own_bounding_box.intersects(&bounding_box) {
-                let shader_descriptor = ShaderDescriptor {
-                    file: "res/shader/transition.wgsl",
-                    vertex_shader: "vs_main",
-                    fragment_shader: "fs_main",
-                };
-                return vec![Event::RequestNewScenes(vec![Scene {
-                    render_scene_descriptor: RenderSceneDescriptor {
-                        index_format: Index::index_format(),
-                        vertex_buffer_layout: SimpleVertex::describe_buffer_layout(),
-                        use_textures: false,
-                    },
-                    name: "BattleScene".into(),
-                    render_scene: "BattleScene".into(),
-                    target_window: MAIN_WINDOW.into(),
-                    z_index: 1,
-                    entities: vec![Box::new(Transition {
-                        name: "BattleTransition".into(),
-                        animation: Animation::new(
-                            "BattleTransition".into(),
-                            vec![
-                                (
-                                    Duration::from_millis(24),
-                                    (
-                                        vec![
-                                            SimpleVertex::new(Vector::new(-0.5, 0.5, 0.0)),
-                                            SimpleVertex::new(Vector::new(0.5, 0.5, 0.0)),
-                                            SimpleVertex::new(Vector::new(0.5, -0.5, 0.0)),
-                                            SimpleVertex::new(Vector::new(-0.5, -0.5, 0.0)),
-                                        ],
-                                        vec![0, 1, 2, 0, 2, 3],
-                                    ),
-                                ),
-                                (
-                                    Duration::from_millis(24),
-                                    (
-                                        vec![
-                                            SimpleVertex::new(Vector::new(-0.75, 0.75, 0.0)),
-                                            SimpleVertex::new(Vector::new(0.75, 0.75, 0.0)),
-                                            SimpleVertex::new(Vector::new(0.75, -0.75, 0.0)),
-                                            SimpleVertex::new(Vector::new(-0.75, -0.75, 0.0)),
-                                        ],
-                                        vec![0, 1, 2, 0, 2, 3],
-                                    ),
-                                ),
-                                (
-                                    Duration::from_millis(24),
-                                    (
-                                        vec![
-                                            SimpleVertex::new(Vector::new(-1.0, 1.0, 0.0)),
-                                            SimpleVertex::new(Vector::new(1.0, 1.0, 0.0)),
-                                            SimpleVertex::new(Vector::new(1.0, -1.0, 0.0)),
-                                            SimpleVertex::new(Vector::new(-1.0, -1.0, 0.0)),
-                                        ],
-                                        vec![0, 1, 2, 0, 2, 3],
-                                    ),
-                                ),
-                                (
-                                    Duration::from_millis(24),
-                                    (
-                                        vec![
-                                            SimpleVertex::new(Vector::new(-0.75, 0.75, 0.0)),
-                                            SimpleVertex::new(Vector::new(0.75, 0.75, 0.0)),
-                                            SimpleVertex::new(Vector::new(0.75, -0.75, 0.0)),
-                                            SimpleVertex::new(Vector::new(-0.75, -0.75, 0.0)),
-                                        ],
-                                        vec![0, 1, 2, 0, 2, 3],
-                                    ),
-                                ),
-                            ],
-                        ),
-                    })],
-                    shader_descriptor,
-                }])];
-            }
-        }
-        vec![]
-    }
-    fn render(
-        &self,
-        vertices: &mut VertexBuffer,
-        indices: &mut IndexBuffer,
-        sprite_sheet: Option<&SpriteSheet>,
-    ) {
-        if let Some(sprite_sheet) = sprite_sheet {
-            render_sprite(
-                &self.bounding_box(),
-                vertices,
-                indices,
-                sprite_sheet,
-                self.animation.keyframe(),
-            );
-        }
-    }
-    fn sprite_sheet(&self) -> Option<&SpriteSheetName> {
-        Some(&self.animation.sprite_sheet())
-    }
-    fn handle_key_input(&mut self, _input: &KeyEvent) {}
-    fn name(&self) -> &EntityName {
-        &self.name
-    }
-    fn bounding_box(&self) -> BoundingBox {
-        BoundingBox {
-            anchor: self.position.clone(),
-            size: PhysicalSize::new(self.size.width as f32, self.size.height as f32),
-        }
-    }
-    fn entity_type(&self) -> Type {
-        Type::Enemy
-    }
-}
-
-struct Player {
-    name: EntityName,
-    size: PhysicalSize<u16>,
-    position: Vector<f32>,
-    velocity: VelocityController,
-    animation: Animation<SpritePosition>,
-}
-impl Debug for Player {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Player")
-            .field("z", &self.z())
-            .field("sprite", &self.sprite_sheet())
-            .finish()
-    }
-}
-impl Entity<Type, Event> for Player {
-    fn entity_type(&self) -> Type {
-        Type::Player
-    }
-    fn update(
-        &mut self,
-        entities: &Vec<&Box<dyn Entity<Type, Event>>>,
-        delta_t: &Duration,
-    ) -> Vec<Event> {
-        self.position += self.velocity.get_velocity();
-        let background = entities
-            .iter()
-            .filter(|e| e.entity_type() == Type::Background)
-            .next()
-            .expect("No Background found to restrict Playermovement");
-        if let Some(new_position) = background
-            .bounding_box()
-            .clamp_box_inside(&self.bounding_box())
-        {
-            self.position = new_position;
-        }
-        self.animation.update(delta_t);
-        vec![]
-    }
-
-    fn name(&self) -> &EntityName {
-        &self.name
-    }
-
-    fn position(&self) -> Vector<f32> {
-        self.position.clone()
-    }
-
-    fn bounding_box(&self) -> BoundingBox {
-        BoundingBox {
-            anchor: self.position.clone(),
-            size: PhysicalSize::new(self.size.width as f32, self.size.height as f32),
-        }
-    }
-
-    fn sprite_sheet(&self) -> Option<&SpriteSheetName> {
-        Some(&self.animation.sprite_sheet())
-    }
-
-    fn z(&self) -> f32 {
-        self.position.z
-    }
-
-    fn render(
-        &self,
-        vertices: &mut VertexBuffer,
-        indices: &mut IndexBuffer,
-        sprite_sheet: Option<&SpriteSheet>,
-    ) {
-        if let Some(sprite_sheet) = sprite_sheet {
-            render_sprite(
-                &self.bounding_box(),
-                vertices,
-                indices,
-                sprite_sheet,
-                self.animation.keyframe(),
-            );
-        }
-    }
-
-    fn handle_key_input(&mut self, input: &KeyEvent) {
-        if input.state == winit::event::ElementState::Released {
-            match input.physical_key {
-                PhysicalKey::Code(KeyCode::KeyW) => {
-                    self.velocity.set_direction(Direction::Up, false);
-                    // self.sprite.position = PLAYER_NEUTRAL;
-                }
-                PhysicalKey::Code(KeyCode::KeyA) => {
-                    self.velocity.set_direction(Direction::Left, false);
-                    // self.sprite.position = PLAYER_NEUTRAL;
-                }
-                PhysicalKey::Code(KeyCode::KeyD) => {
-                    self.velocity.set_direction(Direction::Right, false);
-                    // self.sprite.position = PLAYER_NEUTRAL;
-                }
-                PhysicalKey::Code(KeyCode::KeyS) => {
-                    self.velocity.set_direction(Direction::Down, false);
-                    // self.sprite.position = PLAYER_NEUTRAL;
-                }
-                _ => {}
-            }
-        } else if input.state == winit::event::ElementState::Pressed {
-            match input.physical_key {
-                PhysicalKey::Code(KeyCode::KeyW) => {
-                    self.velocity.set_direction(Direction::Up, true);
-                    // self.sprite.position = PLAYER_UP;
-                }
-                PhysicalKey::Code(KeyCode::KeyA) => {
-                    self.velocity.set_direction(Direction::Left, true);
-                    // self.sprite.position = PLAYER_LEFT;
-                }
-                PhysicalKey::Code(KeyCode::KeyD) => {
-                    self.velocity.set_direction(Direction::Right, true);
-                    // self.sprite.position = PLAYER_RIGHT;
-                }
-                PhysicalKey::Code(KeyCode::KeyS) => {
-                    self.velocity.set_direction(Direction::Down, true);
-                    // self.sprite.position = PLAYER_DOWN;
-                }
-                _ => {}
-            }
-        } else {
-            // self.sprite.position = PLAYER_NEUTRAL;
-        }
-    }
-}
-
 const MAIN_WINDOW: &str = "MainWindow";
+const BATTLE_TRANSITION_SCENE: &str = "BattleTransitionScene";
 const FROG: &str = "Frog";
 fn main() {
     env_logger::Builder::from_env(Env::default().default_filter_or("warn")).init();
@@ -443,7 +106,26 @@ fn main() {
     let main_scene = "MainScene";
     let ressources = RessourceDescriptor {
         windows: vec![(MAIN_WINDOW.into(), main_window_descriptor)],
-        render_scenes: vec![(main_scene.into(), camera_descriptor)],
+        render_scenes: vec![
+            (
+                main_scene.into(),
+                Some(camera_descriptor),
+                RenderSceneDescriptor {
+                    index_format: Index::index_format(),
+                    use_textures: true,
+                    vertex_buffer_layout: Vertex::describe_buffer_layout(),
+                },
+            ),
+            (
+                BATTLE_TRANSITION_SCENE.into(),
+                None,
+                RenderSceneDescriptor {
+                    index_format: Index::index_format(),
+                    vertex_buffer_layout: SimpleVertex::describe_buffer_layout(),
+                    use_textures: false,
+                },
+            ),
+        ],
         sprite_sheets: vec![
             (
                 player_sprite_sheet.into(),
@@ -463,11 +145,6 @@ fn main() {
         ],
     };
     let scene = Scene {
-        render_scene_descriptor: RenderSceneDescriptor {
-            index_format: Index::index_format(),
-            use_textures: true,
-            vertex_buffer_layout: Vertex::describe_buffer_layout(),
-        },
         z_index: 0,
         shader_descriptor,
         name: main_scene.into(),
