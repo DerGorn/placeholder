@@ -22,7 +22,7 @@ pub use buffer_writer::{BufferWriter, IndexBufferWriter, VertexBufferWriter};
 
 mod render_scene;
 use render_scene::RenderScene;
-pub use render_scene::{RenderSceneName, UniformBufferName};
+pub use render_scene::{RenderSceneDescriptor, RenderSceneName, UniformBufferName};
 
 pub struct GraphicsProvider {
     instance: wgpu::Instance,
@@ -193,9 +193,7 @@ impl GraphicsProvider {
         window_id: &WindowId,
         render_scene_name: RenderSceneName,
         shader_descriptor: ShaderDescriptor,
-        index_format: wgpu::IndexFormat,
-        vertex_buffer_layout: wgpu::VertexBufferLayout<'static>,
-        use_textures: bool,
+        render_scene_descriptor: RenderSceneDescriptor,
         initial_uniforms: &[(UniformBufferName, Vec<u8>, wgpu::ShaderStages)],
     ) {
         let device = self.device.as_ref().expect("The device vanished");
@@ -215,9 +213,7 @@ impl GraphicsProvider {
             let mut render_scene = RenderScene::new(
                 render_scene_name.clone(),
                 device,
-                index_format,
-                vertex_buffer_layout.clone(),
-                use_textures,
+                render_scene_descriptor,
             );
             for (uniform, content, visibility) in initial_uniforms {
                 render_scene.create_uniform_buffer(
@@ -240,7 +236,7 @@ impl GraphicsProvider {
                 &bind_groups_layouts,
                 &shader,
                 &shader_descriptor,
-                vertex_buffer_layout,
+                render_scene.vertex_buffer_layout().clone(),
             );
             render_scene.update_pipeline(render_pipeline);
             self.render_scenes
@@ -252,6 +248,13 @@ impl GraphicsProvider {
 
     pub fn remove_window(&mut self, id: &WindowId) {
         self.surfaces.retain(|(i, _)| i != id);
+        let render_scenes_to_delete = self
+            .render_scenes
+            .iter()
+            .filter_map(|(i, s, _, _)| if i == id { Some(s.name()) } else { None })
+            .collect::<Vec<_>>();
+        self.uniform_buffers
+            .retain(|(r, _)| !render_scenes_to_delete.contains(&r));
         self.render_scenes.retain(|(i, _, _, _)| i != id);
     }
 

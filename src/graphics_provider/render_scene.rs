@@ -7,6 +7,13 @@ use super::{IndexBufferWriter, VertexBufferWriter};
 create_name_struct!(RenderSceneName);
 create_name_struct!(UniformBufferName);
 
+#[derive(Debug, Clone)]
+pub struct RenderSceneDescriptor {
+    pub index_format: wgpu::IndexFormat,
+    pub vertex_buffer_layout: wgpu::VertexBufferLayout<'static>,
+    pub use_textures: bool,
+}
+
 pub struct RenderScene {
     name: RenderSceneName,
     render_pipeline: Option<wgpu::RenderPipeline>,
@@ -28,9 +35,7 @@ impl RenderScene {
     pub fn new(
         name: RenderSceneName,
         device: &wgpu::Device,
-        index_format: wgpu::IndexFormat,
-        vertex_buffer_layout: wgpu::VertexBufferLayout<'static>,
-        use_textures: bool,
+        descriptor: RenderSceneDescriptor,
     ) -> Self {
         let vertex_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some(&format!("Vertex Buffer {:?}", name)),
@@ -54,9 +59,9 @@ impl RenderScene {
             index_buffer,
             num_indices,
             num_vertices,
-            index_format,
-            vertex_buffer_layout,
-            use_textures,
+            index_format: descriptor.index_format,
+            vertex_buffer_layout: descriptor.vertex_buffer_layout,
+            use_textures: descriptor.use_textures,
             uniform_buffers: Vec::new(),
         }
     }

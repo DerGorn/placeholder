@@ -1,6 +1,6 @@
 use env_logger::Env;
 use placeholder::app::{IndexBuffer, ManagerApplication, VertexBuffer, WindowDescriptor};
-use placeholder::graphics::ShaderDescriptor;
+use placeholder::graphics::{RenderSceneDescriptor, ShaderDescriptor};
 use std::fmt::Debug;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -183,8 +183,11 @@ impl Entity<Type, Event> for Enemy {
                     fragment_shader: "fs_main",
                 };
                 return vec![Event::RequestNewScenes(vec![Scene {
-                    index_format: Index::index_format(),
-                    vertex_buffer_layout: SimpleVertex::describe_buffer_layout(),
+                    render_scene_descriptor: RenderSceneDescriptor {
+                        index_format: Index::index_format(),
+                        vertex_buffer_layout: SimpleVertex::describe_buffer_layout(),
+                        use_textures: false,
+                    },
                     name: "BattleScene".into(),
                     render_scene: "BattleScene".into(),
                     target_window: MAIN_WINDOW.into(),
@@ -460,8 +463,11 @@ fn main() {
         ],
     };
     let scene = Scene {
-        index_format: Index::index_format(),
-        vertex_buffer_layout: Vertex::describe_buffer_layout(),
+        render_scene_descriptor: RenderSceneDescriptor {
+            index_format: Index::index_format(),
+            use_textures: true,
+            vertex_buffer_layout: Vertex::describe_buffer_layout(),
+        },
         z_index: 0,
         shader_descriptor,
         name: main_scene.into(),

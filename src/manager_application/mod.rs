@@ -17,7 +17,7 @@ mod window_manager;
 pub use window_manager::WindowManager;
 
 use crate::graphics_provider::{
-    BufferWriter, GraphicsProvider, Index, IndexBufferWriter, RenderSceneName, ShaderDescriptor, UniformBufferName, Vertex, VertexBufferWriter
+    BufferWriter, GraphicsProvider, Index, IndexBufferWriter, RenderSceneDescriptor, RenderSceneName, ShaderDescriptor, UniformBufferName, Vertex, VertexBufferWriter
 };
 
 pub struct ManagerApplication<E: ApplicationEvent + 'static, M: EventManager<E>> {
@@ -99,7 +99,7 @@ impl<'a, E: ApplicationEvent + 'static, M: EventManager<E>> ApplicationHandler<E
             return;
         }
         match event.is_request_new_texture() {
-            Some((path, label, render_scenes)) => {
+            Some((path, label)) => {
                 let id = self
                     .graphics_provider
                     .create_texture(path, label);
@@ -112,17 +112,14 @@ impl<'a, E: ApplicationEvent + 'static, M: EventManager<E>> ApplicationHandler<E
                 window_id,
                 render_scene,
                 shader_descriptor,
-                index_format,
-                vertex_buffer_layout,
+                render_scene_descriptor,
                 initial_uniforms,
             )) => {
                 self.graphics_provider.add_render_scene(
                     window_id,
                     render_scene.clone(),
                     shader_descriptor.clone(),
-                    index_format.clone(),
-                    vertex_buffer_layout.clone(),
-                    true,
+                    render_scene_descriptor.clone(),
                     initial_uniforms,
                 );
                 self.window_manager
@@ -250,15 +247,14 @@ pub trait ApplicationEvent: Debug {
     fn is_request_new_window<'a>(&'a self) -> Option<(&'a WindowDescriptor, &'a str)>;
     fn is_render_update(&self) -> bool;
     fn consume_render_update(self) -> (RenderSceneName, VertexBuffer, IndexBuffer);
-    fn is_request_new_texture<'a>(&'a self) -> Option<(&'a Path, &'a str, &[RenderSceneName])>;
+    fn is_request_new_texture<'a>(&'a self) -> Option<(&'a Path, &'a str)>;
     fn is_request_new_render_scene<'a>(
         &'a self,
     ) -> Option<(
         &'a WindowId,
         &'a RenderSceneName,
         &'a ShaderDescriptor,
-        &'a wgpu::IndexFormat,
-        &'a wgpu::VertexBufferLayout<'static>,
+        &'a RenderSceneDescriptor,
         &'a [(UniformBufferName, Vec<u8>, wgpu::ShaderStages)],
     )>;
 }

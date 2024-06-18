@@ -5,7 +5,7 @@ use std::{
 
 use crate::{
     app::{IndexBuffer, VertexBuffer},
-    graphics_provider::ShaderDescriptor,
+    graphics_provider::{RenderSceneDescriptor, ShaderDescriptor},
 };
 
 use super::{
@@ -70,7 +70,7 @@ impl<E: ExternalEvent> Game<E> {
     fn activate_scenes(&mut self, window_manager: &mut WindowManager<GameEvent<E>>) {
         let mut needed_windows = Vec::new();
         let mut scenes_to_discard = Vec::new();
-        let mut scenes_to_reques = Vec::new();
+        let mut scenes_to_request = Vec::new();
         for scene in self.pending_scenes.iter() {
             if self
                 .active_scenes
@@ -87,13 +87,12 @@ impl<E: ExternalEvent> Game<E> {
                 .iter()
                 .find(|(existing_window, _)| scene.target_window == *existing_window)
             {
-                scenes_to_reques.push((
+                scenes_to_request.push((
                     id.clone(),
                     scene.render_scene.clone(),
                     scene.name.clone(),
                     scene.shader_descriptor.clone(),
-                    scene.index_format,
-                    scene.vertex_buffer_layout.clone(),
+                    scene.render_scene_descriptor.clone(),
                 ));
             } else {
                 if !needed_windows.contains(&scene.target_window) {
@@ -106,9 +105,8 @@ impl<E: ExternalEvent> Game<E> {
             render_scene,
             scene,
             shader_descriptor,
-            index_format,
-            vertex_buffer_layout,
-        ) in scenes_to_reques
+            render_scene_descriptor,
+        ) in scenes_to_request
         {
             self.request_render_scene(
                 &window_id,
@@ -116,8 +114,7 @@ impl<E: ExternalEvent> Game<E> {
                 render_scene,
                 scene,
                 shader_descriptor,
-                index_format,
-                vertex_buffer_layout,
+                render_scene_descriptor,
             );
         }
         for window_name in needed_windows.iter() {
@@ -141,8 +138,7 @@ impl<E: ExternalEvent> Game<E> {
         render_scene: RenderSceneName,
         scene: SceneName,
         shader_descriptor: ShaderDescriptor,
-        index_format: wgpu::IndexFormat,
-        vertex_buffer_layout: wgpu::VertexBufferLayout<'static>,
+        render_scene_descriptor: RenderSceneDescriptor,
     ) {
         let uniform_buffers =
             if let Some(camera_descriptor) = &self.ressources.get_camera(&render_scene) {
@@ -165,8 +161,7 @@ impl<E: ExternalEvent> Game<E> {
             target_window.clone(),
             render_scene,
             shader_descriptor,
-            index_format,
-            vertex_buffer_layout,
+            render_scene_descriptor,
             uniform_buffers,
         ));
     }
@@ -174,7 +169,6 @@ impl<E: ExternalEvent> Game<E> {
     fn request_sprite_sheet(
         &self,
         name: &SpriteSheetName,
-        render_scenes: Vec<RenderSceneName>,
         window_manager: &mut WindowManager<GameEvent<E>>,
     ) {
         let path = &self
@@ -188,7 +182,6 @@ impl<E: ExternalEvent> Game<E> {
         window_manager.send_event(GameEvent::RequestNewSpriteSheet(
             name.clone(),
             path.clone(),
-            render_scenes,
         ));
     }
 
@@ -299,8 +292,7 @@ impl<E: ExternalEvent + 'static> EventManager<GameEvent<E>> for Game<E> {
                             scene.render_scene.clone(),
                             scene.name.clone(),
                             scene.shader_descriptor.clone(),
-                            scene.index_format,
-                            scene.vertex_buffer_layout.clone(),
+                            scene.render_scene_descriptor.clone(),
                         );
                     }
                 }
@@ -318,7 +310,6 @@ impl<E: ExternalEvent + 'static> EventManager<GameEvent<E>> for Game<E> {
                 {
                     self.request_sprite_sheet(
                         &sprite_sheet,
-                        vec![render_scene.clone()],
                         window_manager,
                     );
                 }

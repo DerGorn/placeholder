@@ -5,7 +5,7 @@ use std::{
 };
 
 use crate::app::{IndexBuffer, VertexBuffer};
-use crate::graphics_provider::UniformBufferName;
+use crate::graphics_provider::{RenderSceneDescriptor, UniformBufferName};
 use crate::{
     app::{ApplicationEvent, WindowDescriptor},
     graphics::{RenderSceneName, ShaderDescriptor},
@@ -24,14 +24,13 @@ pub enum GameEvent<E: ExternalEvent> {
     RequestNewWindow(WindowDescriptor, WindowName),
     RenderUpdate(RenderSceneName, VertexBuffer, IndexBuffer),
     NewSpriteSheet(SpriteSheetName, Option<u32>),
-    RequestNewSpriteSheet(SpriteSheetName, PathBuf, Vec<RenderSceneName>),
+    RequestNewSpriteSheet(SpriteSheetName, PathBuf),
     NewRenderScene(RenderSceneName),
     RequestNewRenderScene(
         WindowId,
         RenderSceneName,
         ShaderDescriptor,
-        wgpu::IndexFormat,
-        wgpu::VertexBufferLayout<'static>,
+        RenderSceneDescriptor,
         ///Initial uniforms for the render scene
         Vec<(UniformBufferName, Vec<u8>, wgpu::ShaderStages)>,
     ),
@@ -65,9 +64,9 @@ impl<E: ExternalEvent> ApplicationEvent for GameEvent<E> {
         }
     }
 
-    fn is_request_new_texture<'a>(&'a self) -> Option<(&'a Path, &'a str, &[RenderSceneName])> {
-        if let Self::RequestNewSpriteSheet(label, path, render_scenes) = self {
-            Some((path, label.as_str(), render_scenes.as_slice()))
+    fn is_request_new_texture<'a>(&'a self) -> Option<(&'a Path, &'a str)> {
+        if let Self::RequestNewSpriteSheet(label, path) = self {
+            Some((path, label.as_str()))
         } else {
             None
         }
@@ -79,16 +78,14 @@ impl<E: ExternalEvent> ApplicationEvent for GameEvent<E> {
         &'a WindowId,
         &'a RenderSceneName,
         &'a ShaderDescriptor,
-        &'a wgpu::IndexFormat,
-        &'a wgpu::VertexBufferLayout<'static>,
+        &'a RenderSceneDescriptor,
         &'a [(UniformBufferName, Vec<u8>, wgpu::ShaderStages)],
     )> {
         if let Self::RequestNewRenderScene(
             window_id,
             render_scene,
             shader_descriptor,
-            index_format,
-            vertex_buffer_layout,
+            render_scene_descriptor,
             initial_uniforms,
         ) = self
         {
@@ -96,8 +93,7 @@ impl<E: ExternalEvent> ApplicationEvent for GameEvent<E> {
                 window_id,
                 render_scene,
                 shader_descriptor,
-                index_format,
-                vertex_buffer_layout,
+                render_scene_descriptor,
                 initial_uniforms,
             ))
         } else {
