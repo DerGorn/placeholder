@@ -124,4 +124,7 @@ pub trait ExternalEvent: Debug + Send {
     fn new_scene(scene: &Scene<Self>) -> Self
     where
         Self: Sized;
+    fn is_update_uniform_buffer<'a>(
+        &'a self,
+    ) -> Option<(&'a UniformBufferName, &'a [u8])>;
 }

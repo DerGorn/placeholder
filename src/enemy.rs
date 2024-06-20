@@ -12,9 +12,9 @@ use winit::{dpi::PhysicalSize, event::KeyEvent};
 
 use crate::{
     animation::Animation,
-    transition::Transition,
-    vertex::{render_sprite, SimpleVertex},
-    Event, Type, BATTLE_TRANSITION_SCENE, MAIN_WINDOW,
+    transition::{Transition, TransitionTypes},
+    vertex::render_sprite,
+    Event, Type, BATTLE_TRANSITION_SCENE, MAIN_WINDOW, UTIME,
 };
 
 pub struct Enemy {
@@ -47,68 +47,15 @@ impl Entity<Type, Event> for Enemy {
                     file: "res/shader/transition.wgsl",
                     vertex_shader: "vs_main",
                     fragment_shader: "fs_main",
+                    uniforms: vec![UTIME],
                 };
+                let transition_name: &str = "BattleTransition";
                 return vec![Event::RequestNewScenes(vec![Scene {
                     name: BATTLE_TRANSITION_SCENE.into(),
                     render_scene: BATTLE_TRANSITION_SCENE.into(),
                     target_window: MAIN_WINDOW.into(),
                     z_index: 1,
-                    entities: vec![Box::new(Transition {
-                        name: "BattleTransition".into(),
-                        animation: Animation::new(
-                            "BattleTransition".into(),
-                            vec![
-                                (
-                                    Duration::from_millis(24),
-                                    (
-                                        vec![
-                                            SimpleVertex::new(Vector::new(-0.5, 0.5, 0.0)),
-                                            SimpleVertex::new(Vector::new(0.5, 0.5, 0.0)),
-                                            SimpleVertex::new(Vector::new(0.5, -0.5, 0.0)),
-                                            SimpleVertex::new(Vector::new(-0.5, -0.5, 0.0)),
-                                        ],
-                                        vec![0, 1, 2, 0, 2, 3],
-                                    ),
-                                ),
-                                (
-                                    Duration::from_millis(24),
-                                    (
-                                        vec![
-                                            SimpleVertex::new(Vector::new(-0.75, 0.75, 0.0)),
-                                            SimpleVertex::new(Vector::new(0.75, 0.75, 0.0)),
-                                            SimpleVertex::new(Vector::new(0.75, -0.75, 0.0)),
-                                            SimpleVertex::new(Vector::new(-0.75, -0.75, 0.0)),
-                                        ],
-                                        vec![0, 1, 2, 0, 2, 3],
-                                    ),
-                                ),
-                                (
-                                    Duration::from_millis(24),
-                                    (
-                                        vec![
-                                            SimpleVertex::new(Vector::new(-1.0, 1.0, 0.0)),
-                                            SimpleVertex::new(Vector::new(1.0, 1.0, 0.0)),
-                                            SimpleVertex::new(Vector::new(1.0, -1.0, 0.0)),
-                                            SimpleVertex::new(Vector::new(-1.0, -1.0, 0.0)),
-                                        ],
-                                        vec![0, 1, 2, 0, 2, 3],
-                                    ),
-                                ),
-                                (
-                                    Duration::from_millis(24),
-                                    (
-                                        vec![
-                                            SimpleVertex::new(Vector::new(-0.75, 0.75, 0.0)),
-                                            SimpleVertex::new(Vector::new(0.75, 0.75, 0.0)),
-                                            SimpleVertex::new(Vector::new(0.75, -0.75, 0.0)),
-                                            SimpleVertex::new(Vector::new(-0.75, -0.75, 0.0)),
-                                        ],
-                                        vec![0, 1, 2, 0, 2, 3],
-                                    ),
-                                ),
-                            ],
-                        ),
-                    })],
+                    entities: vec![Box::new(Transition::new(TransitionTypes::BattleTransition, transition_name))],
                     shader_descriptor,
                 }])];
             }

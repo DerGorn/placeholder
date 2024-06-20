@@ -4,13 +4,14 @@ use crate::app::WindowDescriptor;
 use crate::create_name_struct;
 
 use crate::game_engine::CameraDescriptor;
-use crate::graphics_provider::{RenderSceneDescriptor, RenderSceneName};
+use crate::graphics_provider::{RenderSceneDescriptor, RenderSceneName, UniformBufferName};
 
 use super::sprite_sheet::SpriteSheetDimensions;
 
 pub struct RessourceDescriptor {
     pub windows: Vec<(WindowName, WindowDescriptor)>,
     pub sprite_sheets: Vec<(SpriteSheetName, PathBuf, SpriteSheetDimensions)>,
+    pub uniforms: Vec<(UniformBufferName, Vec<u8>, wgpu::ShaderStages)>,
     pub render_scenes: Vec<(
         RenderSceneName,
         Option<CameraDescriptor>,
@@ -23,6 +24,9 @@ impl RessourceDescriptor {
             .iter()
             .find(|(window_name, _)| window_name == name)
             .map(|(_, window)| window.clone())
+    }
+    pub fn get_uniform(&self, name: &UniformBufferName) -> Option<(UniformBufferName, Vec<u8>, wgpu::ShaderStages)> {
+        self.uniforms.iter().find(|(uniform_name, _, _)| uniform_name == name).cloned()
     }
     pub fn get_render_scene(
         &self,

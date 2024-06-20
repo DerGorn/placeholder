@@ -96,9 +96,7 @@ impl<E: ExternalEvent> Game<E> {
                 }
             }
         }
-        for (window_id, render_scene, scene, shader_descriptor) in
-            scenes_to_request
-        {
+        for (window_id, render_scene, scene, shader_descriptor) in scenes_to_request {
             self.request_render_scene(
                 &window_id,
                 window_manager,
@@ -136,15 +134,26 @@ impl<E: ExternalEvent> Game<E> {
                 "No Ressources defined for RenderScene {:?}",
                 render_scene
             ));
-        let uniform_buffers = if let Some(camera_descriptor) = camera {
+        let mut uniform_buffers: Vec<(UniformBufferName, Vec<u8>, wgpu::ShaderStages)> =
+            shader_descriptor
+                .uniforms
+                .iter()
+                .map(|name| {
+                    self.ressources
+                        .get_uniform(&(*name).into())
+                        .expect(&format!(
+                            "Did not specify UniformBuffer {:?} in RessourceDescriptor",
+                            name
+                        ))
+                })
+                .collect();
+        if let Some(camera_descriptor) = camera {
             let camera: Camera = (&camera_descriptor).into();
             let uniform_name = &format!("{:?} camera", render_scene.as_str());
             let bytes = camera.as_bytes();
             self.cameras
                 .push((scene.clone(), camera, uniform_name.into()));
-            vec![(uniform_name.into(), bytes, wgpu::ShaderStages::VERTEX)]
-        } else {
-            vec![]
+            uniform_buffers.push((uniform_name.into(), bytes, wgpu::ShaderStages::VERTEX));
         };
         window_manager.send_event(GameEvent::RequestNewRenderScene(
             target_window.clone(),
@@ -372,6 +381,9 @@ impl<E: ExternalEvent + 'static> EventManager<GameEvent<E>> for Game<E> {
                     self.pending_scenes.extend(scenes);
                     self.activate_scenes(window_manager);
                     return;
+                }
+                if let Some((uniform_name, contents)) = event.is_update_uniform_buffer() {
+                    graphics_provider.update_uniform_buffer(uniform_name, contents);
                 }
                 println!("EXTERN EVENT: {:?}", event);
             }

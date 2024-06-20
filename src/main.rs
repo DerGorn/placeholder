@@ -1,21 +1,17 @@
 use env_logger::Env;
 use placeholder::app::{ManagerApplication, WindowDescriptor};
-use placeholder::graphics::{RenderSceneDescriptor, ShaderDescriptor};
+use placeholder::graphics::{RenderSceneDescriptor, ShaderDescriptor, UniformBufferName};
 use std::fmt::Debug;
 use std::path::PathBuf;
 use std::time::Duration;
 use threed::Vector;
-use winit::{
-    dpi::PhysicalSize,
-    window::WindowAttributes,
-};
+use winit::{dpi::PhysicalSize, window::WindowAttributes};
 
 use placeholder::graphics::{Index as I, Vertex as V};
 
 use placeholder::game_engine::{
-    CameraDescriptor, EntityType, ExternalEvent, Game,
-    RessourceDescriptor, Scene, SceneName, SpritePosition, SpriteSheetDimensions,
-    VelocityController,
+    CameraDescriptor, EntityType, ExternalEvent, Game, RessourceDescriptor, Scene, SceneName,
+    SpritePosition, SpriteSheetDimensions, VelocityController,
 };
 
 mod animation;
@@ -49,6 +45,7 @@ impl EntityType for Type {}
 enum Event {
     RequestNewScenes(Vec<Scene<Self>>),
     NewScene(SceneName),
+    UpdateUniformBuffer(UniformBufferName, Vec<u8>),
 }
 impl ExternalEvent for Event {
     type EntityType = Type;
@@ -75,10 +72,20 @@ impl ExternalEvent for Event {
     {
         Self::NewScene(scene.name.clone())
     }
+
+    fn is_update_uniform_buffer<'a>(
+        &'a self,
+    ) -> Option<(&'a placeholder::graphics::UniformBufferName, &'a [u8])> {
+        match self {
+            Event::UpdateUniformBuffer(name, contents) => Some((name, contents)),
+            _ => None,
+        }
+    }
 }
 
 const MAIN_WINDOW: &str = "MainWindow";
 const BATTLE_TRANSITION_SCENE: &str = "BattleTransitionScene";
+const UTIME: &str = "Time";
 const FROG: &str = "Frog";
 fn main() {
     env_logger::Builder::from_env(Env::default().default_filter_or("warn")).init();
@@ -91,6 +98,7 @@ fn main() {
         file: "res/shader/texture_array.wgsl",
         vertex_shader: "vs_main",
         fragment_shader: "fs_main",
+        uniforms: vec![],
     };
     let protaginist_name = "Protagonist";
     let player_sprite_sheet = "PlayerSpriteSheet";
@@ -106,6 +114,11 @@ fn main() {
     let main_scene = "MainScene";
     let ressources = RessourceDescriptor {
         windows: vec![(MAIN_WINDOW.into(), main_window_descriptor)],
+        uniforms: vec![(
+            UTIME.into(),
+            bytemuck::cast_slice(&[0.0_f32]).to_vec(),
+            wgpu::ShaderStages::FRAGMENT,
+        )],
         render_scenes: vec![
             (
                 main_scene.into(),

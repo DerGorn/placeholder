@@ -1,13 +1,85 @@
+use placeholder::{
+    app::{IndexBuffer, VertexBuffer},
+    game_engine::{BoundingBox, Entity, EntityName, SpriteSheet},
+};
 use std::{fmt::Debug, time::Duration};
-use placeholder::{app::{IndexBuffer, VertexBuffer}, game_engine::{BoundingBox, Entity, EntityName, SpriteSheet}};
 use threed::Vector;
 use winit::dpi::PhysicalSize;
 
-use crate::{animation::Animation, vertex::SimpleVertex, Event, Index, Type};
+use crate::{animation::Animation, vertex::SimpleVertex, Event, Index, Type, UTIME};
+
+pub enum TransitionTypes {
+    BattleTransition,
+}
 
 pub struct Transition {
     pub name: EntityName,
     pub animation: Animation<(Vec<SimpleVertex>, Vec<Index>)>,
+    time: f32,
+}
+impl Transition {
+    pub fn new(transition_type: TransitionTypes, name: &str) -> Self {
+        let animation = match transition_type {
+            TransitionTypes::BattleTransition => Animation::new(
+                name.into(),
+                vec![
+                    (
+                        Duration::from_millis(24),
+                        (
+                            vec![
+                                SimpleVertex::new(Vector::new(-0.5, 0.5, 0.0)),
+                                SimpleVertex::new(Vector::new(0.5, 0.5, 0.0)),
+                                SimpleVertex::new(Vector::new(0.5, -0.5, 0.0)),
+                                SimpleVertex::new(Vector::new(-0.5, -0.5, 0.0)),
+                            ],
+                            vec![0, 1, 2, 0, 2, 3],
+                        ),
+                    ),
+                    (
+                        Duration::from_millis(24),
+                        (
+                            vec![
+                                SimpleVertex::new(Vector::new(-0.75, 0.75, 0.0)),
+                                SimpleVertex::new(Vector::new(0.75, 0.75, 0.0)),
+                                SimpleVertex::new(Vector::new(0.75, -0.75, 0.0)),
+                                SimpleVertex::new(Vector::new(-0.75, -0.75, 0.0)),
+                            ],
+                            vec![0, 1, 2, 0, 2, 3],
+                        ),
+                    ),
+                    (
+                        Duration::from_millis(24),
+                        (
+                            vec![
+                                SimpleVertex::new(Vector::new(-1.0, 1.0, 0.0)),
+                                SimpleVertex::new(Vector::new(1.0, 1.0, 0.0)),
+                                SimpleVertex::new(Vector::new(1.0, -1.0, 0.0)),
+                                SimpleVertex::new(Vector::new(-1.0, -1.0, 0.0)),
+                            ],
+                            vec![0, 1, 2, 0, 2, 3],
+                        ),
+                    ),
+                    (
+                        Duration::from_millis(24),
+                        (
+                            vec![
+                                SimpleVertex::new(Vector::new(-0.75, 0.75, 0.0)),
+                                SimpleVertex::new(Vector::new(0.75, 0.75, 0.0)),
+                                SimpleVertex::new(Vector::new(0.75, -0.75, 0.0)),
+                                SimpleVertex::new(Vector::new(-0.75, -0.75, 0.0)),
+                            ],
+                            vec![0, 1, 2, 0, 2, 3],
+                        ),
+                    ),
+                ],
+            ),
+        };
+        Transition {
+            name: name.into(),
+            animation,
+            time: 0.0,
+        }
+    }
 }
 impl Debug for Transition {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -41,7 +113,11 @@ impl Entity<Type, Event> for Transition {
         delta_t: &Duration,
     ) -> Vec<Event> {
         self.animation.update(delta_t);
-        vec![]
+        self.time += delta_t.as_secs_f32() / 100.0;
+        vec![Event::UpdateUniformBuffer(
+            UTIME.into(),
+            bytemuck::cast_slice(&[self.time]).to_vec(),
+        )]
     }
 
     fn name(&self) -> &EntityName {
@@ -59,5 +135,3 @@ impl Entity<Type, Event> for Transition {
         Type::Background
     }
 }
-
-
