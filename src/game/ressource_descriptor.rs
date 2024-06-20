@@ -11,6 +11,7 @@ use super::sprite_sheet::SpriteSheetDimensions;
 pub struct RessourceDescriptor {
     pub windows: Vec<(WindowName, WindowDescriptor)>,
     pub sprite_sheets: Vec<(SpriteSheetName, PathBuf, SpriteSheetDimensions)>,
+    ///describes UniformBuffers that are not Cameras, because of their elevated
     pub uniforms: Vec<(UniformBufferName, Vec<u8>, wgpu::ShaderStages)>,
     pub render_scenes: Vec<(
         RenderSceneName,
