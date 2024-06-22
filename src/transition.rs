@@ -12,72 +12,76 @@ pub enum TransitionTypes {
     BattleTransition,
 }
 
+fn lerp(start: Vec<Vector<f32>>, end: Vec<Vector<f32>>, steps: u16) -> Vec<Vec<Vector<f32>>> {
+    let deltas = start
+        .iter()
+        .enumerate()
+        .map(|(n, f)| (&end[n] - f) / (steps - 1) as f32)
+        .collect::<Vec<_>>();
+    let mut interpolations = Vec::new();
+    for i in 0..steps {
+        let step = start
+            .iter()
+            .enumerate()
+            .map(|(n, f)| f + &deltas[n] * (i as f32))
+            .collect::<Vec<_>>();
+        interpolations.push(step);
+    }
+    interpolations
+}
+
 pub struct Transition {
-    pub name: EntityName,
-    pub animation: Animation<(Vec<SimpleVertex>, Vec<Index>)>,
+    name: EntityName,
+    animation: Animation<(Vec<SimpleVertex>, Vec<Index>)>,
     time: f32,
+    transition_time: f32,
+    running: bool,
 }
 impl Transition {
-    pub fn new(transition_type: TransitionTypes, name: &str) -> Self {
+    pub fn new(transition_type: TransitionTypes, name: &str, transition_time: Duration) -> Self {
+        let steps = 20;
+        let frame_time = (transition_time.as_nanos() / (steps as u128)) as u64;
         let animation = match transition_type {
             TransitionTypes::BattleTransition => Animation::new(
                 name.into(),
-                vec![
+                lerp(
+                    vec![
+                        Vector::new(-0.05, 0.05, 0.0),
+                        Vector::new(0.05, 0.05, 0.0),
+                        Vector::new(0.05, -0.05, 0.0),
+                        Vector::new(-0.05, -0.05, 0.0),
+                    ],
+                    vec![
+                        Vector::new(-1.0, 1.0, 0.0),
+                        Vector::new(1.0, 1.0, 0.0),
+                        Vector::new(1.0, -1.0, 0.0),
+                        Vector::new(-1.0, -1.0, 0.0),
+                    ],
+                    steps,
+                )
+                .iter()
+                .map(|positions| {
                     (
-                        Duration::from_millis(24),
+                        Duration::from_nanos(frame_time),
                         (
-                            vec![
-                                SimpleVertex::new(Vector::new(-0.5, 0.5, 0.0)),
-                                SimpleVertex::new(Vector::new(0.5, 0.5, 0.0)),
-                                SimpleVertex::new(Vector::new(0.5, -0.5, 0.0)),
-                                SimpleVertex::new(Vector::new(-0.5, -0.5, 0.0)),
-                            ],
+                            positions
+                                .iter()
+                                .map(|p| SimpleVertex::new(p.clone()))
+                                .collect::<Vec<_>>(),
                             vec![0, 1, 2, 0, 2, 3],
                         ),
-                    ),
-                    (
-                        Duration::from_millis(24),
-                        (
-                            vec![
-                                SimpleVertex::new(Vector::new(-0.75, 0.75, 0.0)),
-                                SimpleVertex::new(Vector::new(0.75, 0.75, 0.0)),
-                                SimpleVertex::new(Vector::new(0.75, -0.75, 0.0)),
-                                SimpleVertex::new(Vector::new(-0.75, -0.75, 0.0)),
-                            ],
-                            vec![0, 1, 2, 0, 2, 3],
-                        ),
-                    ),
-                    (
-                        Duration::from_millis(24),
-                        (
-                            vec![
-                                SimpleVertex::new(Vector::new(-1.0, 1.0, 0.0)),
-                                SimpleVertex::new(Vector::new(1.0, 1.0, 0.0)),
-                                SimpleVertex::new(Vector::new(1.0, -1.0, 0.0)),
-                                SimpleVertex::new(Vector::new(-1.0, -1.0, 0.0)),
-                            ],
-                            vec![0, 1, 2, 0, 2, 3],
-                        ),
-                    ),
-                    (
-                        Duration::from_millis(24),
-                        (
-                            vec![
-                                SimpleVertex::new(Vector::new(-0.75, 0.75, 0.0)),
-                                SimpleVertex::new(Vector::new(0.75, 0.75, 0.0)),
-                                SimpleVertex::new(Vector::new(0.75, -0.75, 0.0)),
-                                SimpleVertex::new(Vector::new(-0.75, -0.75, 0.0)),
-                            ],
-                            vec![0, 1, 2, 0, 2, 3],
-                        ),
-                    ),
-                ],
+                    )
+                })
+                .collect::<Vec<_>>(),
+                true,
             ),
         };
         Transition {
             name: name.into(),
             animation,
             time: 0.0,
+            transition_time: transition_time.as_secs_f32(),
+            running: true,
         }
     }
 }
@@ -112,12 +116,19 @@ impl Entity<Type, Event> for Transition {
         _entities: &Vec<&Box<dyn Entity<Type, Event>>>,
         delta_t: &Duration,
     ) -> Vec<Event> {
-        self.animation.update(delta_t);
-        self.time += delta_t.as_secs_f32() / 100.0;
-        vec![Event::UpdateUniformBuffer(
-            UTIME.into(),
-            bytemuck::cast_slice(&[self.time]).to_vec(),
-        )]
+        let events = self.animation.update(delta_t);
+        if !events.is_empty() {
+            self.running = false;
+        }
+        if self.running {
+            self.time = (self.time + delta_t.as_secs_f32()) % self.transition_time;
+            vec![Event::UpdateUniformBuffer(
+                UTIME.into(),
+                bytemuck::cast_slice(&[self.time / self.transition_time]).to_vec(),
+            )]
+        } else {
+            events
+        }
     }
 
     fn name(&self) -> &EntityName {

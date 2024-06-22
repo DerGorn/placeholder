@@ -36,7 +36,11 @@ mod scene;
 mod sprite_sheet;
 mod velocity_controller;
 
-pub struct Game<E: ExternalEvent> {
+pub trait State<E: ExternalEvent> {
+    fn handle_event(&mut self, event: E) -> Vec<E>;
+}
+
+pub struct Game<E: ExternalEvent, S: State<E>> {
     ressources: RessourceDescriptor,
     active_scenes: Vec<Scene<E>>,
     pending_scenes: Vec<Scene<E>>,
@@ -45,12 +49,14 @@ pub struct Game<E: ExternalEvent> {
     sprite_sheets: Vec<(SpriteSheetName, SpriteSheet)>,
     cameras: Vec<(SceneName, Camera, UniformBufferName)>,
     target_fps: u8,
+    state: S,
 }
-impl<E: ExternalEvent> Game<E> {
+impl<E: ExternalEvent, S: State<E>> Game<E, S> {
     pub fn new(
         ressources: RessourceDescriptor,
         inital_scenes: Vec<Scene<E>>,
         target_fps: u8,
+        state: S,
     ) -> Self {
         Self {
             ressources,
@@ -61,6 +67,7 @@ impl<E: ExternalEvent> Game<E> {
             sprite_sheets: Vec::new(),
             cameras: Vec::new(),
             target_fps,
+            state,
         }
     }
 
@@ -201,7 +208,7 @@ impl<E: ExternalEvent> Game<E> {
     //         .collect()
     // }
 }
-impl<E: ExternalEvent + 'static> EventManager<GameEvent<E>> for Game<E> {
+impl<E: ExternalEvent + 'static, S: State<E>> EventManager<GameEvent<E>> for Game<E, S> {
     fn window_event(
         &mut self,
         _window_manager: &mut WindowManager<GameEvent<E>>,
@@ -374,6 +381,7 @@ impl<E: ExternalEvent + 'static> EventManager<GameEvent<E>> for Game<E> {
                 }
             }
             GameEvent::External(event) => {
+                // println!("EXTERN EVENT: {:?}", event);
                 if event.is_request_new_scenes() {
                     let scenes = event
                         .consume_scenes_request()
@@ -385,7 +393,10 @@ impl<E: ExternalEvent + 'static> EventManager<GameEvent<E>> for Game<E> {
                 if let Some((uniform_name, contents)) = event.is_update_uniform_buffer() {
                     graphics_provider.update_uniform_buffer(uniform_name, contents);
                 }
-                println!("EXTERN EVENT: {:?}", event);
+                let response_events = self.state.handle_event(event);
+                for event in response_events {
+                    window_manager.send_event(GameEvent::External(event));
+                }
             }
             _ => {}
         }

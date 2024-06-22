@@ -3,18 +3,16 @@ use std::{fmt::Debug, time::Duration};
 use placeholder::{
     app::{IndexBuffer, VertexBuffer},
     game_engine::{
-        BoundingBox, Entity, EntityName, Scene, SpritePosition, SpriteSheet, SpriteSheetName,
+        BoundingBox, Entity, EntityName, SpritePosition, SpriteSheet, SpriteSheetName,
     },
-    graphics::ShaderDescriptor,
 };
 use threed::Vector;
 use winit::{dpi::PhysicalSize, event::KeyEvent};
 
 use crate::{
     animation::Animation,
-    transition::{Transition, TransitionTypes},
     vertex::render_sprite,
-    Event, Type, BATTLE_TRANSITION_SCENE, MAIN_WINDOW, UTIME,
+    EnemyType, Event, Type,
 };
 
 pub struct Enemy {
@@ -22,6 +20,7 @@ pub struct Enemy {
     pub size: PhysicalSize<u16>,
     pub position: Vector<f32>,
     pub animation: Animation<SpritePosition>,
+    pub enemy_type: EnemyType,
 }
 impl Debug for Enemy {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -43,21 +42,7 @@ impl Entity<Type, Event> for Enemy {
         for player in players {
             let bounding_box = player.bounding_box();
             if own_bounding_box.intersects(&bounding_box) {
-                let shader_descriptor = ShaderDescriptor {
-                    file: "res/shader/transition.wgsl",
-                    vertex_shader: "vs_main",
-                    fragment_shader: "fs_main",
-                    uniforms: vec![UTIME],
-                };
-                let transition_name: &str = "BattleTransition";
-                return vec![Event::RequestNewScenes(vec![Scene {
-                    name: BATTLE_TRANSITION_SCENE.into(),
-                    render_scene: BATTLE_TRANSITION_SCENE.into(),
-                    target_window: MAIN_WINDOW.into(),
-                    z_index: 1,
-                    entities: vec![Box::new(Transition::new(TransitionTypes::BattleTransition, transition_name))],
-                    shader_descriptor,
-                }])];
+                return vec![Event::InitiateBattle(self.enemy_type.clone())];
             }
         }
         vec![]

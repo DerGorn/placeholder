@@ -1,17 +1,21 @@
 use env_logger::Env;
 use placeholder::app::{ManagerApplication, WindowDescriptor};
 use placeholder::graphics::{RenderSceneDescriptor, ShaderDescriptor, UniformBufferName};
+use rodio::{Decoder, OutputStream, Sink, Source};
 use std::fmt::Debug;
+use std::fs::File;
+use std::io::BufReader;
 use std::path::PathBuf;
 use std::time::Duration;
 use threed::Vector;
+use transition::{Transition, TransitionTypes};
 use winit::{dpi::PhysicalSize, window::WindowAttributes};
 
 use placeholder::graphics::{Index as I, Vertex as V};
 
 use placeholder::game_engine::{
     CameraDescriptor, EntityType, ExternalEvent, Game, RessourceDescriptor, Scene, SceneName,
-    SpritePosition, SpriteSheetDimensions, VelocityController,
+    SpritePosition, SpriteSheetDimensions, State, VelocityController,
 };
 
 mod animation;
@@ -41,11 +45,17 @@ enum Type {
 }
 impl EntityType for Type {}
 
+#[derive(Debug, Clone)]
+enum EnemyType {
+    Frog,
+}
 #[derive(Debug)]
 enum Event {
     RequestNewScenes(Vec<Scene<Self>>),
     NewScene(SceneName),
     UpdateUniformBuffer(UniformBufferName, Vec<u8>),
+    InitiateBattle(EnemyType),
+    AnimationEnded,
 }
 impl ExternalEvent for Event {
     type EntityType = Type;
@@ -80,6 +90,69 @@ impl ExternalEvent for Event {
             Event::UpdateUniformBuffer(name, contents) => Some((name, contents)),
             _ => None,
         }
+    }
+}
+
+struct PlayerState {
+    health: u8,
+    attack: u8,
+}
+impl PlayerState {
+    fn new() -> Self {
+        Self {
+            health: 0,
+            attack: 0,
+        }
+    }
+}
+struct GameState {
+    player: PlayerState,
+    pending_battle: Option<EnemyType>,
+}
+impl GameState {
+    fn new() -> Self {
+        Self {
+            player: PlayerState::new(),
+            pending_battle: None,
+        }
+    }
+}
+impl State<Event> for GameState {
+    fn handle_event(&mut self, event: Event) -> Vec<Event> {
+        match event {
+            Event::InitiateBattle(enemy) => {
+                if self.pending_battle.is_none() {
+                    let shader_descriptor = ShaderDescriptor {
+                        file: "res/shader/transition.wgsl",
+                        vertex_shader: "vs_main",
+                        fragment_shader: "fs_main",
+                        uniforms: vec![UTIME],
+                    };
+                    let transition_name: &str = "BattleTransition";
+                    self.pending_battle = Some(enemy);
+                    return vec![Event::RequestNewScenes(vec![Scene {
+                        name: BATTLE_TRANSITION_SCENE.into(),
+                        render_scene: BATTLE_TRANSITION_SCENE.into(),
+                        target_window: MAIN_WINDOW.into(),
+                        z_index: 1,
+                        entities: vec![Box::new(Transition::new(
+                            TransitionTypes::BattleTransition,
+                            transition_name,
+                            Duration::from_secs(2),
+                        ))],
+                        shader_descriptor,
+                    }])];
+                }
+            }
+            Event::AnimationEnded => {
+                println!("Animation end {:?}", self.pending_battle);
+                if let Some(enemy) = &self.pending_battle {
+                    println!("Starting Battle!");
+                }
+            }
+            _ => {}
+        }
+        vec![]
     }
 }
 
@@ -177,6 +250,7 @@ fn main() {
                         (Duration::from_millis(240), SpritePosition::new(2, 0)),
                         (Duration::from_millis(240), SpritePosition::new(3, 0)),
                     ],
+                    false,
                 ),
             }),
             Box::new(Background {
@@ -196,10 +270,25 @@ fn main() {
                         (Duration::from_millis(240), SpritePosition::new(2, 0)),
                         (Duration::from_millis(240), SpritePosition::new(3, 0)),
                     ],
+                    false,
                 ),
+                enemy_type: EnemyType::Frog,
             }),
         ],
     };
-    let mut app = ManagerApplication::new(Game::new(ressources, vec![scene], target_fps));
+
+    let (_stream, stream_handle) = OutputStream::try_default().unwrap();
+    let sink = Sink::try_new(&stream_handle).unwrap();
+
+    let file = BufReader::new(File::open("res/audio/Jungle.mp3").unwrap());
+    let source = Decoder::new(file).unwrap().amplify(0.1);
+    sink.append(source);
+
+    let mut app = ManagerApplication::new(Game::new(
+        ressources,
+        vec![scene],
+        target_fps,
+        GameState::new(),
+    ));
     app.run();
 }

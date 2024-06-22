@@ -19,7 +19,7 @@ pub mod game_engine {
     pub use super::game::{
         BoundingBox, CameraDescriptor, Direction, Entity, EntityName, EntityType, ExternalEvent,
         Game, RessourceDescriptor, Scene, SceneName, SpritePosition, SpriteSheet,
-        SpriteSheetDimensions, SpriteSheetName, TextureCoordinates, VelocityController,
+        SpriteSheetDimensions, SpriteSheetName, State, TextureCoordinates, VelocityController,
     };
 }
 

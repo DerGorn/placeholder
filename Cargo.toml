@@ -15,6 +15,7 @@ wgpu = "0.19.4"
 futures = "0.3.30"
 bytemuck = { version = "1.16.0", features = ["derive"] }
 repr-trait = "1.0.0"
+rodio = "0.18.1"
 
 [build-dependencies]
 fs_extra = "1.2"
