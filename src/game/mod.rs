@@ -423,7 +423,6 @@ impl<E: ExternalEvent + 'static, S: State<E>> EventManager<GameEvent<E>> for Gam
                         let scene = self.suspended_scenes.remove(index);
                         self.active_scenes.push(scene);
                         self.active_scenes.sort_by_key(|s| s.z_index);
-                        println!("Active Scenes {:?}", self.active_scenes);
                     } else {
                         warn!(
                             "Tried to activate suspended Scene {:?}, but it is not suspended",

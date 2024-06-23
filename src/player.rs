@@ -61,7 +61,8 @@ impl Entity<Type, Event> for Player {
                 break;
             }
         }
-        self.animation.update(delta_t)
+        self.animation.update(delta_t);
+        vec![]
     }
 
     fn name(&self) -> &EntityName {

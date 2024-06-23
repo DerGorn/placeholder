@@ -2,8 +2,6 @@ use std::time::Duration;
 
 use placeholder::game_engine::SpriteSheetName;
 
-use crate::Event;
-
 pub struct Animation<T> {
     sprite_sheet: SpriteSheetName,
     keyframes: Vec<(Duration, T)>,
@@ -24,9 +22,10 @@ impl<T> Animation<T> {
         }
     }
 
-    pub fn update(&mut self, delta_t: &Duration) -> Vec<Event> {
+    /// Returns true if the animation just ended, false otherwise.
+    pub fn update(&mut self, delta_t: &Duration) -> bool {
         if !self.running {
-            return vec![];
+            return false;
         }
         self.time_since_frame_start += *delta_t;
         if self.time_since_frame_start >= self.keyframes[self.current_keyframe].0 {
@@ -34,11 +33,11 @@ impl<T> Animation<T> {
             if self.once && self.current_keyframe == 0 {
                 self.current_keyframe = self.keyframes.len() - 1;
                 self.running = false;
-                return vec![Event::AnimationEnded];
+                return true;
             }
             self.time_since_frame_start -= self.keyframes[self.current_keyframe].0;
         }
-        vec![]
+        false
     }
 
     pub fn keyframe(&self) -> &T {

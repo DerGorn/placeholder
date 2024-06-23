@@ -55,7 +55,7 @@ enum Event {
     NewScene(SceneName),
     UpdateUniformBuffer(UniformBufferName, Vec<u8>),
     InitiateBattle(EnemyType, EntityName, SceneName),
-    AnimationEnded,
+    AnimationEnded(EntityName),
     RequestSuspendScene(SceneName),
     RequestActivateSuspendedScene(SceneName),
     RequestDeleteScene(SceneName),
@@ -121,6 +121,7 @@ impl ExternalEvent for Event {
     }
 }
 
+const TRANSITION_NAME: &str = "BattleTransition";
 struct PlayerState {
     health: u8,
     attack: u8,
@@ -156,7 +157,6 @@ impl State<Event> for GameState {
                         fragment_shader: "fs_main",
                         uniforms: vec![UTIME],
                     };
-                    let transition_name: &str = "BattleTransition";
                     self.pending_battle = Some((enemy, entity, scene.clone()));
                     return vec![
                         Event::RequestNewScenes(vec![Scene {
@@ -166,7 +166,7 @@ impl State<Event> for GameState {
                             z_index: 1,
                             entities: vec![Box::new(Transition::new(
                                 TransitionTypes::BattleTransition,
-                                transition_name,
+                                TRANSITION_NAME,
                                 Duration::from_millis(750),
                             ))],
                             shader_descriptor,
@@ -175,21 +175,23 @@ impl State<Event> for GameState {
                     ];
                 }
             }
-            Event::AnimationEnded => {
-                let response = if let Some((enemy, entity, scene)) = &self.pending_battle {
-                    println!("Starting Battle!");
-                    vec![
-                        Event::RequestDeleteEntity(entity.clone(), scene.clone()),
-                        Event::RequestDeleteScene(BATTLE_TRANSITION_SCENE.into()),
-                        Event::RequestActivateSuspendedScene(scene.clone()),
-                    ]
-                } else {
-                    vec![]
-                };
-                if response.len() > 0 {
-                    self.pending_battle = None;
+            Event::AnimationEnded(animation_entity) => {
+                if animation_entity == TRANSITION_NAME.into() {
+                    let response = if let Some((enemy, entity, scene)) = &self.pending_battle {
+                        println!("Starting Battle!");
+                        vec![
+                            Event::RequestDeleteEntity(entity.clone(), scene.clone()),
+                            Event::RequestDeleteScene(BATTLE_TRANSITION_SCENE.into()),
+                            Event::RequestActivateSuspendedScene(scene.clone()),
+                        ]
+                    } else {
+                        vec![]
+                    };
+                    if response.len() > 0 {
+                        self.pending_battle = None;
+                    }
+                    return response;
                 }
-                return response;
             }
             _ => {}
         }
@@ -318,12 +320,12 @@ fn main() {
         ],
     };
 
-    let (_stream, stream_handle) = OutputStream::try_default().unwrap();
-    let sink = Sink::try_new(&stream_handle).unwrap();
-
-    let file = BufReader::new(File::open("res/audio/Jungle.mp3").unwrap());
-    let source = Decoder::new(file).unwrap().amplify(0.1);
-    sink.append(source);
+    // let (_stream, stream_handle) = OutputStream::try_default().unwrap();
+    // let sink = Sink::try_new(&stream_handle).unwrap();
+    //
+    // let file = BufReader::new(File::open("res/audio/Jungle.mp3").unwrap());
+    // let source = Decoder::new(file).unwrap().amplify(0.1);
+    // sink.append(source);
 
     let mut app = ManagerApplication::new(Game::new(
         ressources,

@@ -117,18 +117,20 @@ impl Entity<Type, Event> for Transition {
         delta_t: &Duration,
         _scene: &SceneName,
     ) -> Vec<Event> {
-        let events = self.animation.update(delta_t);
-        if !events.is_empty() {
-            self.running = false;
-        }
         if self.running {
+            let end_reached = self.animation.update(delta_t);
+            self.running = !end_reached;
             self.time = (self.time + delta_t.as_secs_f32()) % self.transition_time;
-            vec![Event::UpdateUniformBuffer(
-                UTIME.into(),
-                bytemuck::cast_slice(&[self.time / self.transition_time]).to_vec(),
-            )]
+            if self.running {
+                vec![Event::UpdateUniformBuffer(
+                    UTIME.into(),
+                    bytemuck::cast_slice(&[self.time / self.transition_time]).to_vec(),
+                )]
+            } else {
+                vec![Event::AnimationEnded(self.name.clone())]
+            }
         } else {
-            events
+            vec![]
         }
     }
 
