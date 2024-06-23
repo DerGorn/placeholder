@@ -25,6 +25,13 @@ impl VelocityController {
         }
     }
 
+    pub fn stop_movement(&mut self) {
+        self.up = false;
+        self.down = false;
+        self.left = false;
+        self.right = false;
+    }
+
     pub fn set_direction(&mut self, direction: Direction, value: bool) {
         match direction {
             Direction::Up => {

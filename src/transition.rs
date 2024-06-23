@@ -1,6 +1,6 @@
 use placeholder::{
     app::{IndexBuffer, VertexBuffer},
-    game_engine::{BoundingBox, Entity, EntityName, SpriteSheet},
+    game_engine::{BoundingBox, Entity, EntityName, SceneName, SpriteSheet},
 };
 use std::{fmt::Debug, time::Duration};
 use threed::Vector;
@@ -115,6 +115,7 @@ impl Entity<Type, Event> for Transition {
         &mut self,
         _entities: &Vec<&Box<dyn Entity<Type, Event>>>,
         delta_t: &Duration,
+        _scene: &SceneName,
     ) -> Vec<Event> {
         let events = self.animation.update(delta_t);
         if !events.is_empty() {

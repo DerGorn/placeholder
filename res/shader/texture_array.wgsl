@@ -39,6 +39,7 @@ var sampler_array: binding_array<sampler>;
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    return textureSampleLevel(texture_array[in.tex_index], sampler_array[in.tex_index], in.tex_coords, 0.0);
+    var color = textureSampleLevel(texture_array[in.tex_index], sampler_array[in.tex_index], in.tex_coords, 0.0);
+    return color;
     //return vec4<f32>(0.0, in.tex_coords*150.0, 1.0);
 }

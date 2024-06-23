@@ -44,6 +44,7 @@ pub struct Game<E: ExternalEvent, S: State<E>> {
     ressources: RessourceDescriptor,
     active_scenes: Vec<Scene<E>>,
     pending_scenes: Vec<Scene<E>>,
+    suspended_scenes: Vec<Scene<E>>,
     window_ids: Vec<(WindowName, WindowId)>,
     window_sizes: Vec<(WindowId, PhysicalSize<u32>)>,
     sprite_sheets: Vec<(SpriteSheetName, SpriteSheet)>,
@@ -62,6 +63,7 @@ impl<E: ExternalEvent, S: State<E>> Game<E, S> {
             ressources,
             pending_scenes: inital_scenes,
             active_scenes: Vec::new(),
+            suspended_scenes: Vec::new(),
             window_ids: Vec::new(),
             window_sizes: Vec::new(),
             sprite_sheets: Vec::new(),
@@ -349,7 +351,7 @@ impl<E: ExternalEvent + 'static, S: State<E>> EventManager<GameEvent<E>> for Gam
                         let (left, right) = entities.split_at_mut(i);
                         let (entity, right) = right.split_first_mut().unwrap();
                         let interactions = left.iter().chain(right.iter()).map(|e| &*e).collect();
-                        let events = entity.update(&interactions, &delta_t);
+                        let events = entity.update(&interactions, &delta_t, &scene.name);
                         for event in events {
                             window_manager.send_event(GameEvent::External(event))
                         }
@@ -383,6 +385,7 @@ impl<E: ExternalEvent + 'static, S: State<E>> EventManager<GameEvent<E>> for Gam
             GameEvent::External(event) => {
                 // println!("EXTERN EVENT: {:?}", event);
                 if event.is_request_new_scenes() {
+                    info!("Creating new Scenes");
                     let scenes = event
                         .consume_scenes_request()
                         .expect("Somehow generated no Scene");
@@ -390,8 +393,85 @@ impl<E: ExternalEvent + 'static, S: State<E>> EventManager<GameEvent<E>> for Gam
                     self.activate_scenes(window_manager);
                     return;
                 }
+                if let Some(suspendable_scene) = event.is_request_suspend_scene() {
+                    info!("Suspending Scene {:?}", suspendable_scene);
+                    if let Some(index) = self
+                        .active_scenes
+                        .iter()
+                        .position(|s| s.name == *suspendable_scene)
+                    {
+                        let scene = self.active_scenes.remove(index);
+                        self.suspended_scenes.push(scene);
+                        self.cameras
+                            .iter_mut()
+                            .filter(|(s, _, _)| s == suspendable_scene)
+                            .for_each(|(_, camera, _)| camera.reset_offset());
+                    } else {
+                        warn!(
+                            "Tried to suspend Scene {:?}, but it is not active",
+                            suspendable_scene
+                        );
+                    }
+                }
+                if let Some(activatable_scene) = event.is_request_activate_suspended_scene() {
+                    info!("Activating Scene: {:?}", activatable_scene);
+                    if let Some(index) = self
+                        .suspended_scenes
+                        .iter()
+                        .position(|s| s.name == *activatable_scene)
+                    {
+                        let scene = self.suspended_scenes.remove(index);
+                        self.active_scenes.push(scene);
+                        self.active_scenes.sort_by_key(|s| s.z_index);
+                        println!("Active Scenes {:?}", self.active_scenes);
+                    } else {
+                        warn!(
+                            "Tried to activate suspended Scene {:?}, but it is not suspended",
+                            activatable_scene
+                        );
+                    }
+                }
+                if let Some(deletable_scene) = event.is_request_delete_scene() {
+                    info!("Deleting Scene {:?}", deletable_scene);
+                    if let Some(active_index) = self
+                        .active_scenes
+                        .iter()
+                        .position(|s| s.name == *deletable_scene)
+                    {
+                        let scene = self.active_scenes.remove(active_index);
+                        graphics_provider.remove_render_scene(&scene.render_scene);
+                    } else if let Some(suspended_index) = self
+                        .suspended_scenes
+                        .iter()
+                        .position(|s| s.name == *deletable_scene)
+                    {
+                        let scene = self.suspended_scenes.remove(suspended_index);
+                        graphics_provider.remove_render_scene(&scene.render_scene);
+                    } else {
+                        warn!(
+                            "Tried to delete Scene {:?}, but its neither active nor suspended",
+                            deletable_scene
+                        );
+                    }
+                    self.cameras
+                        .retain(|(scene_name, _, _)| scene_name != deletable_scene);
+                }
                 if let Some((uniform_name, contents)) = event.is_update_uniform_buffer() {
                     graphics_provider.update_uniform_buffer(uniform_name, contents);
+                }
+                if let Some((entity, scene)) = event.is_delete_entity() {
+                    info!("Deleting Entiy {:?} from Scene {:?}", entity, scene);
+                    let scene = self
+                        .active_scenes
+                        .iter_mut()
+                        .find(|s| s.name == *scene)
+                        .unwrap_or_else(|| {
+                            self.suspended_scenes
+                                .iter_mut()
+                                .find(|s| s.name == *scene)
+                                .expect(&format!("Found no active nor suspended scene {:?}", scene))
+                        });
+                    scene.entities.retain(|e| e.name() != entity);
                 }
                 let response_events = self.state.handle_event(event);
                 for event in response_events {

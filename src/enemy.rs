@@ -3,17 +3,13 @@ use std::{fmt::Debug, time::Duration};
 use placeholder::{
     app::{IndexBuffer, VertexBuffer},
     game_engine::{
-        BoundingBox, Entity, EntityName, SpritePosition, SpriteSheet, SpriteSheetName,
+        BoundingBox, Entity, EntityName, SceneName, SpritePosition, SpriteSheet, SpriteSheetName,
     },
 };
 use threed::Vector;
 use winit::{dpi::PhysicalSize, event::KeyEvent};
 
-use crate::{
-    animation::Animation,
-    vertex::render_sprite,
-    EnemyType, Event, Type,
-};
+use crate::{animation::Animation, vertex::render_sprite, EnemyType, Event, Type};
 
 pub struct Enemy {
     pub name: EntityName,
@@ -35,17 +31,28 @@ impl Entity<Type, Event> for Enemy {
         &mut self,
         entities: &Vec<&Box<dyn Entity<Type, Event>>>,
         delta_t: &Duration,
+        scene: &SceneName,
     ) -> Vec<Event> {
         self.animation.update(delta_t);
         let players = entities.iter().filter(|e| e.entity_type() == Type::Player);
         let own_bounding_box = self.bounding_box();
+        let mut start_fight = false;
         for player in players {
             let bounding_box = player.bounding_box();
             if own_bounding_box.intersects(&bounding_box) {
-                return vec![Event::InitiateBattle(self.enemy_type.clone())];
+                start_fight = true;
+                break;
             }
         }
-        vec![]
+        if start_fight {
+            vec![Event::InitiateBattle(
+                self.enemy_type.clone(),
+                self.name.clone(),
+                scene.clone(),
+            )]
+        } else {
+            vec![]
+        }
     }
     fn render(
         &self,

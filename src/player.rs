@@ -3,8 +3,7 @@ use std::{fmt::Debug, time::Duration};
 use placeholder::{
     app::{IndexBuffer, VertexBuffer},
     game_engine::{
-        BoundingBox, Direction, Entity, EntityName, SpritePosition, SpriteSheet, SpriteSheetName,
-        VelocityController,
+        BoundingBox, Direction, Entity, EntityName, SceneName, SpritePosition, SpriteSheet, SpriteSheetName, VelocityController
     },
 };
 use threed::Vector;
@@ -39,6 +38,7 @@ impl Entity<Type, Event> for Player {
         &mut self,
         entities: &Vec<&Box<dyn Entity<Type, Event>>>,
         delta_t: &Duration,
+        _scene: &SceneName,
     ) -> Vec<Event> {
         self.position += self.velocity.get_velocity();
         let background = entities
@@ -51,6 +51,15 @@ impl Entity<Type, Event> for Player {
             .clamp_box_inside(&self.bounding_box())
         {
             self.position = new_position;
+        }
+        let enemies = entities.iter().filter(|e| e.entity_type() == Type::Enemy);
+        let own_bounding_box = self.bounding_box();
+        for enemy in enemies {
+            let bounding_box = enemy.bounding_box();
+            if own_bounding_box.intersects(&bounding_box) {
+                self.velocity.stop_movement();
+                break;
+            }
         }
         self.animation.update(delta_t)
     }

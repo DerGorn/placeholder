@@ -103,6 +103,11 @@ impl Camera {
             target_entity: descriptor.target_entity.clone(),
         }
     }
+    
+    pub fn reset_offset(&mut self) {
+        self.velocity.stop_movement();
+        self.offset_position = Vector::scalar(0.0);
+    }
 
     pub fn update<T: EntityType, E: ExternalEvent>(
         &mut self,

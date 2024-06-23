@@ -14,8 +14,8 @@ use winit::{dpi::PhysicalSize, window::WindowAttributes};
 use placeholder::graphics::{Index as I, Vertex as V};
 
 use placeholder::game_engine::{
-    CameraDescriptor, EntityType, ExternalEvent, Game, RessourceDescriptor, Scene, SceneName,
-    SpritePosition, SpriteSheetDimensions, State, VelocityController,
+    CameraDescriptor, EntityName, EntityType, ExternalEvent, Game, RessourceDescriptor, Scene,
+    SceneName, SpritePosition, SpriteSheetDimensions, State, VelocityController,
 };
 
 mod animation;
@@ -54,11 +54,33 @@ enum Event {
     RequestNewScenes(Vec<Scene<Self>>),
     NewScene(SceneName),
     UpdateUniformBuffer(UniformBufferName, Vec<u8>),
-    InitiateBattle(EnemyType),
+    InitiateBattle(EnemyType, EntityName, SceneName),
     AnimationEnded,
+    RequestSuspendScene(SceneName),
+    RequestActivateSuspendedScene(SceneName),
+    RequestDeleteScene(SceneName),
+    RequestDeleteEntity(EntityName, SceneName),
 }
 impl ExternalEvent for Event {
     type EntityType = Type;
+    fn is_request_suspend_scene<'a>(&'a self) -> Option<&'a SceneName> {
+        match self {
+            Event::RequestSuspendScene(scene) => Some(scene),
+            _ => None,
+        }
+    }
+    fn is_request_activate_suspended_scene<'a>(&'a self) -> Option<&'a SceneName> {
+        match self {
+            Event::RequestActivateSuspendedScene(scene) => Some(scene),
+            _ => None,
+        }
+    }
+    fn is_request_delete_scene<'a>(&'a self) -> Option<&'a SceneName> {
+        match self {
+            Event::RequestDeleteScene(scene) => Some(scene),
+            _ => None,
+        }
+    }
     fn is_request_new_scenes<'a>(&'a self) -> bool {
         match self {
             Event::RequestNewScenes(_) => true,
@@ -91,6 +113,12 @@ impl ExternalEvent for Event {
             _ => None,
         }
     }
+    fn is_delete_entity<'a>(&'a self) -> Option<(&'a EntityName, &'a SceneName)> {
+        match self {
+            Event::RequestDeleteEntity(entity, scene) => Some((entity, scene)),
+            _ => None,
+        }
+    }
 }
 
 struct PlayerState {
@@ -107,7 +135,7 @@ impl PlayerState {
 }
 struct GameState {
     player: PlayerState,
-    pending_battle: Option<EnemyType>,
+    pending_battle: Option<(EnemyType, EntityName, SceneName)>,
 }
 impl GameState {
     fn new() -> Self {
@@ -120,7 +148,7 @@ impl GameState {
 impl State<Event> for GameState {
     fn handle_event(&mut self, event: Event) -> Vec<Event> {
         match event {
-            Event::InitiateBattle(enemy) => {
+            Event::InitiateBattle(enemy, entity, scene) => {
                 if self.pending_battle.is_none() {
                     let shader_descriptor = ShaderDescriptor {
                         file: "res/shader/transition.wgsl",
@@ -129,26 +157,39 @@ impl State<Event> for GameState {
                         uniforms: vec![UTIME],
                     };
                     let transition_name: &str = "BattleTransition";
-                    self.pending_battle = Some(enemy);
-                    return vec![Event::RequestNewScenes(vec![Scene {
-                        name: BATTLE_TRANSITION_SCENE.into(),
-                        render_scene: BATTLE_TRANSITION_SCENE.into(),
-                        target_window: MAIN_WINDOW.into(),
-                        z_index: 1,
-                        entities: vec![Box::new(Transition::new(
-                            TransitionTypes::BattleTransition,
-                            transition_name,
-                            Duration::from_secs(2),
-                        ))],
-                        shader_descriptor,
-                    }])];
+                    self.pending_battle = Some((enemy, entity, scene.clone()));
+                    return vec![
+                        Event::RequestNewScenes(vec![Scene {
+                            name: BATTLE_TRANSITION_SCENE.into(),
+                            render_scene: BATTLE_TRANSITION_SCENE.into(),
+                            target_window: MAIN_WINDOW.into(),
+                            z_index: 1,
+                            entities: vec![Box::new(Transition::new(
+                                TransitionTypes::BattleTransition,
+                                transition_name,
+                                Duration::from_millis(750),
+                            ))],
+                            shader_descriptor,
+                        }]),
+                        Event::RequestSuspendScene(scene),
+                    ];
                 }
             }
             Event::AnimationEnded => {
-                println!("Animation end {:?}", self.pending_battle);
-                if let Some(enemy) = &self.pending_battle {
+                let response = if let Some((enemy, entity, scene)) = &self.pending_battle {
                     println!("Starting Battle!");
+                    vec![
+                        Event::RequestDeleteEntity(entity.clone(), scene.clone()),
+                        Event::RequestDeleteScene(BATTLE_TRANSITION_SCENE.into()),
+                        Event::RequestActivateSuspendedScene(scene.clone()),
+                    ]
+                } else {
+                    vec![]
+                };
+                if response.len() > 0 {
+                    self.pending_battle = None;
                 }
+                return response;
             }
             _ => {}
         }
@@ -157,6 +198,7 @@ impl State<Event> for GameState {
 }
 
 const MAIN_WINDOW: &str = "MainWindow";
+const MAIN_SCENE: &str = "MainScene";
 const BATTLE_TRANSITION_SCENE: &str = "BattleTransitionScene";
 const UTIME: &str = "Time";
 const FROG: &str = "Frog";
@@ -184,7 +226,6 @@ fn main() {
         bound_entity: Some(background.into()),
         max_offset_position: 100.0,
     };
-    let main_scene = "MainScene";
     let ressources = RessourceDescriptor {
         windows: vec![(MAIN_WINDOW.into(), main_window_descriptor)],
         uniforms: vec![(
@@ -194,7 +235,7 @@ fn main() {
         )],
         render_scenes: vec![
             (
-                main_scene.into(),
+                MAIN_SCENE.into(),
                 Some(camera_descriptor),
                 RenderSceneDescriptor {
                     index_format: Index::index_format(),
@@ -233,8 +274,8 @@ fn main() {
     let scene = Scene {
         z_index: 0,
         shader_descriptor,
-        name: main_scene.into(),
-        render_scene: main_scene.into(),
+        name: MAIN_SCENE.into(),
+        render_scene: MAIN_SCENE.into(),
         target_window: MAIN_WINDOW.into(),
         entities: vec![
             Box::new(Player {

@@ -54,6 +54,11 @@ impl GraphicsProvider {
         }
     }
 
+    pub fn remove_render_scene(&mut self, render_scene: &RenderSceneName) {
+        self.render_scenes
+            .retain(|(_, r, _, _)| r.name() != render_scene);
+    }
+
     pub fn get_window(&self, render_scene: &RenderSceneName) -> Option<&WindowId> {
         self.render_scenes
             .iter()
@@ -210,11 +215,8 @@ impl GraphicsProvider {
                         .into(),
                 ),
             });
-            let mut render_scene = RenderScene::new(
-                render_scene_name.clone(),
-                device,
-                render_scene_descriptor,
-            );
+            let mut render_scene =
+                RenderScene::new(render_scene_name.clone(), device, render_scene_descriptor);
             for (uniform, content, visibility) in initial_uniforms {
                 render_scene.create_uniform_buffer(
                     device,

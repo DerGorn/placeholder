@@ -121,6 +121,7 @@ impl RenderScene {
             &self.index_buffer,
             self.num_indices,
             wgpu::BufferUsages::INDEX,
+            self.num_indices > indices.buffer_len(),
         ) {
             self.index_buffer = index_buffer;
             self.num_indices = num_indices;
@@ -131,6 +132,7 @@ impl RenderScene {
             &self.vertex_buffer,
             self.num_vertices,
             wgpu::BufferUsages::VERTEX,
+            false,
         ) {
             self.vertex_buffer = vertex_buffer;
             self.num_vertices = num_vertices;

@@ -11,10 +11,11 @@ pub trait BufferWriter {
         buffer: &wgpu::Buffer,
         buffer_len: u32,
         usage: wgpu::BufferUsages,
+        force_overwrite: bool,
     ) -> Option<(wgpu::Buffer, u32)> {
         if let Some(buffer_data) = self.buffer_data() {
             let new_len = self.buffer_len();
-            if buffer_len < new_len {
+            if buffer_len < new_len || force_overwrite {
                 let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                     label: Some(&format!("{:?} Buffer", usage)),
                     contents: buffer_data,

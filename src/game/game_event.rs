@@ -12,7 +12,7 @@ use crate::{
 };
 use winit::window::WindowId;
 
-use super::{EntityType, Scene};
+use super::{EntityName, EntityType, Scene, SceneName};
 
 use super::ressource_descriptor::{SpriteSheetName, WindowName};
 
@@ -116,6 +116,12 @@ impl<E: ExternalEvent> ApplicationEvent for GameEvent<E> {
 
 pub trait ExternalEvent: Debug + Send {
     type EntityType: EntityType;
+    ///Suspended scenes will now longer update their buffers, but will still be rendered in their
+    ///current state
+    fn is_request_suspend_scene<'a>(&'a self) -> Option<&'a SceneName>;
+    fn is_request_activate_suspended_scene<'a>(&'a self) -> Option<&'a SceneName>;
+    ///Deleting a scene will remove it entirely from the game, such that it cannot be rendere again
+    fn is_request_delete_scene<'a>(&'a self) -> Option<&'a SceneName>;
     fn is_request_new_scenes<'a>(&'a self) -> bool;
     /// Should only be called if is_request_new_scene returns true
     fn consume_scenes_request(self) -> Option<Vec<Scene<Self>>>
@@ -127,4 +133,5 @@ pub trait ExternalEvent: Debug + Send {
     fn is_update_uniform_buffer<'a>(
         &'a self,
     ) -> Option<(&'a UniformBufferName, &'a [u8])>;
+    fn is_delete_entity<'a>(&'a self) -> Option<(&'a EntityName, &'a SceneName)>;
 }
