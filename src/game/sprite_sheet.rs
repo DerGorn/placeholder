@@ -1,3 +1,4 @@
+#[derive(Debug)]
 pub struct TextureCoordinates {
     pub u: f32,
     pub v: f32,
@@ -26,8 +27,8 @@ impl SpriteSheetDimensions {
 
 pub struct SpriteSheet {
     texture: u32,
-    sprites_per_row: u8,
-    sprites_per_column: u8,
+    pub sprites_per_row: u8,
+    pub sprites_per_column: u8,
 }
 impl SpriteSheet {
     pub fn texture(&self) -> u32 {

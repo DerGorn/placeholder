@@ -3,6 +3,7 @@ use winit::dpi::PhysicalSize;
 
 ///Bounding Box defined by middle point and width and height
 ///The negative sides (anchor - size/2) and the positive sides (anchor + size/2) are inclusive
+#[derive(Debug)]
 pub struct BoundingBox {
     ///Middle point
     pub anchor: Vector<f32>,

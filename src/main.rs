@@ -35,6 +35,9 @@ use player::Player;
 mod vertex;
 use vertex::{SimpleVertex, Vertex};
 
+mod text;
+use text::Text;
+
 type Index = u16;
 
 #[derive(Debug, PartialEq)]
@@ -42,6 +45,7 @@ enum Type {
     Background,
     Player,
     Enemy,
+    Menu,
 }
 impl EntityType for Type {}
 
@@ -201,9 +205,11 @@ impl State<Event> for GameState {
 
 const MAIN_WINDOW: &str = "MainWindow";
 const MAIN_SCENE: &str = "MainScene";
+const UI_SCENE: &str = "UIScene";
 const BATTLE_TRANSITION_SCENE: &str = "BattleTransitionScene";
 const UTIME: &str = "Time";
 const FROG: &str = "Frog";
+const FONT: &str = "Font";
 fn main() {
     env_logger::Builder::from_env(Env::default().default_filter_or("warn")).init();
     let target_fps = 60;
@@ -211,12 +217,6 @@ fn main() {
     let cursor_path = "res/images/cursor/Cursor_Goth_Cursor.png";
     let main_window = WindowAttributes::default().with_title("Wispers in the Void - Dark Dynasty");
     let main_window_descriptor = WindowDescriptor::new(main_window).with_cursor(cursor_path);
-    let shader_descriptor = ShaderDescriptor {
-        file: "res/shader/texture_array.wgsl",
-        vertex_shader: "vs_main",
-        fragment_shader: "fs_main",
-        uniforms: vec![],
-    };
     let protaginist_name = "Protagonist";
     let player_sprite_sheet = "PlayerSpriteSheet";
     let background = "Background";
@@ -228,14 +228,31 @@ fn main() {
         bound_entity: Some(background.into()),
         max_offset_position: 100.0,
     };
+    let font_color = "FontColor";
     let ressources = RessourceDescriptor {
         windows: vec![(MAIN_WINDOW.into(), main_window_descriptor)],
-        uniforms: vec![(
-            UTIME.into(),
-            bytemuck::cast_slice(&[0.0_f32]).to_vec(),
-            wgpu::ShaderStages::FRAGMENT,
-        )],
+        uniforms: vec![
+            (
+                UTIME.into(),
+                bytemuck::cast_slice(&[0.0_f32]).to_vec(),
+                wgpu::ShaderStages::FRAGMENT,
+            ),
+            (
+                font_color.into(),
+                bytemuck::cast_slice(&[0.0_f32; 3]).to_vec(),
+                wgpu::ShaderStages::FRAGMENT,
+            ),
+        ],
         render_scenes: vec![
+            (
+                UI_SCENE.into(),
+                Some(camera_descriptor.clone()),
+                RenderSceneDescriptor {
+                    index_format: Index::index_format(),
+                    use_textures: true,
+                    vertex_buffer_layout: Vertex::describe_buffer_layout(),
+                },
+            ),
             (
                 MAIN_SCENE.into(),
                 Some(camera_descriptor),
@@ -271,11 +288,21 @@ fn main() {
                 PathBuf::from("res/images/spriteSheets/frog.png"),
                 SpriteSheetDimensions::new(4, 1),
             ),
+            (
+                FONT.into(),
+                PathBuf::from("res/fonts/font.png"),
+                SpriteSheetDimensions::new(16, 16),
+            ),
         ],
     };
-    let scene = Scene {
+    let main_scene = Scene {
         z_index: 0,
-        shader_descriptor,
+        shader_descriptor: ShaderDescriptor {
+            file: "res/shader/texture_array.wgsl",
+            vertex_shader: "vs_main",
+            fragment_shader: "fs_main",
+            uniforms: vec![],
+        },
         name: MAIN_SCENE.into(),
         render_scene: MAIN_SCENE.into(),
         target_window: MAIN_WINDOW.into(),
@@ -320,6 +347,27 @@ fn main() {
         ],
     };
 
+    let ui_scene = Scene {
+        z_index: 100,
+        shader_descriptor: ShaderDescriptor {
+        file: "res/shader/font.wgsl",
+        vertex_shader: "vs_main",
+        fragment_shader: "fs_main",
+        uniforms: vec![font_color],
+        },
+        name: UI_SCENE.into(),
+    render_scene: UI_SCENE.into(),
+        target_window: MAIN_WINDOW.into(),
+        entities: vec![
+            Box::new(Text::new(
+                String::from("Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata"),
+                "TestText".into(),
+                PhysicalSize::new(512, 512),
+                Vector::scalar(0.0),
+                40,
+            )),
+        ],
+    };
     // let (_stream, stream_handle) = OutputStream::try_default().unwrap();
     // let sink = Sink::try_new(&stream_handle).unwrap();
     //
@@ -329,7 +377,7 @@ fn main() {
 
     let mut app = ManagerApplication::new(Game::new(
         ressources,
-        vec![scene],
+        vec![main_scene, ui_scene],
         target_fps,
         GameState::new(),
     ));
