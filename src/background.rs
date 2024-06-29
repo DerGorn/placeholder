@@ -1,6 +1,7 @@
-use placeholder::{app::{IndexBuffer, VertexBuffer}, game_engine::{
-    BoundingBox, Entity, EntityName, SpritePosition, SpriteSheet, SpriteSheetName,
-}};
+use placeholder::{
+    app::{IndexBuffer, VertexBuffer},
+    game_engine::{BoundingBox, Entity, EntityName, SpritePosition, SpriteSheet, SpriteSheetName},
+};
 use std::fmt::Debug;
 use threed::Vector;
 use winit::{dpi::PhysicalSize, event::KeyEvent};
@@ -16,7 +17,7 @@ impl Debug for Background {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Background")
             .field("z", &self.z())
-            .field("sprite", &self.sprite_sheet())
+            .field("sprite", &self.sprite_sheet)
             .finish()
     }
 }
@@ -24,8 +25,8 @@ impl Entity<Type, Event> for Background {
     fn entity_type(&self) -> Type {
         Type::Background
     }
-    fn sprite_sheet(&self) -> Option<&SpriteSheetName> {
-        Some(&self.sprite_sheet)
+    fn sprite_sheets(&self) -> Vec<&SpriteSheetName> {
+        vec![&self.sprite_sheet]
     }
     fn name(&self) -> &EntityName {
         &self.name
@@ -47,10 +48,16 @@ impl Entity<Type, Event> for Background {
         &self,
         vertices: &mut VertexBuffer,
         indices: &mut IndexBuffer,
-        sprite_sheet: Option<&SpriteSheet>,
+        sprite_sheet: Vec<&SpriteSheet>,
     ) {
-        if let Some(sprite_sheet) = sprite_sheet {
-            render_sprite(&self.bounding_box(), vertices, indices, sprite_sheet, &SpritePosition::new(0, 0));
+        if let Some(sprite_sheet) = sprite_sheet.get(0) {
+            render_sprite(
+                &self.bounding_box(),
+                vertices,
+                indices,
+                sprite_sheet,
+                &SpritePosition::new(0, 0),
+            );
         }
     }
 }

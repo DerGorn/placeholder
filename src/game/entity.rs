@@ -22,10 +22,10 @@ pub trait Entity<T: EntityType, E: ExternalEvent>: Debug + Send {
         &self,
         vertices: &mut VertexBuffer,
         indices: &mut IndexBuffer,
-        sprite_sheet: Option<&SpriteSheet>,
+        sprite_sheet: Vec<&SpriteSheet>,
     );
-   fn sprite_sheet(&self) -> Option<&SpriteSheetName> {
-        None
+   fn sprite_sheets(&self) -> Vec<&SpriteSheetName> {
+        vec![]
     }
     fn handle_key_input(&mut self, _input: &KeyEvent) {}
     fn name(&self) -> &EntityName;

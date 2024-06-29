@@ -22,7 +22,7 @@ impl Debug for Enemy {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Enemy")
             .field("z", &self.z())
-            .field("sprite", &self.sprite_sheet())
+            .field("sprite", &self.sprite_sheets())
             .finish()
     }
 }
@@ -58,9 +58,9 @@ impl Entity<Type, Event> for Enemy {
         &self,
         vertices: &mut VertexBuffer,
         indices: &mut IndexBuffer,
-        sprite_sheet: Option<&SpriteSheet>,
+        sprite_sheet: Vec<&SpriteSheet>,
     ) {
-        if let Some(sprite_sheet) = sprite_sheet {
+        if let Some(sprite_sheet) = sprite_sheet.get(0) {
             render_sprite(
                 &self.bounding_box(),
                 vertices,
@@ -70,8 +70,8 @@ impl Entity<Type, Event> for Enemy {
             );
         }
     }
-    fn sprite_sheet(&self) -> Option<&SpriteSheetName> {
-        Some(&self.animation.sprite_sheet())
+    fn sprite_sheets(&self) -> Vec<&SpriteSheetName> {
+        vec![&self.animation.sprite_sheet()]
     }
     fn handle_key_input(&mut self, _input: &KeyEvent) {}
     fn name(&self) -> &EntityName {

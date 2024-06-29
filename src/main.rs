@@ -9,6 +9,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 use threed::Vector;
 use transition::{Transition, TransitionTypes};
+use ui::{FlexBox, FlexDirection};
 use winit::{dpi::PhysicalSize, window::WindowAttributes};
 
 use placeholder::graphics::{Index as I, Vertex as V};
@@ -17,6 +18,9 @@ use placeholder::game_engine::{
     CameraDescriptor, EntityName, EntityType, ExternalEvent, Game, RessourceDescriptor, Scene,
     SceneName, SpritePosition, SpriteSheetDimensions, State, VelocityController,
 };
+
+mod static_camera;
+use static_camera::static_camera;
 
 mod animation;
 use animation::Animation;
@@ -37,6 +41,8 @@ use vertex::{SimpleVertex, Vertex};
 
 mod text;
 use text::Text;
+
+mod ui;
 
 type Index = u16;
 
@@ -206,8 +212,10 @@ impl State<Event> for GameState {
 const MAIN_WINDOW: &str = "MainWindow";
 const MAIN_SCENE: &str = "MainScene";
 const UI_SCENE: &str = "UIScene";
+const MAIN_MENU_SCENE: &str = "MainMenuScene";
 const BATTLE_TRANSITION_SCENE: &str = "BattleTransitionScene";
 const UTIME: &str = "Time";
+const UUI_CAMERA: &str = "UICamera";
 const FROG: &str = "Frog";
 const FONT: &str = "Font";
 fn main() {
@@ -242,11 +250,25 @@ fn main() {
                 bytemuck::cast_slice(&[0.0_f32; 3]).to_vec(),
                 wgpu::ShaderStages::FRAGMENT,
             ),
+            (
+                UUI_CAMERA.into(),
+                bytemuck::cast_slice(&static_camera(PhysicalSize::new(800.0, 600.0))).to_vec(),
+                wgpu::ShaderStages::VERTEX,
+            ),
         ],
         render_scenes: vec![
             (
+                MAIN_MENU_SCENE.into(),
+                None,
+                RenderSceneDescriptor {
+                    index_format: Index::index_format(),
+                    use_textures: true,
+                    vertex_buffer_layout: Vertex::describe_buffer_layout(),
+                },
+            ),
+            (
                 UI_SCENE.into(),
-                Some(camera_descriptor.clone()),
+                None,
                 RenderSceneDescriptor {
                     index_format: Index::index_format(),
                     use_textures: true,
@@ -347,27 +369,48 @@ fn main() {
         ],
     };
 
-    let ui_scene = Scene {
+    let main_menu_scene = Scene {
         z_index: 100,
         shader_descriptor: ShaderDescriptor {
-        file: "res/shader/font.wgsl",
-        vertex_shader: "vs_main",
-        fragment_shader: "fs_main",
-        uniforms: vec![font_color],
+            file: "res/shader/font.wgsl",
+            vertex_shader: "vs_main",
+            fragment_shader: "fs_main",
+            uniforms: vec![font_color, UUI_CAMERA],
         },
-        name: UI_SCENE.into(),
-    render_scene: UI_SCENE.into(),
+        name: MAIN_MENU_SCENE.into(),
+        render_scene: MAIN_MENU_SCENE.into(),
         target_window: MAIN_WINDOW.into(),
-        entities: vec![
-            Box::new(Text::new(
-                String::from("Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata"),
-                "TestText".into(),
-                PhysicalSize::new(512, 512),
-                Vector::scalar(0.0),
-                40,
-            )),
-        ],
+        entities: vec![Box::new(FlexBox {
+            flex_direction: FlexDirection::Y,
+            dimensions: PhysicalSize::new(800, 600),
+            position: Vector::new(0.0, 0.0, 0.0),
+            children: vec![
+                Box::new(Text::new(
+                    String::from("Whispers in the Void - Dark Dynasty"),
+                    "Title".into(),
+                    PhysicalSize::new(800, 600),
+                    Vector::scalar(0.0),
+                    40,
+                )),
+                Box::new(Text::new(
+                    String::from("New Game"),
+                    "StartButton".into(),
+                    PhysicalSize::new(800, 600),
+                    Vector::scalar(0.0),
+                    40,
+                )),
+                Box::new(Text::new(
+                    String::from("End Game"),
+                    "EndButton".into(),
+                    PhysicalSize::new(800, 600),
+                    Vector::scalar(0.0),
+                    40,
+                )),
+            ],
+            name: "MainMenu".into(),
+        })],
     };
+    // todo!("PROMOTE CAMERA TO ENTITY. And implement a static camera with screen size");
     // let (_stream, stream_handle) = OutputStream::try_default().unwrap();
     // let sink = Sink::try_new(&stream_handle).unwrap();
     //
@@ -377,7 +420,7 @@ fn main() {
 
     let mut app = ManagerApplication::new(Game::new(
         ressources,
-        vec![main_scene, ui_scene],
+        vec![main_menu_scene],
         target_fps,
         GameState::new(),
     ));

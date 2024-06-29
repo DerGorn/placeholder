@@ -3,7 +3,8 @@ use std::{fmt::Debug, time::Duration};
 use placeholder::{
     app::{IndexBuffer, VertexBuffer},
     game_engine::{
-        BoundingBox, Direction, Entity, EntityName, SceneName, SpritePosition, SpriteSheet, SpriteSheetName, VelocityController
+        BoundingBox, Direction, Entity, EntityName, SceneName, SpritePosition, SpriteSheet,
+        SpriteSheetName, VelocityController,
     },
 };
 use threed::Vector;
@@ -26,7 +27,7 @@ impl Debug for Player {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Player")
             .field("z", &self.z())
-            .field("sprite", &self.sprite_sheet())
+            .field("sprite", &self.sprite_sheets())
             .finish()
     }
 }
@@ -80,8 +81,8 @@ impl Entity<Type, Event> for Player {
         }
     }
 
-    fn sprite_sheet(&self) -> Option<&SpriteSheetName> {
-        Some(&self.animation.sprite_sheet())
+    fn sprite_sheets(&self) -> Vec<&SpriteSheetName> {
+        vec![&self.animation.sprite_sheet()]
     }
 
     fn z(&self) -> f32 {
@@ -92,9 +93,9 @@ impl Entity<Type, Event> for Player {
         &self,
         vertices: &mut VertexBuffer,
         indices: &mut IndexBuffer,
-        sprite_sheet: Option<&SpriteSheet>,
+        sprite_sheet: Vec<&SpriteSheet>,
     ) {
-        if let Some(sprite_sheet) = sprite_sheet {
+        if let Some(sprite_sheet) = sprite_sheet.get(0) {
             render_sprite(
                 &self.bounding_box(),
                 vertices,

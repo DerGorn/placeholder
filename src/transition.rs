@@ -97,7 +97,7 @@ impl Entity<Type, Event> for Transition {
         &self,
         vertices: &mut VertexBuffer,
         indices: &mut IndexBuffer,
-        _sprite_sheet: Option<&SpriteSheet>,
+        _sprite_sheet: Vec<&SpriteSheet>,
     ) {
         let (new_vertices, new_indices) = self.animation.keyframe();
         let start_index = vertices.len() as u16;

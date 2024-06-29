@@ -111,7 +111,7 @@ pub fn render_character(
     vertices: &mut VertexBuffer,
     indices: &mut IndexBuffer,
     font: &SpriteSheet,
-    debug: bool,
+    // debug: bool,
 ) -> f32 {
     if (c as u32) < 32 || (c as u32) > 126 {
         panic!("Character not supported: {}", c);
@@ -160,12 +160,12 @@ pub fn render_character(
     let x = bounding_box.anchor.x;
     let x_offset = bounding_box.size.width * (1.0 - 2.0 * padding_factor) / 2.0;
     let y_offset = bounding_box.size.height / 2.0;
-    if debug {
-        println!("padding: {}", CHARACTER_PADDING[sub_ascii as usize]);
-        println!("padding_factor: {:?}", padding_factor);
-        println!("bounding_box: {:?}", bounding_box);
-        println!("x_offset: {:?}", x_offset);
-    };
+    // if debug {
+    //     println!("padding: {}", CHARACTER_PADDING[sub_ascii as usize]);
+    //     println!("padding_factor: {:?}", padding_factor);
+    //     println!("bounding_box: {:?}", bounding_box);
+    //     println!("x_offset: {:?}", x_offset);
+    // };
     let new_vertices = [
         Vertex::new(
             Vector::new(x - x_offset, y + y_offset, 0.0),

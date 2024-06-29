@@ -309,7 +309,8 @@ impl<E: ExternalEvent + 'static, S: State<E>> EventManager<GameEvent<E>> for Gam
                 for sprite_sheet in self.pending_scenes[index]
                     .entities
                     .iter()
-                    .filter_map(|e| e.sprite_sheet())
+                    .map(|e| e.sprite_sheets())
+                    .flatten()
                 {
                     self.request_sprite_sheet(&sprite_sheet, window_manager);
                 }
@@ -355,16 +356,17 @@ impl<E: ExternalEvent + 'static, S: State<E>> EventManager<GameEvent<E>> for Gam
                         for event in events {
                             window_manager.send_event(GameEvent::External(event))
                         }
-                        let sprite_sheet = if let Some(entity_sprite_sheet) = entity.sprite_sheet()
-                        {
-                            self.sprite_sheets
-                                .iter()
-                                .find(|(l, _)| l == entity_sprite_sheet)
-                                .map(|(_, s)| s)
-                        } else {
-                            None
-                        };
-                        entity.render(&mut vertices, &mut indices, sprite_sheet);
+                        let sprite_sheets = entity
+                            .sprite_sheets()
+                            .iter()
+                            .filter_map(|entity_sprite_sheet| {
+                                self.sprite_sheets
+                                    .iter()
+                                    .find(|(l, _)| l == *entity_sprite_sheet)
+                                    .map(|(_, s)| s)
+                            })
+                            .collect();
+                        entity.render(&mut vertices, &mut indices, sprite_sheets);
                     }
                     if let Some((_, camera, camera_name)) =
                         self.cameras.iter_mut().find(|(n, _, _)| n == &scene.name)
