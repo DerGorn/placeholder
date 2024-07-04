@@ -45,12 +45,12 @@ impl Entity<Type, Event> for Background {
     }
     fn handle_key_input(&mut self, _input: &KeyEvent) {}
     fn render(
-        &self,
+        &mut self,
         vertices: &mut VertexBuffer,
         indices: &mut IndexBuffer,
-        sprite_sheet: Vec<&SpriteSheet>,
+        sprite_sheet: Vec<Option<&SpriteSheet>>,
     ) {
-        if let Some(sprite_sheet) = sprite_sheet.get(0) {
+        if let Some(sprite_sheet) = sprite_sheet[0] {
             render_sprite(
                 &self.bounding_box(),
                 vertices,

@@ -7,7 +7,8 @@ use threed::Vector;
 use winit::event::KeyEvent;
 
 use super::{
-    ressource_descriptor::SpriteSheetName, sprite_sheet::SpriteSheet, BoundingBox, ExternalEvent, SceneName,
+    ressource_descriptor::SpriteSheetName, sprite_sheet::SpriteSheet, BoundingBox, ExternalEvent,
+    SceneName,
 };
 
 create_name_struct!(EntityName);
@@ -15,18 +16,21 @@ create_name_struct!(EntityName);
 pub trait EntityType: PartialEq + Debug {}
 
 pub trait Entity<T: EntityType, E: ExternalEvent>: Debug + Send {
-    fn update(&mut self, _entities: &Vec<&Box<dyn Entity<T, E>>>, _delta_t: &Duration, _scene: &SceneName) -> Vec<E> {
+    fn update(
+        &mut self,
+        _entities: &Vec<&Box<dyn Entity<T, E>>>,
+        _delta_t: &Duration,
+        _scene: &SceneName,
+    ) -> Vec<E> {
         vec![]
     }
     fn render(
-        &self,
+        &mut self,
         vertices: &mut VertexBuffer,
         indices: &mut IndexBuffer,
-        sprite_sheet: Vec<&SpriteSheet>,
+        sprite_sheet: Vec<Option<&SpriteSheet>>,
     );
-   fn sprite_sheets(&self) -> Vec<&SpriteSheetName> {
-        vec![]
-    }
+    fn sprite_sheets(&self) -> Vec<&SpriteSheetName>;
     fn handle_key_input(&mut self, _input: &KeyEvent) {}
     fn name(&self) -> &EntityName;
     fn bounding_box(&self) -> BoundingBox;

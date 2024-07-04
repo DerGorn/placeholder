@@ -1,7 +1,5 @@
 use log::warn;
-use placeholder::game_engine::{
-    BoundingBox, Entity, EntityName, SpriteSheet, SpriteSheetName,
-};
+use placeholder::game_engine::{BoundingBox, Entity, EntityName, SpriteSheet, SpriteSheetName};
 use std::fmt::Debug;
 // use std::cell::RefCell;
 use threed::Vector;
@@ -17,10 +15,11 @@ pub struct Text {
     text: String,
     name: EntityName,
     size: PhysicalSize<u16>,
+    max_size: PhysicalSize<u16>,
     position: Vector<f32>,
     sprite_sheet: SpriteSheetName,
     font_size: u8,
-    // first_render: RefCell<bool>,
+    fit_to_content: bool,
 }
 impl Text {
     pub fn new(
@@ -29,15 +28,17 @@ impl Text {
         size: PhysicalSize<u16>,
         position: Vector<f32>,
         font_size: u8,
+        fit_to_content: bool,
     ) -> Self {
         Self {
             text,
             name,
+            max_size: size.clone(),
             size,
             position,
             sprite_sheet: FONT.into(),
             font_size,
-            // first_render: true.into(),
+            fit_to_content,
         }
     }
 }
@@ -59,12 +60,13 @@ impl Entity<Type, Event> for Text {
         vec![]
     }
     fn render(
-        &self,
+        &mut self,
         vertices: &mut placeholder::app::VertexBuffer,
         indices: &mut placeholder::app::IndexBuffer,
-        sprite_sheet: Vec<&SpriteSheet>,
+        sprite_sheet: Vec<Option<&SpriteSheet>>,
     ) {
-        let font = if let Some(ss) = sprite_sheet.get(0) {
+        let mut text_width = f32::NEG_INFINITY;
+        let font = if let Some(ss) = sprite_sheet[0] {
             ss
         } else {
             return;
@@ -72,24 +74,17 @@ impl Entity<Type, Event> for Text {
         let mut char_y: u16 = 0;
         let anchor = &self.position
             + Vector::new(
-                -(self.size.width as f32 / 2.0) + self.font_size as f32 / 2.0,
-                self.size.height as f32 / 2.0 - self.font_size as f32 / 2.0,
+                -(self.size.width as f32 - self.font_size as f32) / 2.0,
+                (self.size.height as f32 - self.font_size as f32) / 2.0,
                 0.0,
             );
         let mut char_bounding_box = BoundingBox {
             anchor: anchor.clone(),
             size: PhysicalSize::new(self.font_size as f32, self.font_size as f32),
         };
-        let width = self.size.width as f32 / 2.0;
+        let width = self.position.x + (self.size.width as f32 - self.font_size as f32) / 2.0;
         let height = self.size.height / self.font_size as u16;
         for s in self.text.chars() {
-            // if *self.first_render.borrow() {
-            //     println!("Rendering text: {:?}", s);
-            //     println!(
-            //         "At Position: ({}, {}) => {:?}",
-            //         char_x, char_y, char_bounding_box.anchor
-            //     );
-            // }
             let new_line = s == '\n';
             if new_line || char_bounding_box.anchor.x >= width {
                 char_y += 1;
@@ -97,26 +92,31 @@ impl Entity<Type, Event> for Text {
                     warn!("Text too long for bounding box");
                     break;
                 }
+                if char_bounding_box.anchor.x >= text_width {
+                    text_width = char_bounding_box.anchor.x;
+                }
                 char_bounding_box.anchor.x = anchor.x;
                 char_bounding_box.anchor.y -= self.font_size as f32;
                 if new_line {
                     continue;
                 }
             }
-            let character_width = render_character(
-                s,
-                &char_bounding_box,
-                vertices,
-                indices,
-                font,
-                // *self.first_render.borrow(),
-            );
+            let character_width = render_character(s, &char_bounding_box, vertices, indices, font);
             char_bounding_box.anchor.x += character_width;
         }
-        // self.first_render.replace(false);
+        if char_bounding_box.anchor.x >= text_width {
+            text_width = char_bounding_box.anchor.x;
+        }
+        if self.fit_to_content {
+            let height = ((char_y + 1) * self.font_size as u16).min(self.max_size.height);
+            let width =
+                ((text_width - anchor.x) as u16 + self.font_size as u16).min(self.max_size.width);
+            self.size.width = width;
+            self.size.height = height;
+        }
     }
     fn sprite_sheets(&self) -> Vec<&SpriteSheetName> {
-  vec![&self.sprite_sheet]
+        vec![&self.sprite_sheet]
     }
     fn entity_type(&self) -> Type {
         Type::Menu
@@ -135,7 +135,7 @@ impl Entity<Type, Event> for Text {
     }
 }
 impl FlexItem for Text {
-    fn set_position(&mut self, position: Vector<f32>) {
-        self.position = position;
+    fn position_mut(&mut self) -> &mut Vector<f32> {
+        &mut self.position
     }
 }

@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 use threed::Vector;
 use transition::{Transition, TransitionTypes};
-use ui::{FlexBox, FlexDirection};
+use ui::{Alignment, FlexBox, FlexDirection, Image};
 use winit::{dpi::PhysicalSize, window::WindowAttributes};
 
 use placeholder::graphics::{Index as I, Vertex as V};
@@ -39,10 +39,8 @@ use player::Player;
 mod vertex;
 use vertex::{SimpleVertex, Vertex};
 
-mod text;
-use text::Text;
-
 mod ui;
+use ui::Text;
 
 type Index = u16;
 
@@ -223,7 +221,9 @@ fn main() {
     let target_fps = 60;
 
     let cursor_path = "res/images/cursor/Cursor_Goth_Cursor.png";
-    let main_window = WindowAttributes::default().with_title("Wispers in the Void - Dark Dynasty");
+    let main_window = WindowAttributes::default()
+        .with_title("Wispers in the Void - Dark Dynasty")
+        .with_inner_size(PhysicalSize::new(800, 600));
     let main_window_descriptor = WindowDescriptor::new(main_window).with_cursor(cursor_path);
     let protaginist_name = "Protagonist";
     let player_sprite_sheet = "PlayerSpriteSheet";
@@ -237,6 +237,7 @@ fn main() {
         max_offset_position: 100.0,
     };
     let font_color = "FontColor";
+    let title = "Title";
     let ressources = RessourceDescriptor {
         windows: vec![(MAIN_WINDOW.into(), main_window_descriptor)],
         uniforms: vec![
@@ -315,6 +316,11 @@ fn main() {
                 PathBuf::from("res/fonts/font.png"),
                 SpriteSheetDimensions::new(16, 16),
             ),
+            (
+                title.into(),
+                PathBuf::from("res/images/spriteSheets/title.png"),
+                SpriteSheetDimensions::new(1, 1),
+            ),
         ],
     };
     let main_scene = Scene {
@@ -380,35 +386,52 @@ fn main() {
         name: MAIN_MENU_SCENE.into(),
         render_scene: MAIN_MENU_SCENE.into(),
         target_window: MAIN_WINDOW.into(),
-        entities: vec![Box::new(FlexBox {
-            flex_direction: FlexDirection::Y,
-            dimensions: PhysicalSize::new(800, 600),
-            position: Vector::new(0.0, 0.0, 0.0),
-            children: vec![
-                Box::new(Text::new(
-                    String::from("Whispers in the Void - Dark Dynasty"),
-                    "Title".into(),
-                    PhysicalSize::new(800, 600),
-                    Vector::scalar(0.0),
-                    40,
-                )),
-                Box::new(Text::new(
-                    String::from("New Game"),
-                    "StartButton".into(),
-                    PhysicalSize::new(800, 600),
-                    Vector::scalar(0.0),
-                    40,
-                )),
-                Box::new(Text::new(
-                    String::from("End Game"),
-                    "EndButton".into(),
-                    PhysicalSize::new(800, 600),
-                    Vector::scalar(0.0),
-                    40,
+        entities: vec![Box::new(FlexBox::new(
+            FlexDirection::Y,
+            Alignment::Center,
+            None,
+            150.0,
+            false,
+            PhysicalSize::new(800, 600),
+            Vector::new(0.0, 0.0, 0.0),
+            "MainMenu".into(),
+            vec![
+                Box::new(Image {
+                    dimensions: PhysicalSize::new(800, 200),
+                    name: title.into(),
+                    position: Vector::new(0.0, 200.0, 0.0),
+                    image: (title.into(), SpritePosition::new(0, 0)),
+                }),
+                Box::new(FlexBox::new(
+                    FlexDirection::Y,
+                    Alignment::Center,
+                    None,
+                    20.0,
+                    true,
+                    PhysicalSize::new(800, 400),
+                    Vector::new(0.0, 200.0, 0.0),
+                    "MainMenuButtons".into(),
+                    vec![
+                        Box::new(Text::new(
+                            String::from("New Game"),
+                            "StartButton".into(),
+                            PhysicalSize::new(800, 600),
+                            Vector::scalar(0.0),
+                            40,
+                            true,
+                        )),
+                        Box::new(Text::new(
+                            String::from("End Game"),
+                            "EndButton".into(),
+                            PhysicalSize::new(800, 600),
+                            Vector::scalar(0.0),
+                            40,
+                            true,
+                        )),
+                    ],
                 )),
             ],
-            name: "MainMenu".into(),
-        })],
+        ))],
     };
     // todo!("PROMOTE CAMERA TO ENTITY. And implement a static camera with screen size");
     // let (_stream, stream_handle) = OutputStream::try_default().unwrap();

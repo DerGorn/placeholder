@@ -94,10 +94,10 @@ impl Debug for Transition {
 }
 impl Entity<Type, Event> for Transition {
     fn render(
-        &self,
+        &mut self,
         vertices: &mut VertexBuffer,
         indices: &mut IndexBuffer,
-        _sprite_sheet: Vec<&SpriteSheet>,
+        _sprite_sheet: Vec<Option<&SpriteSheet>>,
     ) {
         let (new_vertices, new_indices) = self.animation.keyframe();
         let start_index = vertices.len() as u16;
@@ -109,6 +109,10 @@ impl Entity<Type, Event> for Transition {
                 .collect::<Vec<_>>()
                 .as_slice(),
         );
+    }
+
+    fn sprite_sheets(&self) -> Vec<&placeholder::game_engine::SpriteSheetName> {
+        vec![]
     }
 
     fn update(

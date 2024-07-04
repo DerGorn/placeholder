@@ -359,7 +359,7 @@ impl<E: ExternalEvent + 'static, S: State<E>> EventManager<GameEvent<E>> for Gam
                         let sprite_sheets = entity
                             .sprite_sheets()
                             .iter()
-                            .filter_map(|entity_sprite_sheet| {
+                            .map(|entity_sprite_sheet| {
                                 self.sprite_sheets
                                     .iter()
                                     .find(|(l, _)| l == *entity_sprite_sheet)
