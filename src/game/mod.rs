@@ -136,13 +136,7 @@ impl<E: ExternalEvent, S: State<E>> Game<E, S> {
         scene: SceneName,
         shader_descriptor: ShaderDescriptor,
     ) {
-        let (camera, render_scene_descriptor) = self
-            .ressources
-            .get_render_scene(&render_scene)
-            .expect(&format!(
-                "No Ressources defined for RenderScene {:?}",
-                render_scene
-            ));
+        let (camera, render_scene_descriptor) = self.ressources.get_render_scene(&render_scene);
         let mut uniform_buffers: Vec<(UniformBufferName, Vec<u8>, wgpu::ShaderStages)> =
             shader_descriptor
                 .uniforms

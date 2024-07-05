@@ -80,7 +80,10 @@ impl GraphicsProvider {
             &wgpu::DeviceDescriptor {
                 required_features: wgpu::Features::TEXTURE_BINDING_ARRAY
                     | wgpu::Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING,
-                required_limits: wgpu::Limits::default(),
+                required_limits: wgpu::Limits {
+                    // max_vertex_attributes: 32,
+                    ..Default::default()
+                },
                 label: None,
             },
             None, // Trace path

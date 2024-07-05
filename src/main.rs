@@ -37,10 +37,13 @@ mod player;
 use player::Player;
 
 mod vertex;
-use vertex::{SimpleVertex, Vertex};
+use vertex::{SimpleVertex, UiVertex, Vertex};
 
 mod ui;
 use ui::Text;
+
+mod color;
+use color::Color;
 
 type Index = u16;
 
@@ -209,7 +212,6 @@ impl State<Event> for GameState {
 
 const MAIN_WINDOW: &str = "MainWindow";
 const MAIN_SCENE: &str = "MainScene";
-const UI_SCENE: &str = "UIScene";
 const MAIN_MENU_SCENE: &str = "MainMenuScene";
 const BATTLE_TRANSITION_SCENE: &str = "BattleTransitionScene";
 const UTIME: &str = "Time";
@@ -236,8 +238,8 @@ fn main() {
         bound_entity: Some(background.into()),
         max_offset_position: 100.0,
     };
-    let font_color = "FontColor";
     let title = "Title";
+    let title_backdrop = "TitleBackdrop";
     let ressources = RessourceDescriptor {
         windows: vec![(MAIN_WINDOW.into(), main_window_descriptor)],
         uniforms: vec![
@@ -247,16 +249,20 @@ fn main() {
                 wgpu::ShaderStages::FRAGMENT,
             ),
             (
-                font_color.into(),
-                bytemuck::cast_slice(&[0.0_f32; 3]).to_vec(),
-                wgpu::ShaderStages::FRAGMENT,
-            ),
-            (
                 UUI_CAMERA.into(),
                 bytemuck::cast_slice(&static_camera(PhysicalSize::new(800.0, 600.0))).to_vec(),
                 wgpu::ShaderStages::VERTEX,
             ),
         ],
+        default_render_scene: (
+            None,
+            RenderSceneDescriptor {
+                index_format: Index::index_format(),
+                use_textures: true,
+
+                vertex_buffer_layout: Vertex::describe_buffer_layout(),
+            },
+        ),
         render_scenes: vec![
             (
                 MAIN_MENU_SCENE.into(),
@@ -264,16 +270,7 @@ fn main() {
                 RenderSceneDescriptor {
                     index_format: Index::index_format(),
                     use_textures: true,
-                    vertex_buffer_layout: Vertex::describe_buffer_layout(),
-                },
-            ),
-            (
-                UI_SCENE.into(),
-                None,
-                RenderSceneDescriptor {
-                    index_format: Index::index_format(),
-                    use_textures: true,
-                    vertex_buffer_layout: Vertex::describe_buffer_layout(),
+                    vertex_buffer_layout: UiVertex::describe_buffer_layout(),
                 },
             ),
             (
@@ -321,67 +318,97 @@ fn main() {
                 PathBuf::from("res/images/spriteSheets/title.png"),
                 SpriteSheetDimensions::new(1, 1),
             ),
+            (
+                title_backdrop.into(),
+                PathBuf::from("res/images/spriteSheets/titleBackDrop.png"),
+                SpriteSheetDimensions::new(1, 1),
+            ),
         ],
     };
-    let main_scene = Scene {
-        z_index: 0,
-        shader_descriptor: ShaderDescriptor {
-            file: "res/shader/texture_array.wgsl",
-            vertex_shader: "vs_main",
-            fragment_shader: "fs_main",
-            uniforms: vec![],
-        },
-        name: MAIN_SCENE.into(),
-        render_scene: MAIN_SCENE.into(),
-        target_window: MAIN_WINDOW.into(),
-        entities: vec![
-            Box::new(Player {
-                name: protaginist_name.into(),
-                size: PhysicalSize::new(64, 128),
-                position: Vector::new(0.0, 0.0, 0.0),
-                velocity: VelocityController::new(3.0),
-                animation: Animation::new(
-                    player_sprite_sheet.into(),
-                    vec![
-                        (Duration::from_millis(240), SpritePosition::new(0, 0)),
-                        (Duration::from_millis(240), SpritePosition::new(1, 0)),
-                        (Duration::from_millis(240), SpritePosition::new(2, 0)),
-                        (Duration::from_millis(240), SpritePosition::new(3, 0)),
-                    ],
-                    false,
-                ),
-            }),
-            Box::new(Background {
-                name: background.into(),
-                size: PhysicalSize::new(1280, 800),
-                sprite_sheet: background.into(),
-            }),
-            Box::new(Enemy {
-                name: FROG.into(),
-                size: PhysicalSize::new(64, 64),
-                position: Vector::new(100.0, 100.0, 0.0),
-                animation: Animation::new(
-                    FROG.into(),
-                    vec![
-                        (Duration::from_millis(240), SpritePosition::new(0, 0)),
-                        (Duration::from_millis(240), SpritePosition::new(1, 0)),
-                        (Duration::from_millis(240), SpritePosition::new(2, 0)),
-                        (Duration::from_millis(240), SpritePosition::new(3, 0)),
-                    ],
-                    false,
-                ),
-                enemy_type: EnemyType::Frog,
-            }),
-        ],
-    };
+    // let main_scene = Scene {
+    //     z_index: 0,
+    //     shader_descriptor: ShaderDescriptor {
+    //         file: "res/shader/texture_array.wgsl",
+    //         vertex_shader: "vs_main",
+    //         fragment_shader: "fs_main",
+    //         uniforms: vec![],
+    //     },
+    //     name: MAIN_SCENE.into(),
+    //     render_scene: MAIN_SCENE.into(),
+    //     target_window: MAIN_WINDOW.into(),
+    //     entities: vec![
+    //         Box::new(Player {
+    //             name: protaginist_name.into(),
+    //             size: PhysicalSize::new(64, 128),
+    //             position: Vector::new(0.0, 0.0, 0.0),
+    //             velocity: VelocityController::new(3.0),
+    //             animation: Animation::new(
+    //                 player_sprite_sheet.into(),
+    //                 vec![
+    //                     (Duration::from_millis(240), SpritePosition::new(0, 0)),
+    //                     (Duration::from_millis(240), SpritePosition::new(1, 0)),
+    //                     (Duration::from_millis(240), SpritePosition::new(2, 0)),
+    //                     (Duration::from_millis(240), SpritePosition::new(3, 0)),
+    //                 ],
+    //                 false,
+    //             ),
+    //         }),
+    //         Box::new(Background {
+    //             name: background.into(),
+    //             size: PhysicalSize::new(1280, 800),
+    //             sprite_sheet: background.into(),
+    //         }),
+    //         Box::new(Enemy {
+    //             name: FROG.into(),
+    //             size: PhysicalSize::new(64, 64),
+    //             position: Vector::new(100.0, 100.0, 0.0),
+    //             animation: Animation::new(
+    //                 FROG.into(),
+    //                 vec![
+    //                     (Duration::from_millis(240), SpritePosition::new(0, 0)),
+    //                     (Duration::from_millis(240), SpritePosition::new(1, 0)),
+    //                     (Duration::from_millis(240), SpritePosition::new(2, 0)),
+    //                     (Duration::from_millis(240), SpritePosition::new(3, 0)),
+    //                 ],
+    //                 false,
+    //             ),
+    //             enemy_type: EnemyType::Frog,
+    //         }),
+    //     ],
+    // };
 
-    let main_menu_scene = Scene {
-        z_index: 100,
+    // let main_menu_background_scene = Scene {
+    //     z_index: 0,
+    //     shader_descriptor: ShaderDescriptor {
+    //         file: "res/shader/texture_array.wgsl",
+    //         vertex_shader: "vs_main",
+    //         fragment_shader: "fs_main",
+    //         uniforms: vec![UUI_CAMERA],
+    //     },
+    //     name: MAIN_MENU_BACKGROUND_SCENE.into(),
+    //     render_scene: MAIN_MENU_BACKGROUND_SCENE.into(),
+    //     target_window: MAIN_WINDOW.into(),
+    //     entities: vec![
+    //         Box::new(Background {
+    //             name: background.into(),
+    //             size: PhysicalSize::new(800, 600),
+    //             sprite_sheet: background.into(),
+    //         }),
+    //         Box::new(Image {
+    //             name: title_backdrop.into(),
+    //             dimensions: PhysicalSize::new(800, 200),
+    //             position: Vector::new(0.0, 200.0, 0.0),
+    //             image: (title_backdrop.into(), SpritePosition::new(0, 0)),
+    //         }),
+    //     ],
+    // };
+    let main_menu_text_scene = Scene {
+        z_index: 1,
         shader_descriptor: ShaderDescriptor {
-            file: "res/shader/font.wgsl",
+            file: "res/shader/ui_texture.wgsl",
             vertex_shader: "vs_main",
             fragment_shader: "fs_main",
-            uniforms: vec![font_color, UUI_CAMERA],
+            uniforms: vec![UUI_CAMERA],
         },
         name: MAIN_MENU_SCENE.into(),
         render_scene: MAIN_MENU_SCENE.into(),
@@ -389,12 +416,13 @@ fn main() {
         entities: vec![Box::new(FlexBox::new(
             FlexDirection::Y,
             Alignment::Center,
-            None,
-            150.0,
+            Some((background.into(), SpritePosition::new(0, 0))),
+            // None,
+            120.0,
             false,
             PhysicalSize::new(800, 600),
             Vector::new(0.0, 0.0, 0.0),
-            "MainMenu".into(),
+            "MainMenuText".into(),
             vec![
                 Box::new(Image {
                     dimensions: PhysicalSize::new(800, 200),
@@ -413,21 +441,24 @@ fn main() {
                     "MainMenuButtons".into(),
                     vec![
                         Box::new(Text::new(
-                            String::from("New Game"),
+                            // String::from("New Game"),
+                            String::from("A"),
+                            Color::new_rgba(0, 0, 0, 255),
                             "StartButton".into(),
                             PhysicalSize::new(800, 600),
                             Vector::scalar(0.0),
                             40,
                             true,
                         )),
-                        Box::new(Text::new(
-                            String::from("End Game"),
-                            "EndButton".into(),
-                            PhysicalSize::new(800, 600),
-                            Vector::scalar(0.0),
-                            40,
-                            true,
-                        )),
+                        // Box::new(Text::new(
+                        //     String::from("End Game"),
+                        //     Color::new_rgba(0, 255, 0, 255),
+                        //     "EndButton".into(),
+                        //     PhysicalSize::new(800, 600),
+                        //     Vector::scalar(0.0),
+                        //     40,
+                        //     true,
+                        // )),
                     ],
                 )),
             ],
@@ -443,7 +474,7 @@ fn main() {
 
     let mut app = ManagerApplication::new(Game::new(
         ressources,
-        vec![main_menu_scene],
+        vec![main_menu_text_scene],
         target_fps,
         GameState::new(),
     ));

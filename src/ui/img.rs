@@ -6,7 +6,7 @@ use std::fmt::Debug;
 use threed::Vector;
 use winit::dpi::PhysicalSize;
 
-use crate::{vertex::render_sprite, Event, Type};
+use crate::{vertex::render_ui_sprite, Event, Type};
 
 use super::FlexItem;
 
@@ -32,7 +32,7 @@ impl Entity<Type, Event> for Image {
         sprite_sheet: Vec<Option<&SpriteSheet>>,
     ) {
         if let Some(sprite_sheet) = sprite_sheet[0] {
-            render_sprite(
+            render_ui_sprite(
                 &self.bounding_box(),
                 vertices,
                 indices,

@@ -4,7 +4,7 @@ use placeholder::{
 };
 use threed::Vector;
 
-use crate::vertex::Vertex;
+use crate::{color::Color, vertex::UiVertex};
 
 const CHARACTER_PADDING: [u8; 95] = [
     6,  // Space
@@ -69,7 +69,7 @@ const CHARACTER_PADDING: [u8; 95] = [
     9,  // [
     6,  // \
     9,  // ]
-    7, // ^
+    7,  // ^
     2,  // _
     10, // `
     8,  // a
@@ -83,7 +83,7 @@ const CHARACTER_PADDING: [u8; 95] = [
     12, // i
     10, // j
     8,  // k
-    9, // l
+    9,  // l
     6,  // m
     8,  // n
     8,  // o
@@ -107,6 +107,7 @@ const PIXELS_PER_CHARACTER: f32 = 32.0;
 
 pub fn render_character(
     c: char,
+    color: &Color,
     bounding_box: &BoundingBox,
     vertices: &mut VertexBuffer,
     indices: &mut IndexBuffer,
@@ -167,25 +168,29 @@ pub fn render_character(
     //     println!("x_offset: {:?}", x_offset);
     // };
     let new_vertices = [
-        Vertex::new(
+        UiVertex::new(
             Vector::new(x - x_offset, y + y_offset, 0.0),
             &texture_coords[0],
             texture,
+            color.clone(),
         ),
-        Vertex::new(
+        UiVertex::new(
             Vector::new(x + x_offset, y + y_offset, 0.0),
             &texture_coords[1],
             texture,
+            color.clone(),
         ),
-        Vertex::new(
+        UiVertex::new(
             Vector::new(x + x_offset, y - y_offset, 0.0),
             &texture_coords[2],
             texture,
+            color.clone(),
         ),
-        Vertex::new(
+        UiVertex::new(
             Vector::new(x - x_offset, y - y_offset, 0.0),
             &texture_coords[3],
             texture,
+            color.clone(),
         ),
     ];
     // if debug {
@@ -200,6 +205,9 @@ pub fn render_character(
         start_index + 2,
         start_index + 3,
     ];
+    println!("new_indices: {:?}", new_indices);
+    println!("new_vertices: {:?}", new_vertices);
+    println!("c: {}", c);
     vertices.extend_from_slice(&new_vertices);
     indices.extend_from_slice(&new_indices);
     x_offset * 2.0

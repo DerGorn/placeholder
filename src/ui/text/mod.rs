@@ -5,7 +5,7 @@ use std::fmt::Debug;
 use threed::Vector;
 use winit::dpi::PhysicalSize;
 
-use crate::{ui::FlexItem, Event, Type, FONT};
+use crate::{color::Color, ui::FlexItem, Event, Type, FONT};
 
 use self::font_manager::render_character;
 
@@ -13,6 +13,7 @@ mod font_manager;
 
 pub struct Text {
     text: String,
+    color: Color,
     name: EntityName,
     size: PhysicalSize<u16>,
     max_size: PhysicalSize<u16>,
@@ -24,6 +25,7 @@ pub struct Text {
 impl Text {
     pub fn new(
         text: String,
+        color: Color,
         name: EntityName,
         size: PhysicalSize<u16>,
         position: Vector<f32>,
@@ -32,6 +34,7 @@ impl Text {
     ) -> Self {
         Self {
             text,
+            color,
             name,
             max_size: size.clone(),
             size,
@@ -101,7 +104,7 @@ impl Entity<Type, Event> for Text {
                     continue;
                 }
             }
-            let character_width = render_character(s, &char_bounding_box, vertices, indices, font);
+            let character_width = render_character(s, &self.color, &char_bounding_box, vertices, indices, font);
             char_bounding_box.anchor.x += character_width;
         }
         if char_bounding_box.anchor.x >= text_width {
@@ -114,6 +117,9 @@ impl Entity<Type, Event> for Text {
             self.size.width = width;
             self.size.height = height;
         }
+        println!("Text: {:?}", self.text);
+        println!("vertices: {:?}", vertices);
+        println!("indices: {:?}", indices);
     }
     fn sprite_sheets(&self) -> Vec<&SpriteSheetName> {
         vec![&self.sprite_sheet]

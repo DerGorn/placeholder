@@ -4,7 +4,7 @@ use std::fmt::{self, Debug};
 use threed::Vector;
 use winit::dpi::PhysicalSize;
 
-use crate::{vertex::render_sprite, Event, Type};
+use crate::{vertex::render_ui_sprite, Event, Type};
 
 #[derive(Debug)]
 pub enum FlexDirection {
@@ -201,7 +201,7 @@ impl Entity<Type, Event> for FlexBox {
             if let Some(sprite_sheet) = sprite_sheet.get(0).expect("Got no option in sprite_sheets")
             {
                 index += 1;
-                render_sprite(
+                render_ui_sprite(
                     &self.bounding_box(),
                     vertices,
                     indices,
