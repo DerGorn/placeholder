@@ -424,12 +424,12 @@ fn main() {
             Vector::new(0.0, 0.0, 0.0),
             "MainMenuText".into(),
             vec![
-                Box::new(Image {
-                    dimensions: PhysicalSize::new(800, 200),
-                    name: title.into(),
-                    position: Vector::new(0.0, 200.0, 0.0),
-                    image: (title.into(), SpritePosition::new(0, 0)),
-                }),
+                Box::new(Image::new(
+                    title.into(),
+                    PhysicalSize::new(800, 200),
+                    Vector::new(0.0, 200.0, 0.0),
+                    (title.into(), SpritePosition::new(0, 0)),
+                )),
                 Box::new(FlexBox::new(
                     FlexDirection::Y,
                     Alignment::Center,
@@ -441,8 +441,7 @@ fn main() {
                     "MainMenuButtons".into(),
                     vec![
                         Box::new(Text::new(
-                            // String::from("New Game"),
-                            String::from("A"),
+                            String::from("New Game"),
                             Color::new_rgba(0, 0, 0, 255),
                             "StartButton".into(),
                             PhysicalSize::new(800, 600),
@@ -450,15 +449,15 @@ fn main() {
                             40,
                             true,
                         )),
-                        // Box::new(Text::new(
-                        //     String::from("End Game"),
-                        //     Color::new_rgba(0, 255, 0, 255),
-                        //     "EndButton".into(),
-                        //     PhysicalSize::new(800, 600),
-                        //     Vector::scalar(0.0),
-                        //     40,
-                        //     true,
-                        // )),
+                        Box::new(Text::new(
+                            String::from("End Game"),
+                            Color::new_rgba(0, 0, 0, 255),
+                            "EndButton".into(),
+                            PhysicalSize::new(800, 600),
+                            Vector::scalar(0.0),
+                            40,
+                            true,
+                        )),
                     ],
                 )),
             ],

@@ -21,6 +21,7 @@ pub struct Text {
     sprite_sheet: SpriteSheetName,
     font_size: u8,
     fit_to_content: bool,
+    is_dirty: bool,
 }
 impl Text {
     pub fn new(
@@ -42,6 +43,7 @@ impl Text {
             sprite_sheet: FONT.into(),
             font_size,
             fit_to_content,
+            is_dirty: true,
         }
     }
 }
@@ -104,7 +106,8 @@ impl Entity<Type, Event> for Text {
                     continue;
                 }
             }
-            let character_width = render_character(s, &self.color, &char_bounding_box, vertices, indices, font);
+            let character_width =
+                render_character(s, &self.color, &char_bounding_box, vertices, indices, font);
             char_bounding_box.anchor.x += character_width;
         }
         if char_bounding_box.anchor.x >= text_width {
@@ -114,12 +117,12 @@ impl Entity<Type, Event> for Text {
             let height = ((char_y + 1) * self.font_size as u16).min(self.max_size.height);
             let width =
                 ((text_width - anchor.x) as u16 + self.font_size as u16).min(self.max_size.width);
-            self.size.width = width;
-            self.size.height = height;
+            if width != self.size.width || height != self.size.height {
+                self.size.width = width;
+                self.size.height = height;
+                self.is_dirty = true;
+            }
         }
-        println!("Text: {:?}", self.text);
-        println!("vertices: {:?}", vertices);
-        println!("indices: {:?}", indices);
     }
     fn sprite_sheets(&self) -> Vec<&SpriteSheetName> {
         vec![&self.sprite_sheet]
@@ -143,5 +146,11 @@ impl Entity<Type, Event> for Text {
 impl FlexItem for Text {
     fn position_mut(&mut self) -> &mut Vector<f32> {
         &mut self.position
+    }
+
+    fn is_dirty(&mut self) -> bool {
+        let dirt = self.is_dirty;
+        self.is_dirty = false;
+        dirt
     }
 }

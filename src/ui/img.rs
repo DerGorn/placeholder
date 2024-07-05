@@ -11,10 +11,27 @@ use crate::{vertex::render_ui_sprite, Event, Type};
 use super::FlexItem;
 
 pub struct Image {
-    pub dimensions: PhysicalSize<u16>,
-    pub position: Vector<f32>,
-    pub name: EntityName,
-    pub image: (SpriteSheetName, SpritePosition),
+    dimensions: PhysicalSize<u16>,
+    position: Vector<f32>,
+    name: EntityName,
+    image: (SpriteSheetName, SpritePosition),
+    is_dirty: bool,
+}
+impl Image {
+    pub fn new(
+        name: EntityName,
+        dimensions: PhysicalSize<u16>,
+        position: Vector<f32>,
+        image: (SpriteSheetName, SpritePosition),
+    ) -> Self {
+        Self {
+            dimensions,
+            position,
+            name,
+            image,
+            is_dirty: true,
+        }
+    }
 }
 impl Debug for Image {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -60,5 +77,11 @@ impl Entity<Type, Event> for Image {
 impl FlexItem for Image {
     fn position_mut(&mut self) -> &mut Vector<f32> {
         &mut self.position
+    }
+
+    fn is_dirty(&mut self) -> bool {
+        let dirt = self.is_dirty;
+        self.is_dirty = false;
+        dirt
     }
 }

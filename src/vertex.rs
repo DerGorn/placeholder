@@ -98,7 +98,6 @@ impl UiVertex {
     ) -> Self {
         let color = color.to_slice();
         let color = u32::from_be_bytes(color);
-        println!("color: {:?}", color);
         Self {
             position: [position.x, position.y],
             tex_coords: [texture_coordinates.u, texture_coordinates.v],
@@ -107,13 +106,12 @@ impl UiVertex {
         }
     }
 }
-const UI_VERTEX_ATTRIBUTES: [wgpu::VertexAttribute; 4] = vertex_attr_array![0 => Float32x2, 1 => Float32x2, 2 => Uint32,
-    3 => Uint32
-];
+const UI_VERTEX_ATTRIBUTES: [wgpu::VertexAttribute; 4] = vertex_attr_array![0 => Float32x2, 1 => Float32x2, 2 => Uint32, 3 => Uint32];
+// const UI_VERTEX_ATTRIBUTES: [wgpu::VertexAttribute; 3] = vertex_attr_array![0 => Float32x2, 1 => Float32x2, 2 => Uint32];
 impl Vert for UiVertex {
     fn describe_buffer_layout() -> wgpu::VertexBufferLayout<'static> {
         wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<Vertex>() as wgpu::BufferAddress,
+            array_stride: std::mem::size_of::<Self>() as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Vertex,
             attributes: &UI_VERTEX_ATTRIBUTES,
         }

@@ -19,6 +19,7 @@ pub enum Alignment {
 
 pub trait FlexItem: Entity<Type, Event> {
     fn position_mut(&mut self) -> &mut Vector<f32>;
+    fn is_dirty(&mut self) -> bool;
 }
 
 pub struct FlexBox {
@@ -33,6 +34,7 @@ pub struct FlexBox {
     name: EntityName,
     shrink_to_content: bool,
     number_of_sprites: Vec<usize>,
+    is_dirty: bool,
 }
 impl FlexBox {
     pub fn new(
@@ -58,25 +60,11 @@ impl FlexBox {
             name,
             shrink_to_content,
             number_of_sprites,
+            is_dirty: true,
         }
     }
-}
-impl Debug for FlexBox {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("FlexBox")
-            .field("flex_direction", &self.flex_direction)
-            .field("children", &self.children)
-            .field("name", &self.name)
-            .finish()
-    }
-}
-impl Entity<Type, Event> for FlexBox {
-    fn render(
-        &mut self,
-        vertices: &mut placeholder::app::VertexBuffer,
-        indices: &mut placeholder::app::IndexBuffer,
-        sprite_sheet: Vec<Option<&placeholder::game_engine::SpriteSheet>>,
-    ) {
+
+    fn flex(&mut self) {
         let boxes = self.children.iter().map(|x| x.bounding_box());
         let flex_origin = &self.position
             + Vector::new(
@@ -195,7 +183,39 @@ impl Entity<Type, Event> for FlexBox {
                 }
             }
         }
-
+    }
+}
+impl Debug for FlexBox {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("FlexBox")
+            .field("flex_direction", &self.flex_direction)
+            .field("children", &self.children)
+            .field("name", &self.name)
+            .finish()
+    }
+}
+impl Entity<Type, Event> for FlexBox {
+    fn update(
+        &mut self,
+        entities: &Vec<&Box<dyn Entity<Type, Event>>>,
+        delta_t: &std::time::Duration,
+        scene: &placeholder::game_engine::SceneName,
+    ) -> Vec<Event> {
+        if self.children.iter_mut().any(|c| c.is_dirty()) {
+            self.flex();
+            self.is_dirty = true;
+        }
+        for child in &mut self.children {
+            child.update(entities, delta_t, scene);
+        }
+        vec![]
+    }
+    fn render(
+        &mut self,
+        vertices: &mut placeholder::app::VertexBuffer,
+        indices: &mut placeholder::app::IndexBuffer,
+        sprite_sheet: Vec<Option<&placeholder::game_engine::SpriteSheet>>,
+    ) {
         let mut index = 0;
         if let Some((background, sprite_position)) = &self.background_image {
             if let Some(sprite_sheet) = sprite_sheet.get(0).expect("Got no option in sprite_sheets")
@@ -259,5 +279,10 @@ impl Entity<Type, Event> for FlexBox {
 impl FlexItem for FlexBox {
     fn position_mut(&mut self) -> &mut Vector<f32> {
         &mut self.position
+    }
+    fn is_dirty(&mut self) -> bool {
+        let dirt = self.is_dirty;
+        self.is_dirty = false;
+        dirt
     }
 }

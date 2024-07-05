@@ -205,9 +205,6 @@ pub fn render_character(
         start_index + 2,
         start_index + 3,
     ];
-    println!("new_indices: {:?}", new_indices);
-    println!("new_vertices: {:?}", new_vertices);
-    println!("c: {}", c);
     vertices.extend_from_slice(&new_vertices);
     indices.extend_from_slice(&new_indices);
     x_offset * 2.0
