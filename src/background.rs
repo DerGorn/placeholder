@@ -43,7 +43,6 @@ impl Entity<Type, Event> for Background {
     fn z(&self) -> f32 {
         -1000.0
     }
-    fn handle_key_input(&mut self, _input: &KeyEvent) {}
     fn render(
         &mut self,
         vertices: &mut VertexBuffer,

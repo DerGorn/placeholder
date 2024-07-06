@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 use threed::Vector;
 use transition::{Transition, TransitionTypes};
-use ui::{Alignment, FlexBox, FlexDirection, Image};
+use ui::{Alignment, Button, FlexBox, FlexButtonLine, FlexDirection, Image};
 use winit::{dpi::PhysicalSize, window::WindowAttributes};
 
 use placeholder::graphics::{Index as I, Vertex as V};
@@ -62,6 +62,7 @@ enum EnemyType {
 }
 #[derive(Debug)]
 enum Event {
+    EndGame,
     RequestNewScenes(Vec<Scene<Self>>),
     NewScene(SceneName),
     UpdateUniformBuffer(UniformBufferName, Vec<u8>),
@@ -71,6 +72,7 @@ enum Event {
     RequestActivateSuspendedScene(SceneName),
     RequestDeleteScene(SceneName),
     RequestDeleteEntity(EntityName, SceneName),
+    ButtonPressed(EntityName),
 }
 impl ExternalEvent for Event {
     type EntityType = Type;
@@ -130,6 +132,10 @@ impl ExternalEvent for Event {
             _ => None,
         }
     }
+
+    fn is_end_game(&self) -> bool {
+        matches!(self, Event::EndGame)
+    }
 }
 
 const TRANSITION_NAME: &str = "BattleTransition";
@@ -145,68 +151,88 @@ impl PlayerState {
         }
     }
 }
-struct GameState {
+#[derive(Default)]
+enum GameState {
+    #[default]
+    MainMenu,
+}
+struct GameLogic {
     player: PlayerState,
     pending_battle: Option<(EnemyType, EntityName, SceneName)>,
+    game_state: GameState,
 }
-impl GameState {
+impl GameLogic {
     fn new() -> Self {
         Self {
             player: PlayerState::new(),
             pending_battle: None,
+            game_state: GameState::default(),
+        }
+    }
+
+    fn main_menu_event(&mut self, event: Event) -> Vec<Event> {
+        match event {
+            Event::ButtonPressed(entity) => match entity.as_str() {
+                END_GAME_BUTTON => vec![Event::EndGame],
+                _ => vec![],
+            },
+            _ => vec![],
         }
     }
 }
-impl State<Event> for GameState {
+impl State<Event> for GameLogic {
     fn handle_event(&mut self, event: Event) -> Vec<Event> {
-        match event {
-            Event::InitiateBattle(enemy, entity, scene) => {
-                if self.pending_battle.is_none() {
-                    let shader_descriptor = ShaderDescriptor {
-                        file: "res/shader/transition.wgsl",
-                        vertex_shader: "vs_main",
-                        fragment_shader: "fs_main",
-                        uniforms: vec![UTIME],
-                    };
-                    self.pending_battle = Some((enemy, entity, scene.clone()));
-                    return vec![
-                        Event::RequestNewScenes(vec![Scene {
-                            name: BATTLE_TRANSITION_SCENE.into(),
-                            render_scene: BATTLE_TRANSITION_SCENE.into(),
-                            target_window: MAIN_WINDOW.into(),
-                            z_index: 1,
-                            entities: vec![Box::new(Transition::new(
-                                TransitionTypes::BattleTransition,
-                                TRANSITION_NAME,
-                                Duration::from_millis(750),
-                            ))],
-                            shader_descriptor,
-                        }]),
-                        Event::RequestSuspendScene(scene),
-                    ];
-                }
-            }
-            Event::AnimationEnded(animation_entity) => {
-                if animation_entity == TRANSITION_NAME.into() {
-                    let response = if let Some((enemy, entity, scene)) = &self.pending_battle {
-                        println!("Starting Battle!");
-                        vec![
-                            Event::RequestDeleteEntity(entity.clone(), scene.clone()),
-                            Event::RequestDeleteScene(BATTLE_TRANSITION_SCENE.into()),
-                            Event::RequestActivateSuspendedScene(scene.clone()),
-                        ]
-                    } else {
-                        vec![]
-                    };
-                    if response.len() > 0 {
-                        self.pending_battle = None;
-                    }
-                    return response;
-                }
-            }
-            _ => {}
+        match self.game_state {
+            GameState::MainMenu => self.main_menu_event(event),
         }
-        vec![]
+        // match event {
+        //     Event::InitiateBattle(enemy, entity, scene) => {
+        //         if self.pending_battle.is_none() {
+        //             let shader_descriptor = ShaderDescriptor {
+        //                 file: "res/shader/transition.wgsl",
+        //                 vertex_shader: "vs_main",
+        //                 fragment_shader: "fs_main",
+        //                 uniforms: vec![UTIME],
+        //             };
+        //             self.pending_battle = Some((enemy, entity, scene.clone()));
+        //             return vec![
+        //                 Event::RequestNewScenes(vec![Scene {
+        //                     name: BATTLE_TRANSITION_SCENE.into(),
+        //                     render_scene: BATTLE_TRANSITION_SCENE.into(),
+        //                     target_window: MAIN_WINDOW.into(),
+        //                     z_index: 1,
+        //                     entities: vec![Box::new(Transition::new(
+        //                         TransitionTypes::BattleTransition,
+        //                         TRANSITION_NAME,
+        //                         Duration::from_millis(750),
+        //                     ))],
+        //                     shader_descriptor,
+        //                 }]),
+        //                 Event::RequestSuspendScene(scene),
+        //             ];
+        //         }
+        //     }
+        //     Event::AnimationEnded(animation_entity) => {
+        //         if animation_entity == TRANSITION_NAME.into() {
+        //             let response = if let Some((enemy, entity, scene)) = &self.pending_battle {
+        //                 println!("Starting Battle!");
+        //                 vec![
+        //                     Event::RequestDeleteEntity(entity.clone(), scene.clone()),
+        //                     Event::RequestDeleteScene(BATTLE_TRANSITION_SCENE.into()),
+        //                     Event::RequestActivateSuspendedScene(scene.clone()),
+        //                 ]
+        //             } else {
+        //                 vec![]
+        //             };
+        //             if response.len() > 0 {
+        //                 self.pending_battle = None;
+        //             }
+        //             return response;
+        //         }
+        //     }
+        //     _ => {}
+        // }
+        // vec![]
     }
 }
 
@@ -218,6 +244,9 @@ const UTIME: &str = "Time";
 const UUI_CAMERA: &str = "UICamera";
 const FROG: &str = "Frog";
 const FONT: &str = "Font";
+const BOX_BORDER: &str = "BoxBorder";
+const END_GAME_BUTTON: &str = "EndGameButton";
+const START_GAME_BUTTON: &str = "StartGameButton";
 fn main() {
     env_logger::Builder::from_env(Env::default().default_filter_or("warn")).init();
     let target_fps = 60;
@@ -293,6 +322,11 @@ fn main() {
             ),
         ],
         sprite_sheets: vec![
+            (
+                BOX_BORDER.into(),
+                PathBuf::from("res/images/spriteSheets/boxBorder.png"),
+                SpriteSheetDimensions::new(1, 1),
+            ),
             (
                 player_sprite_sheet.into(),
                 PathBuf::from("res/images/spriteSheets/ProtagonistP.png"),
@@ -377,31 +411,6 @@ fn main() {
     //     ],
     // };
 
-    // let main_menu_background_scene = Scene {
-    //     z_index: 0,
-    //     shader_descriptor: ShaderDescriptor {
-    //         file: "res/shader/texture_array.wgsl",
-    //         vertex_shader: "vs_main",
-    //         fragment_shader: "fs_main",
-    //         uniforms: vec![UUI_CAMERA],
-    //     },
-    //     name: MAIN_MENU_BACKGROUND_SCENE.into(),
-    //     render_scene: MAIN_MENU_BACKGROUND_SCENE.into(),
-    //     target_window: MAIN_WINDOW.into(),
-    //     entities: vec![
-    //         Box::new(Background {
-    //             name: background.into(),
-    //             size: PhysicalSize::new(800, 600),
-    //             sprite_sheet: background.into(),
-    //         }),
-    //         Box::new(Image {
-    //             name: title_backdrop.into(),
-    //             dimensions: PhysicalSize::new(800, 200),
-    //             position: Vector::new(0.0, 200.0, 0.0),
-    //             image: (title_backdrop.into(), SpritePosition::new(0, 0)),
-    //         }),
-    //     ],
-    // };
     let main_menu_text_scene = Scene {
         z_index: 1,
         shader_descriptor: ShaderDescriptor {
@@ -430,7 +439,7 @@ fn main() {
                     Vector::new(0.0, 200.0, 0.0),
                     (title.into(), SpritePosition::new(0, 0)),
                 )),
-                Box::new(FlexBox::new(
+                Box::new(FlexButtonLine::new(
                     FlexDirection::Y,
                     Alignment::Center,
                     None,
@@ -440,19 +449,17 @@ fn main() {
                     Vector::new(0.0, 200.0, 0.0),
                     "MainMenuButtons".into(),
                     vec![
-                        Box::new(Text::new(
+                        Box::new(Button::new(
                             String::from("New Game"),
-                            Color::new_rgba(0, 0, 0, 255),
-                            "StartButton".into(),
+                            START_GAME_BUTTON.into(),
                             PhysicalSize::new(800, 600),
                             Vector::scalar(0.0),
                             40,
                             true,
                         )),
-                        Box::new(Text::new(
+                        Box::new(Button::new(
                             String::from("End Game"),
-                            Color::new_rgba(0, 0, 0, 255),
-                            "EndButton".into(),
+                            END_GAME_BUTTON.into(),
                             PhysicalSize::new(800, 600),
                             Vector::scalar(0.0),
                             40,
@@ -475,7 +482,7 @@ fn main() {
         ressources,
         vec![main_menu_text_scene],
         target_fps,
-        GameState::new(),
+        GameLogic::new(),
     ));
     app.run();
 }

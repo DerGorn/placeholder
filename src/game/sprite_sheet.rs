@@ -30,6 +30,15 @@ pub struct SpriteSheet {
     pub sprites_per_row: u8,
     pub sprites_per_column: u8,
 }
+impl Default for SpriteSheet {
+    fn default() -> Self {
+        Self {
+            texture: 0,
+            sprites_per_row: 1,
+            sprites_per_column: 1,
+        }
+    }
+}
 impl SpriteSheet {
     pub fn texture(&self) -> u32 {
         self.texture

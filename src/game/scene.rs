@@ -18,9 +18,11 @@ pub struct Scene<E: ExternalEvent> {
     pub z_index: i32,
 }
 impl<E: ExternalEvent> Scene<E> {
-    pub fn handle_key_input(&mut self, input: &KeyEvent) {
+    pub fn handle_key_input(&mut self, input: &KeyEvent) -> Vec<E> {
+        let mut events = vec![];
         for entity in self.entities.iter_mut() {
-            entity.handle_key_input(input);
+            events.append(&mut entity.handle_key_input(input));
         }
+        events
     }
 }

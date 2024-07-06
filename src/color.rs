@@ -1,14 +1,14 @@
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Color {
     RGBA(u8, u8, u8, u8),
     HSVA(u8, u8, u8, u8),
 }
 impl Color {
-    pub fn new_rgba(r: u8, g: u8, b: u8, a: u8) -> Self {
+    pub const fn new_rgba(r: u8, g: u8, b: u8, a: u8) -> Self {
         Self::RGBA(r, g, b, a)
     }
 
-    pub fn new_hsva(h: u8, s: u8, v: u8, a: u8) -> Self {
+    pub const fn new_hsva(h: u8, s: u8, v: u8, a: u8) -> Self {
         Self::HSVA(h, s, v, a)
     }
 

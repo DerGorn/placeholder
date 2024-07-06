@@ -130,6 +130,10 @@ impl<'a, E: ApplicationEvent + 'static, M: EventManager<E>> ApplicationHandler<E
             }
             None => {}
         }
+        if event.is_quit() {
+            event_loop.exit();
+            return;
+        }
 
         self.event_manager.user_event(
             &mut self.window_manager,
@@ -196,4 +200,5 @@ pub trait ApplicationEvent: Debug {
         &'a RenderSceneDescriptor,
         &'a [(UniformBufferName, Vec<u8>, wgpu::ShaderStages)],
     )>;
+    fn is_quit(&self) -> bool;
 }

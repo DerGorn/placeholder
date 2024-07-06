@@ -44,14 +44,15 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     var sample = textureSampleLevel(texture_array[in.tex_index], sampler_array[in.tex_index], in.tex_coords, 0.0);
 
     if in.blend_color != 0 {
-        let alpha_a = f32(in.blend_color & 255) / 255.0;
         let alpha_b = sample.a;
-        let alpha_c = alpha_a + (1 - alpha_a) * alpha_b;
-        let b = f32(in.blend_color & (u32(255) << 8)) / 255.0;
-        let g = f32(in.blend_color & (u32(255) << 16)) / 255.0;
-        let r = f32(in.blend_color & (u32(255) << 24)) / 255.0;
-        let out_color = (alpha_a * vec4<f32>(r, g, b, alpha_b) + (1 - alpha_a) * alpha_b * sample) / alpha_c;
-        sample = out_color;
-    }
+        let alpha_a = f32(in.blend_color & 255) / 255.0;
+        let b = f32(in.blend_color >> 8 & 255) / 255.0;
+        let g = f32(in.blend_color >> 16 & 255) / 255.0;
+        let r = f32(in.blend_color >> 24 & 255) / 255.0;
+        sample = vec4<f32>(r, g, b, alpha_a);
+        if alpha_b == 0.0 {
+            sample.a = alpha_b;
+        }
+    } 
     return sample;
 }

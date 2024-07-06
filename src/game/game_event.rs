@@ -35,6 +35,7 @@ pub enum GameEvent<E: ExternalEvent> {
         Vec<(UniformBufferName, Vec<u8>, wgpu::ShaderStages)>,
     ),
     External(E),
+    EndGame,
 }
 impl<E: ExternalEvent> ApplicationEvent for GameEvent<E> {
     fn app_resumed() -> Self {
@@ -112,6 +113,10 @@ impl<E: ExternalEvent> ApplicationEvent for GameEvent<E> {
     fn new_window(id: &WindowId, name: &str) -> Self {
         Self::NewWindow(id.clone(), name.into())
     }
+
+    fn is_quit(&self) -> bool {
+        matches!(self, Self::EndGame)
+    }
 }
 
 pub trait ExternalEvent: Debug + Send {
@@ -134,4 +139,5 @@ pub trait ExternalEvent: Debug + Send {
         &'a self,
     ) -> Option<(&'a UniformBufferName, &'a [u8])>;
     fn is_delete_entity<'a>(&'a self) -> Option<(&'a EntityName, &'a SceneName)>;
+    fn is_end_game(&self) -> bool;
 }

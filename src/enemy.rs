@@ -73,7 +73,6 @@ impl Entity<Type, Event> for Enemy {
     fn sprite_sheets(&self) -> Vec<&SpriteSheetName> {
         vec![&self.animation.sprite_sheet()]
     }
-    fn handle_key_input(&mut self, _input: &KeyEvent) {}
     fn name(&self) -> &EntityName {
         &self.name
     }

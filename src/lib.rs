@@ -34,6 +34,12 @@ macro_rules! create_name_struct {
                 self.0.as_str()
             }
         }
+        impl std::ops::Add<&str> for $name {
+            type Output = Self;
+            fn add(self, rhs: &str) -> Self::Output {
+                (self.0 + rhs).into()
+            }
+        }
         impl From<&str> for $name {
             fn from(value: &str) -> Self {
                 Self(value.to_string())

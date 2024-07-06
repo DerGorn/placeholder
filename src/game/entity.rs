@@ -31,7 +31,9 @@ pub trait Entity<T: EntityType, E: ExternalEvent>: Debug + Send {
         sprite_sheet: Vec<Option<&SpriteSheet>>,
     );
     fn sprite_sheets(&self) -> Vec<&SpriteSheetName>;
-    fn handle_key_input(&mut self, _input: &KeyEvent) {}
+    fn handle_key_input(&mut self, _input: &KeyEvent) -> Vec<E> { 
+        vec![]
+    }
     fn name(&self) -> &EntityName;
     fn bounding_box(&self) -> BoundingBox;
     fn entity_type(&self) -> T;

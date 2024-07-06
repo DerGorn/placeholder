@@ -1,6 +1,8 @@
 use placeholder::{
     app::{IndexBuffer, VertexBuffer},
-    game_engine::{BoundingBox, SpritePosition, SpriteSheet, TextureCoordinates},
+    game_engine::{
+        BoundingBox, SpritePosition, SpriteSheet, TextureCoordinates,
+    },
     graphics::Vertex as Vert,
 };
 use repr_trait::C;
@@ -106,8 +108,8 @@ impl UiVertex {
         }
     }
 }
-const UI_VERTEX_ATTRIBUTES: [wgpu::VertexAttribute; 4] = vertex_attr_array![0 => Float32x2, 1 => Float32x2, 2 => Uint32, 3 => Uint32];
-// const UI_VERTEX_ATTRIBUTES: [wgpu::VertexAttribute; 3] = vertex_attr_array![0 => Float32x2, 1 => Float32x2, 2 => Uint32];
+const UI_VERTEX_ATTRIBUTES: [wgpu::VertexAttribute; 4] =
+    vertex_attr_array![0 => Float32x2, 1 => Float32x2, 2 => Uint32, 3 => Uint32];
 impl Vert for UiVertex {
     fn describe_buffer_layout() -> wgpu::VertexBufferLayout<'static> {
         wgpu::VertexBufferLayout {
@@ -118,19 +120,117 @@ impl Vert for UiVertex {
     }
 }
 
+pub fn render_ui_box_border(
+    bounding_box: &BoundingBox,
+    vertices: &mut VertexBuffer,
+    indices: &mut IndexBuffer,
+    border_thickness: f32,
+    color: &Color,
+) {
+    let y = bounding_box.anchor.y;
+    let x = bounding_box.anchor.x;
+    let x_offset = bounding_box.size.width / 2.0;
+    let y_offset = bounding_box.size.height / 2.0;
+    let sprite_sheet = SpriteSheet::default();
+    let texture_coords = sprite_sheet.get_sprite_coordinates(&SpritePosition::new(0, 0));
+    let squares = [
+        [
+            Vector::new(x - x_offset - border_thickness, y + y_offset, 0.0),
+            Vector::new(x - x_offset, y + y_offset, 0.0),
+            Vector::new(x - x_offset, y - y_offset, 0.0),
+            Vector::new(x - x_offset - border_thickness, y - y_offset, 0.0),
+        ],
+        [
+            Vector::new(
+                x - x_offset - border_thickness,
+                y + y_offset + border_thickness,
+                0.0,
+            ),
+            Vector::new(
+                x + x_offset + border_thickness,
+                y + y_offset + border_thickness,
+                0.0,
+            ),
+            Vector::new(x + x_offset + border_thickness, y + y_offset, 0.0),
+            Vector::new(x - x_offset - border_thickness, y + y_offset, 0.0),
+        ],
+        [
+            Vector::new(x + x_offset, y + y_offset, 0.0),
+            Vector::new(x + x_offset + border_thickness, y + y_offset, 0.0),
+            Vector::new(x + x_offset + border_thickness, y - y_offset, 0.0),
+            Vector::new(x + x_offset, y - y_offset, 0.0),
+        ],
+        [
+            Vector::new(x - x_offset - border_thickness, y - y_offset, 0.0),
+            Vector::new(x + x_offset + border_thickness, y - y_offset, 0.0),
+            Vector::new(
+                x + x_offset + border_thickness,
+                y - y_offset - border_thickness,
+                0.0,
+            ),
+            Vector::new(
+                x - x_offset - border_thickness,
+                y - y_offset - border_thickness,
+                0.0,
+            ),
+        ],
+    ];
+    for square in squares.into_iter() {
+        let mut vectors = square.into_iter();
+        let new_vertices = [
+            UiVertex::new(
+                vectors.next().unwrap(),
+                &texture_coords[0],
+                sprite_sheet.texture(),
+                color.clone(),
+            ),
+            UiVertex::new(
+                vectors.next().unwrap(),
+                &texture_coords[1],
+                sprite_sheet.texture(),
+                color.clone(),
+            ),
+            UiVertex::new(
+                vectors.next().unwrap(),
+                &texture_coords[2],
+                sprite_sheet.texture(),
+                color.clone(),
+            ),
+            UiVertex::new(
+                vectors.next().unwrap(),
+                &texture_coords[3],
+                sprite_sheet.texture(),
+                color.clone(),
+            ),
+        ];
+        let start_index = vertices.len() as u16;
+        let new_indices = [
+            start_index,
+            start_index + 1,
+            start_index + 2,
+            start_index,
+            start_index + 2,
+            start_index + 3,
+        ];
+        vertices.extend_from_slice(&new_vertices);
+        indices.extend_from_slice(&new_indices);
+    }
+}
+const NO_BLEND_COLOR: Color = Color::new_rgba(0, 0, 0, 0);
 pub fn render_ui_sprite(
     bounding_box: &BoundingBox,
     vertices: &mut VertexBuffer,
     indices: &mut IndexBuffer,
     sprite_sheet: &SpriteSheet,
     sprite_position: &SpritePosition,
+    color: Option<&Color>,
 ) {
     let y = bounding_box.anchor.y;
     let x = bounding_box.anchor.x;
     let x_offset = bounding_box.size.width / 2.0;
     let y_offset = bounding_box.size.height / 2.0;
     let texture_coords = sprite_sheet.get_sprite_coordinates(sprite_position);
-    let color = Color::new_rgba(0, 0, 0, 0);
+    let color = color.or(Some(&NO_BLEND_COLOR)).unwrap();
     let new_vertices = [
         UiVertex::new(
             Vector::new(x - x_offset, y + y_offset, 0.0),

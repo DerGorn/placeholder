@@ -207,7 +207,7 @@ impl<E: ExternalEvent, S: State<E>> Game<E, S> {
 impl<E: ExternalEvent + 'static, S: State<E>> EventManager<GameEvent<E>> for Game<E, S> {
     fn window_event(
         &mut self,
-        _window_manager: &mut WindowManager<GameEvent<E>>,
+        window_manager: &mut WindowManager<GameEvent<E>>,
         _event_loop: &winit::event_loop::ActiveEventLoop,
         id: &winit::window::WindowId,
         event: &winit::event::WindowEvent,
@@ -233,11 +233,14 @@ impl<E: ExternalEvent + 'static, S: State<E>> EventManager<GameEvent<E>> for Gam
                             .iter_mut()
                             .filter(|scene| scene.target_window == window_name)
                         {
-                            scene.handle_key_input(event);
+                            let events = scene.handle_key_input(event);
                             if let Some((_, camera, _)) =
                                 self.cameras.iter_mut().find(|(n, _, _)| n == &scene.name)
                             {
                                 camera.handle_key_input(event);
+                            }
+                            for event in events {
+                                window_manager.send_event(GameEvent::External(event));
                             }
                         }
                     }
@@ -379,7 +382,7 @@ impl<E: ExternalEvent + 'static, S: State<E>> EventManager<GameEvent<E>> for Gam
                 }
             }
             GameEvent::External(event) => {
-                // println!("EXTERN EVENT: {:?}", event);
+                println!("EXTERN EVENT: {:?}", event);
                 if event.is_request_new_scenes() {
                     info!("Creating new Scenes");
                     let scenes = event
@@ -467,6 +470,10 @@ impl<E: ExternalEvent + 'static, S: State<E>> EventManager<GameEvent<E>> for Gam
                                 .expect(&format!("Found no active nor suspended scene {:?}", scene))
                         });
                     scene.entities.retain(|e| e.name() != entity);
+                }
+                if event.is_end_game() {
+                    window_manager.send_event(GameEvent::EndGame);
+                    return;
                 }
                 let response_events = self.state.handle_event(event);
                 for event in response_events {

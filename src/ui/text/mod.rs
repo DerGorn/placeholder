@@ -13,7 +13,7 @@ mod font_manager;
 
 pub struct Text {
     text: String,
-    color: Color,
+    pub color: Color,
     name: EntityName,
     size: PhysicalSize<u16>,
     max_size: PhysicalSize<u16>,
@@ -70,6 +70,7 @@ impl Entity<Type, Event> for Text {
         indices: &mut placeholder::app::IndexBuffer,
         sprite_sheet: Vec<Option<&SpriteSheet>>,
     ) {
+        let color = &self.color;
         let mut text_width = f32::NEG_INFINITY;
         let font = if let Some(ss) = sprite_sheet[0] {
             ss
@@ -107,7 +108,7 @@ impl Entity<Type, Event> for Text {
                 }
             }
             let character_width =
-                render_character(s, &self.color, &char_bounding_box, vertices, indices, font);
+                render_character(s, &color, &char_bounding_box, vertices, indices, font);
             char_bounding_box.anchor.x += character_width;
         }
         if char_bounding_box.anchor.x >= text_width {

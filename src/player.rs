@@ -106,7 +106,7 @@ impl Entity<Type, Event> for Player {
         }
     }
 
-    fn handle_key_input(&mut self, input: &KeyEvent) {
+    fn handle_key_input(&mut self, input: &KeyEvent) -> Vec<Event> {
         if input.state == winit::event::ElementState::Released {
             match input.physical_key {
                 PhysicalKey::Code(KeyCode::KeyW) => {
@@ -150,5 +150,6 @@ impl Entity<Type, Event> for Player {
         } else {
             // self.sprite.position = PLAYER_NEUTRAL;
         }
+        vec![]
     }
 }

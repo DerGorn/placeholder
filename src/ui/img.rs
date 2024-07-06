@@ -55,6 +55,7 @@ impl Entity<Type, Event> for Image {
                 indices,
                 sprite_sheet,
                 &self.image.1,
+                None,
             )
         }
     }
