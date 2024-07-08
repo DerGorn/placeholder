@@ -225,7 +225,7 @@ Z ZaZbZcZdZeZfZgZhZiZjZkZlZmZnZoZpZqZrZsZtZuZvZwZxZyZzZ,Z.Z!Z?Z:"),
                                     START_GAME_BUTTON.into(),
                                     RESOLUTION,
                                     Vector::scalar(0.0),
-                                    40,
+                                    32,
                                     true,
                                 )),
                                 // Box::new(Button::new(
@@ -456,6 +456,7 @@ fn main() {
             (
                 FONT.into(),
                 PathBuf::from("res/fonts/font.png"),
+                // PathBuf::from("res/fonts/pain.png"),
                 SpriteSheetDimensions::new(16, 16),
             ),
         ],
