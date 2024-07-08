@@ -189,14 +189,14 @@ impl GameState {
                             None,
                             20.0,
                             true,
-                            PhysicalSize::new(800, 400),
+                            RESOLUTION,
+                            // PhysicalSize::new(800, 400),
                             Vector::new(0.0, 200.0, 0.0),
                             "MainMenuButtons".into(),
                             vec![
                                 Box::new(Button::new(
                                     String::from(
-                                        "
-AbAcAdAeAfAgAhAiAjAkAlAmAnAoApAqArAsAtAuAvAwAxAyAzA,A.A!A?A:
+"AbAcAdAeAfAgAhAiAjAkAlAmAnAoApAqArAsAtAuAvAwAxAyAzA,A.A!A?A:
 BbBcBdBeBfBgBhBiBjBkBlBmBnBoBpBqBrBsBtBuBvBwBxByBzB,B.B!B?B:
 CbCcCdCeCfCgChCiCjCkClCmCnCoCpCqCrCsCtCuCvCwCxCyCzC,C.C!C?C:
 DbDcDdDeDfDgDhDiDjDkDlDmDnDoDpDqDrDsDtDuDvDwDxDyDzD,D.D!D?D:
@@ -221,10 +221,9 @@ VbVcVdVeVfVgVhViVjVkVlVmVnVoVpVqVrVsVtVuVvVwVxVyVzV,V.V!V?V:
 WbWcWdWeWfWgWhWiWjWkWlWmWnWoWpWqWrWsWtWuWvWwWxWyWzW,W.W!W?W:
 XbXcXdXeXfXgXhXiXjXkXlXmXnXoXpXqXrXsXtXuXvXwXxXyXzX,X.X!X?X:
 YbYcYdYeYfYgYhYiYjYkYlYmYnYoYpYqYrYsYtYuYvYwYxYyYzY,Y.Y!Y?Y:
-ZbZcZdZeZfZgZhZiZjZkZlZmZnZoZpZqZrZsZtZuZvZwZxZyZzZ,Z.Z!Z?Z:
-"),
+ZbZcZdZeZfZgZhZiZjZkZlZmZnZoZpZqZrZsZtZuZvZwZxZyZzZ,Z.Z!Z?Z:"),
                                     START_GAME_BUTTON.into(),
-                                    PhysicalSize::new(800, 600),
+                                    RESOLUTION,
                                     Vector::scalar(0.0),
                                     40,
                                     true,

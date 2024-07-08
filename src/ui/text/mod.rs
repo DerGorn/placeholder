@@ -25,7 +25,7 @@ pub struct Text {
 }
 impl Text {
     pub fn new(
-        text: String,
+        mut text: String,
         color: Color,
         name: EntityName,
         size: PhysicalSize<u16>,
@@ -33,6 +33,7 @@ impl Text {
         font_size: u8,
         fit_to_content: bool,
     ) -> Self {
+        text += " ";
         Self {
             text,
             color,
@@ -90,8 +91,11 @@ impl Entity<Type, Event> for Text {
         };
         let width = self.position.x + (self.size.width as f32 - self.font_size as f32) / 2.0;
         let height = self.size.height / self.font_size as u16;
-        for s in self.text.chars() {
-            let new_line = s == '\n';
+        for chars in self.text.as_bytes().windows(2) {
+            let current = chars[0];
+            let next = chars[1];
+            // if current == \n
+            let new_line = current ==  10;
             if new_line || char_bounding_box.anchor.x >= width {
                 char_y += 1;
                 if char_y >= height {
@@ -108,7 +112,7 @@ impl Entity<Type, Event> for Text {
                 }
             }
             let character_width =
-                render_character(s, &color, &char_bounding_box, vertices, indices, font);
+                render_character(current, next, &color, &char_bounding_box, vertices, indices, font);
             char_bounding_box.anchor.x += character_width;
         }
         if char_bounding_box.anchor.x >= text_width {
