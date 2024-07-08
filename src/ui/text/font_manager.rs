@@ -340,7 +340,7 @@ const PAIN_MATRIX: [[u8; 95]; 95] = [
     ], // @
     [
     //     !  "  #  $  %  &  '  (  )  *  +  ,  -  .  /  0  1  2  3  4  5  6  7  8  9  :  ;  <  =
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     //  >  ?  @  A  B  C  D  E  F  G  H  I  J  K  L  M  N  O  P  Q  R  S  T  U  V  W  X  Y  Z  [
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     //  \  ]  ^  _  `  a  b  c  d  e  f  g  h  i  j  k  l  m  n  o  p  q  r  s  t  u  v  w  x  y 
@@ -984,24 +984,23 @@ pub fn render_character(
     let y = (sub_ascii / 16) as u8;
     let right_padding =
         PAIN_MATRIX[sub_ascii as usize][next_sub_ascii as usize] as f32 / PIXELS_PER_CHARACTER;
+    let right_offset = bounding_box.size.width * right_padding;
 
     let width = 1.0 / font.sprites_per_row as f32;
     let height = 1.0 / font.sprites_per_column as f32;
-    let padding_width = width * right_padding;
     let x_offset = x as f32 * width;
     let y_offset = y as f32 * height;
-    let width = width - padding_width;
     let texture_coords = [
         TextureCoordinates {
             u: x_offset,
             v: y_offset,
         },
         TextureCoordinates {
-            u: x_offset + width - padding_width,
+            u: x_offset + width,
             v: y_offset,
         },
         TextureCoordinates {
-            u: x_offset + width - padding_width,
+            u: x_offset + width,
             v: y_offset + height,
         },
         TextureCoordinates {
@@ -1070,5 +1069,5 @@ pub fn render_character(
     ];
     vertices.extend_from_slice(&new_vertices);
     indices.extend_from_slice(&new_indices);
-    x_offset * 2.0
+    x_offset * 2.0 - right_offset
 }
