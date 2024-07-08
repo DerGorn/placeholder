@@ -113,17 +113,10 @@ impl Debug for FlexButtonLine {
 impl Entity<Type, Event> for FlexButtonLine {
     fn handle_key_input(&mut self, input: &winit::event::KeyEvent) -> Vec<Event> {
         if input.state == winit::event::ElementState::Pressed {
-            let selection_change = match self.flex_direction {
-                FlexDirection::Y => match input.physical_key {
-                    PhysicalKey::Code(KeyCode::KeyW) => 1,
-                    PhysicalKey::Code(KeyCode::KeyS) => -1,
-                    _ => 0,
-                },
-                FlexDirection::X => match input.physical_key {
-                    PhysicalKey::Code(KeyCode::KeyD) => 1,
-                    PhysicalKey::Code(KeyCode::KeyA) => -1,
-                    _ => 0,
-                },
+            let selection_change = match input.physical_key {
+                PhysicalKey::Code(KeyCode::KeyD) | PhysicalKey::Code(KeyCode::KeyS) => 1,
+                PhysicalKey::Code(KeyCode::KeyA) | PhysicalKey::Code(KeyCode::KeyW) => -1,
+                _ => 0,
             };
             let new_focus =
                 (self.focused_child as i32 + selection_change + self.children.len() as i32)

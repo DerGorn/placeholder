@@ -17,10 +17,10 @@ use crate::{
     Event, Type,
 };
 
-const FOCUS_HIGH_COLOR: Color = Color::new_rgba(120, 120, 240, 255);
-const FOCUS_LOW_COLOR: Color = Color::new_rgba(20, 20, 30, 160);
-const UNFOCUS_HIGH_COLOR: Color = Color::new_rgba(10, 5, 5, 255);
-const UNFOCUS_LOW_COLOR: Color = Color::new_rgba(60, 50, 50, 160);
+const FOCUS_HIGH_COLOR: Color = Color::new_rgba(255, 0, 0, 255);
+const FOCUS_LOW_COLOR: Color = Color::new_rgba(82, 5, 5, 160);
+const UNFOCUS_HIGH_COLOR: Color = Color::new_rgba(24, 25, 27, 255);
+const UNFOCUS_LOW_COLOR: Color = Color::new_rgba(0, 0, 0, 160);
 
 pub struct Button {
     position: Vector<f32>,
@@ -84,7 +84,7 @@ impl Entity<Type, Event> for Button {
     fn handle_key_input(&mut self, input: &winit::event::KeyEvent) -> Vec<Event> {
         if self.is_focused && input.state == winit::event::ElementState::Pressed {
             match input.physical_key {
-                PhysicalKey::Code(KeyCode::Enter) => {
+                PhysicalKey::Code(KeyCode::Space) | PhysicalKey::Code(KeyCode::Enter) => {
                     vec![Event::ButtonPressed(self.name.clone())]
                 }
                 _ => vec![],

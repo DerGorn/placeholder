@@ -1,8 +1,6 @@
 use placeholder::{
     app::{IndexBuffer, VertexBuffer},
-    game_engine::{
-        BoundingBox, SpritePosition, SpriteSheet, TextureCoordinates,
-    },
+    game_engine::{BoundingBox, SpritePosition, SpriteSheet, TextureCoordinates},
     graphics::Vertex as Vert,
 };
 use repr_trait::C;
@@ -133,6 +131,7 @@ pub fn render_ui_box_border(
     let y_offset = bounding_box.size.height / 2.0;
     let sprite_sheet = SpriteSheet::default();
     let texture_coords = sprite_sheet.get_sprite_coordinates(&SpritePosition::new(0, 0));
+    let index_origin = indices.len();
     let squares = [
         [
             Vector::new(x - x_offset - border_thickness, y + y_offset, 0.0),
@@ -141,18 +140,10 @@ pub fn render_ui_box_border(
             Vector::new(x - x_offset - border_thickness, y - y_offset, 0.0),
         ],
         [
-            Vector::new(
-                x - x_offset - border_thickness,
-                y + y_offset + border_thickness,
-                0.0,
-            ),
-            Vector::new(
-                x + x_offset + border_thickness,
-                y + y_offset + border_thickness,
-                0.0,
-            ),
-            Vector::new(x + x_offset + border_thickness, y + y_offset, 0.0),
-            Vector::new(x - x_offset - border_thickness, y + y_offset, 0.0),
+            Vector::new(x - x_offset, y + y_offset + border_thickness, 0.0),
+            Vector::new(x + x_offset, y + y_offset + border_thickness, 0.0),
+            Vector::new(x + x_offset, y + y_offset, 0.0),
+            Vector::new(x - x_offset, y + y_offset, 0.0),
         ],
         [
             Vector::new(x + x_offset, y + y_offset, 0.0),
@@ -161,21 +152,13 @@ pub fn render_ui_box_border(
             Vector::new(x + x_offset, y - y_offset, 0.0),
         ],
         [
-            Vector::new(x - x_offset - border_thickness, y - y_offset, 0.0),
-            Vector::new(x + x_offset + border_thickness, y - y_offset, 0.0),
-            Vector::new(
-                x + x_offset + border_thickness,
-                y - y_offset - border_thickness,
-                0.0,
-            ),
-            Vector::new(
-                x - x_offset - border_thickness,
-                y - y_offset - border_thickness,
-                0.0,
-            ),
+            Vector::new(x - x_offset, y - y_offset, 0.0),
+            Vector::new(x + x_offset, y - y_offset, 0.0),
+            Vector::new(x + x_offset, y - y_offset - border_thickness, 0.0),
+            Vector::new(x - x_offset, y - y_offset - border_thickness, 0.0),
         ],
     ];
-    for square in squares.into_iter() {
+    for square in squares.iter().cloned() {
         let mut vectors = square.into_iter();
         let new_vertices = [
             UiVertex::new(
@@ -212,6 +195,38 @@ pub fn render_ui_box_border(
             start_index + 2,
             start_index + 3,
         ];
+        vertices.extend_from_slice(&new_vertices);
+        indices.extend_from_slice(&new_indices);
+    }
+    let corner_triangles = [[0, 4, 1], [5, 9, 6], [11, 10, 14], [3, 2, 15]];
+    for triangle in corner_triangles {
+        let mut vectors = triangle.iter().map(|i| {
+            let square = &squares[*i / 4];
+            let vertex = &square[*i % 4];
+            vertex.clone()
+        });
+        let new_vertices = [
+            UiVertex::new(
+                vectors.next().unwrap(),
+                &texture_coords[0],
+                sprite_sheet.texture(),
+                color.clone(),
+            ),
+            UiVertex::new(
+                vectors.next().unwrap(),
+                &texture_coords[1],
+                sprite_sheet.texture(),
+                color.clone(),
+            ),
+            UiVertex::new(
+                vectors.next().unwrap(),
+                &texture_coords[2],
+                sprite_sheet.texture(),
+                color.clone(),
+            ),
+        ];
+        let start_index = vertices.len() as u16;
+        let new_indices = [start_index, start_index + 1, start_index + 2];
         vertices.extend_from_slice(&new_vertices);
         indices.extend_from_slice(&new_indices);
     }

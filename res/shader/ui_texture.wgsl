@@ -49,7 +49,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         let b = f32(in.blend_color >> 8 & 255) / 255.0;
         let g = f32(in.blend_color >> 16 & 255) / 255.0;
         let r = f32(in.blend_color >> 24 & 255) / 255.0;
-        sample = vec4<f32>(r, g, b, alpha_a);
+        sample = vec4<f32>(r, g, b, alpha_a) * sample;
         if alpha_b == 0.0 {
             sample.a = alpha_b;
         }

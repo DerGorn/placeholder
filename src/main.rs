@@ -156,6 +156,109 @@ enum GameState {
     #[default]
     MainMenu,
 }
+impl GameState {
+    fn get_start_scenes(&self) -> Vec<Scene<Event>> {
+        match self {
+            GameState::MainMenu => vec![Scene {
+                z_index: 1,
+                shader_descriptor: SHADER_UI_TEXTURE,
+                name: MAIN_MENU_SCENE.into(),
+                render_scene: MAIN_MENU_SCENE.into(),
+                target_window: MAIN_WINDOW.into(),
+                entities: vec![Box::new(FlexBox::new(
+                    FlexDirection::Y,
+                    Alignment::Center,
+                    Some(("title_background".into(), SpritePosition::new(0, 0))),
+                    // None,
+                    330.0,
+                    false,
+                    RESOLUTION.clone(),
+                    Vector::new(0.0, 0.0, 0.0),
+                    "MainMenuText".into(),
+                    vec![
+                        // Box::new(Image::new(
+                        //     "title".into(),
+                        //     PhysicalSize::new(800, 200),
+                        //     Vector::new(0.0, 200.0, 0.0),
+                        //     ("title".into(), SpritePosition::new(0, 0)),
+                        //     Some(Color::new_rgba(82, 5, 5, 255)),
+                        // )),
+                        Box::new(FlexButtonLine::new(
+                            FlexDirection::Y,
+                            Alignment::Center,
+                            None,
+                            20.0,
+                            true,
+                            PhysicalSize::new(800, 400),
+                            Vector::new(0.0, 200.0, 0.0),
+                            "MainMenuButtons".into(),
+                            vec![
+                                Box::new(Button::new(
+                                    String::from(
+                                        "
+AbAcAdAeAfAgAhAiAjAkAlAmAnAoApAqArAsAtAuAvAwAxAyAzA,A.A!A?A:
+BbBcBdBeBfBgBhBiBjBkBlBmBnBoBpBqBrBsBtBuBvBwBxByBzB,B.B!B?B:
+CbCcCdCeCfCgChCiCjCkClCmCnCoCpCqCrCsCtCuCvCwCxCyCzC,C.C!C?C:
+DbDcDdDeDfDgDhDiDjDkDlDmDnDoDpDqDrDsDtDuDvDwDxDyDzD,D.D!D?D:
+EbEcEdEeEfEgEhEiEjEkElEmEnEoEpEqErEsEtEuEvEwExEyEzE,E.E!E?E:
+FbFcFdFeFfFgFhFiFjFkFlFmFnFoFpFqFrFsFtFuFvFwFxFyFzF,F.F!F?F:
+GbGcGdGeGfGgGhGiGjGkGlGmGnGoGpGqGrGsGtGuGvGwGxGyGzG,G.G!G?G:
+HbHcHdHeHfHgHhHiHjHkHlHmHnHoHpHqHrHsHtHuHvHwHxHyHzH,H.H!H?H:
+IbIcIdIeIfIgIhIiIjIkIlImInIoIpIqIrIsItIuIvIwIxIyIzI,I.I!I?I:
+JbJcJdJeJfJgJhJiJjJkJlJmJnJoJpJqJrJsJtJuJvJwJxJyJzJ,J.J!J?J:
+KbKcKdKeKfKgKhKiKjKkKlKmKnKoKpKqKrKsKtKuKvKwKxKyKzK,K.K!K?K:
+LbLcLdLeLfLgLhLiLjLkLlLmLnLoLpLqLrLsLtLuLvLwLxLyLzL,L.L!L?L:
+MbMcMdMeMfMgMhMiMjMkMlMmMnMoMpMqMrMsMtMuMvMwMxMyMzM,M.M!M?M:
+NbNcNdNeNfNgNhNiNjNkNlNmNnNoNpNqNrNsNtNuNvNwNxNyNzN,N.N!N?N:
+ObOcOdOeOfOgOhOiOjOkOlOmOnOoOpOqOrOsOtOuOvOwOxOyOzO,O.O!O?O:
+PbPcPdPePfPgPhPiPjPkPlPmPnPoPpPqPrPsPtPuPvPwPxPyPzP,P.P!P?P:
+QbQcQdQeQfQgQhQiQjQkQlQmQnQoQpQqQrQsQtQuQvQwQxQyQzQ,Q.Q!Q?Q:
+RbRcRdReRfRgRhRiRjRkRlRmRnRoRpRqRrRsRtRuRvRwRxRyRzR,R.R!R?R:
+SbScSdSeSfSgShSiSjSkSlSmSnSoSpSqSrSsStSuSvSwSxSySzS,S.S!S?S:
+TbTcTdTeTfTgThTiTjTkTlTmTnToTpTqTrTsTtTuTvTwTxTyTzT,T.T!T?T:
+UbUcUdUeUfUgUhUiUjUkUlUmUnUoUpUqUrUsUtUuUvUwUxUyUzU,U.U!U?U:
+VbVcVdVeVfVgVhViVjVkVlVmVnVoVpVqVrVsVtVuVvVwVxVyVzV,V.V!V?V:
+WbWcWdWeWfWgWhWiWjWkWlWmWnWoWpWqWrWsWtWuWvWwWxWyWzW,W.W!W?W:
+XbXcXdXeXfXgXhXiXjXkXlXmXnXoXpXqXrXsXtXuXvXwXxXyXzX,X.X!X?X:
+YbYcYdYeYfYgYhYiYjYkYlYmYnYoYpYqYrYsYtYuYvYwYxYyYzY,Y.Y!Y?Y:
+ZbZcZdZeZfZgZhZiZjZkZlZmZnZoZpZqZrZsZtZuZvZwZxZyZzZ,Z.Z!Z?Z:
+"),
+                                    START_GAME_BUTTON.into(),
+                                    PhysicalSize::new(800, 600),
+                                    Vector::scalar(0.0),
+                                    40,
+                                    true,
+                                )),
+                                // Box::new(Button::new(
+                                //     String::from(" New Game"),
+                                //     START_GAME_BUTTON.into(),
+                                //     PhysicalSize::new(800, 600),
+                                //     Vector::scalar(0.0),
+                                //     40,
+                                //     true,
+                                // )),
+                                // Box::new(Button::new(
+                                //     String::from(" End Game"),
+                                //     END_GAME_BUTTON.into(),
+                                //     PhysicalSize::new(800, 600),
+                                //     Vector::scalar(0.0),
+                                //     40,
+                                //     true,
+                                // )),
+                            ],
+                        )),
+                    ],
+                ))],
+            }],
+        }
+    }
+}
+const SHADER_UI_TEXTURE: ShaderDescriptor = ShaderDescriptor {
+    file: "res/shader/ui_texture.wgsl",
+    vertex_shader: "vs_main",
+    fragment_shader: "fs_main",
+    uniforms: &[UUI_CAMERA],
+};
 struct GameLogic {
     player: PlayerState,
     pending_battle: Option<(EnemyType, EntityName, SceneName)>,
@@ -174,6 +277,19 @@ impl GameLogic {
         match event {
             Event::ButtonPressed(entity) => match entity.as_str() {
                 END_GAME_BUTTON => vec![Event::EndGame],
+                START_GAME_BUTTON => {
+                    vec![
+                        Event::RequestDeleteScene(MAIN_MENU_SCENE.into()),
+                        Event::RequestNewScenes(vec![Scene {
+                            name: BATTLE_SCENE.into(),
+                            render_scene: BATTLE_SCENE.into(),
+                            target_window: MAIN_WINDOW.into(),
+                            z_index: 0,
+                            shader_descriptor: SHADER_UI_TEXTURE,
+                            entities: vec![],
+                        }]),
+                    ]
+                }
                 _ => vec![],
             },
             _ => vec![],
@@ -181,6 +297,9 @@ impl GameLogic {
     }
 }
 impl State<Event> for GameLogic {
+    fn start_scenes(&self) -> Vec<Scene<Event>> {
+        self.game_state.get_start_scenes()
+    }
     fn handle_event(&mut self, event: Event) -> Vec<Event> {
         match self.game_state {
             GameState::MainMenu => self.main_menu_event(event),
@@ -237,16 +356,21 @@ impl State<Event> for GameLogic {
 }
 
 const MAIN_WINDOW: &str = "MainWindow";
-const MAIN_SCENE: &str = "MainScene";
+
 const MAIN_MENU_SCENE: &str = "MainMenuScene";
+const BATTLE_SCENE: &str = "BattleScene";
+const MAIN_SCENE: &str = "MainScene";
 const BATTLE_TRANSITION_SCENE: &str = "BattleTransitionScene";
+
 const UTIME: &str = "Time";
 const UUI_CAMERA: &str = "UICamera";
 const FROG: &str = "Frog";
 const FONT: &str = "Font";
-const BOX_BORDER: &str = "BoxBorder";
 const END_GAME_BUTTON: &str = "EndGameButton";
 const START_GAME_BUTTON: &str = "StartGameButton";
+const RESOLUTION: PhysicalSize<u16> = PhysicalSize::new(1920, 1080);
+const FLOAT_RESOULTION: PhysicalSize<f32> =
+    PhysicalSize::new(RESOLUTION.width as f32, RESOLUTION.height as f32);
 fn main() {
     env_logger::Builder::from_env(Env::default().default_filter_or("warn")).init();
     let target_fps = 60;
@@ -254,21 +378,19 @@ fn main() {
     let cursor_path = "res/images/cursor/Cursor_Goth_Cursor.png";
     let main_window = WindowAttributes::default()
         .with_title("Wispers in the Void - Dark Dynasty")
-        .with_inner_size(PhysicalSize::new(800, 600));
+        .with_inner_size(RESOLUTION.clone());
     let main_window_descriptor = WindowDescriptor::new(main_window).with_cursor(cursor_path);
     let protaginist_name = "Protagonist";
     let player_sprite_sheet = "PlayerSpriteSheet";
     let background = "Background";
     let camera_descriptor = CameraDescriptor {
-        view_size: PhysicalSize::new(800.0, 600.0),
+        view_size: FLOAT_RESOULTION.clone(),
         speed: 90.0,
         acceleration_steps: 30,
         target_entity: protaginist_name.into(),
         bound_entity: Some(background.into()),
         max_offset_position: 100.0,
     };
-    let title = "Title";
-    let title_backdrop = "TitleBackdrop";
     let ressources = RessourceDescriptor {
         windows: vec![(MAIN_WINDOW.into(), main_window_descriptor)],
         uniforms: vec![
@@ -279,7 +401,7 @@ fn main() {
             ),
             (
                 UUI_CAMERA.into(),
-                bytemuck::cast_slice(&static_camera(PhysicalSize::new(800.0, 600.0))).to_vec(),
+                bytemuck::cast_slice(&static_camera(FLOAT_RESOULTION.clone())).to_vec(),
                 wgpu::ShaderStages::VERTEX,
             ),
         ],
@@ -288,13 +410,12 @@ fn main() {
             RenderSceneDescriptor {
                 index_format: Index::index_format(),
                 use_textures: true,
-
                 vertex_buffer_layout: Vertex::describe_buffer_layout(),
             },
         ),
         render_scenes: vec![
             (
-                MAIN_MENU_SCENE.into(),
+                vec![BATTLE_SCENE.into(), MAIN_MENU_SCENE.into()],
                 None,
                 RenderSceneDescriptor {
                     index_format: Index::index_format(),
@@ -303,7 +424,7 @@ fn main() {
                 },
             ),
             (
-                MAIN_SCENE.into(),
+                vec![MAIN_SCENE.into()],
                 Some(camera_descriptor),
                 RenderSceneDescriptor {
                     index_format: Index::index_format(),
@@ -312,7 +433,7 @@ fn main() {
                 },
             ),
             (
-                BATTLE_TRANSITION_SCENE.into(),
+                vec![BATTLE_TRANSITION_SCENE.into()],
                 None,
                 RenderSceneDescriptor {
                     index_format: Index::index_format(),
@@ -321,21 +442,12 @@ fn main() {
                 },
             ),
         ],
+        image_directory: PathBuf::from("res/images/spriteSheets/"),
         sprite_sheets: vec![
-            (
-                BOX_BORDER.into(),
-                PathBuf::from("res/images/spriteSheets/boxBorder.png"),
-                SpriteSheetDimensions::new(1, 1),
-            ),
             (
                 player_sprite_sheet.into(),
                 PathBuf::from("res/images/spriteSheets/ProtagonistP.png"),
                 SpriteSheetDimensions::new(4, 1),
-            ),
-            (
-                background.into(),
-                PathBuf::from("res/images/spriteSheets/background.png"),
-                SpriteSheetDimensions::new(1, 1),
             ),
             (
                 FROG.into(),
@@ -346,16 +458,6 @@ fn main() {
                 FONT.into(),
                 PathBuf::from("res/fonts/font.png"),
                 SpriteSheetDimensions::new(16, 16),
-            ),
-            (
-                title.into(),
-                PathBuf::from("res/images/spriteSheets/title.png"),
-                SpriteSheetDimensions::new(1, 1),
-            ),
-            (
-                title_backdrop.into(),
-                PathBuf::from("res/images/spriteSheets/titleBackDrop.png"),
-                SpriteSheetDimensions::new(1, 1),
             ),
         ],
     };
@@ -411,65 +513,6 @@ fn main() {
     //     ],
     // };
 
-    let main_menu_text_scene = Scene {
-        z_index: 1,
-        shader_descriptor: ShaderDescriptor {
-            file: "res/shader/ui_texture.wgsl",
-            vertex_shader: "vs_main",
-            fragment_shader: "fs_main",
-            uniforms: vec![UUI_CAMERA],
-        },
-        name: MAIN_MENU_SCENE.into(),
-        render_scene: MAIN_MENU_SCENE.into(),
-        target_window: MAIN_WINDOW.into(),
-        entities: vec![Box::new(FlexBox::new(
-            FlexDirection::Y,
-            Alignment::Center,
-            Some((background.into(), SpritePosition::new(0, 0))),
-            // None,
-            120.0,
-            false,
-            PhysicalSize::new(800, 600),
-            Vector::new(0.0, 0.0, 0.0),
-            "MainMenuText".into(),
-            vec![
-                Box::new(Image::new(
-                    title.into(),
-                    PhysicalSize::new(800, 200),
-                    Vector::new(0.0, 200.0, 0.0),
-                    (title.into(), SpritePosition::new(0, 0)),
-                )),
-                Box::new(FlexButtonLine::new(
-                    FlexDirection::Y,
-                    Alignment::Center,
-                    None,
-                    20.0,
-                    true,
-                    PhysicalSize::new(800, 400),
-                    Vector::new(0.0, 200.0, 0.0),
-                    "MainMenuButtons".into(),
-                    vec![
-                        Box::new(Button::new(
-                            String::from("New Game"),
-                            START_GAME_BUTTON.into(),
-                            PhysicalSize::new(800, 600),
-                            Vector::scalar(0.0),
-                            40,
-                            true,
-                        )),
-                        Box::new(Button::new(
-                            String::from("End Game"),
-                            END_GAME_BUTTON.into(),
-                            PhysicalSize::new(800, 600),
-                            Vector::scalar(0.0),
-                            40,
-                            true,
-                        )),
-                    ],
-                )),
-            ],
-        ))],
-    };
     // todo!("PROMOTE CAMERA TO ENTITY. And implement a static camera with screen size");
     // let (_stream, stream_handle) = OutputStream::try_default().unwrap();
     // let sink = Sink::try_new(&stream_handle).unwrap();
@@ -478,11 +521,6 @@ fn main() {
     // let source = Decoder::new(file).unwrap().amplify(0.1);
     // sink.append(source);
 
-    let mut app = ManagerApplication::new(Game::new(
-        ressources,
-        vec![main_menu_text_scene],
-        target_fps,
-        GameLogic::new(),
-    ));
+    let mut app = ManagerApplication::new(Game::new(ressources, target_fps, GameLogic::new()));
     app.run();
 }

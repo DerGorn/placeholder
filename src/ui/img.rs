@@ -6,7 +6,7 @@ use std::fmt::Debug;
 use threed::Vector;
 use winit::dpi::PhysicalSize;
 
-use crate::{vertex::render_ui_sprite, Event, Type};
+use crate::{color::Color, vertex::render_ui_sprite, Event, Type};
 
 use super::FlexItem;
 
@@ -15,6 +15,7 @@ pub struct Image {
     position: Vector<f32>,
     name: EntityName,
     image: (SpriteSheetName, SpritePosition),
+    blend_color: Option<Color>,
     is_dirty: bool,
 }
 impl Image {
@@ -23,6 +24,7 @@ impl Image {
         dimensions: PhysicalSize<u16>,
         position: Vector<f32>,
         image: (SpriteSheetName, SpritePosition),
+    blend_color: Option<Color>,
     ) -> Self {
         Self {
             dimensions,
@@ -30,6 +32,7 @@ impl Image {
             name,
             image,
             is_dirty: true,
+            blend_color,
         }
     }
 }
@@ -55,7 +58,7 @@ impl Entity<Type, Event> for Image {
                 indices,
                 sprite_sheet,
                 &self.image.1,
-                None,
+                self.blend_color.as_ref(),
             )
         }
     }

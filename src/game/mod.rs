@@ -38,6 +38,7 @@ mod velocity_controller;
 
 pub trait State<E: ExternalEvent> {
     fn handle_event(&mut self, event: E) -> Vec<E>;
+    fn start_scenes(&self) -> Vec<Scene<E>>;
 }
 
 pub struct Game<E: ExternalEvent, S: State<E>> {
@@ -55,13 +56,13 @@ pub struct Game<E: ExternalEvent, S: State<E>> {
 impl<E: ExternalEvent, S: State<E>> Game<E, S> {
     pub fn new(
         ressources: RessourceDescriptor,
-        inital_scenes: Vec<Scene<E>>,
         target_fps: u8,
         state: S,
     ) -> Self {
+        let initial_scenes = state.start_scenes();
         Self {
             ressources,
-            pending_scenes: inital_scenes,
+            pending_scenes: initial_scenes,
             active_scenes: Vec::new(),
             suspended_scenes: Vec::new(),
             window_ids: Vec::new(),
@@ -175,10 +176,6 @@ impl<E: ExternalEvent, S: State<E>> Game<E, S> {
         let path = &self
             .ressources
             .get_sprite_sheet(&name)
-            .expect(&format!(
-                "No source path provided for SpriteSheet '{:?}'",
-                name
-            ))
             .0;
         window_manager.send_event(GameEvent::RequestNewSpriteSheet(name.clone(), path.clone()));
     }
@@ -330,10 +327,6 @@ impl<E: ExternalEvent + 'static, S: State<E>> EventManager<GameEvent<E>> for Gam
                     let dimensions = &self
                         .ressources
                         .get_sprite_sheet(&label)
-                        .expect(&format!(
-                            "No dimensions provided for SpriteSheet '{:?}'",
-                            label
-                        ))
                         .1;
                     let sprite_sheet = SpriteSheet::new(id, dimensions);
                     self.sprite_sheets.push((label.clone(), sprite_sheet));
