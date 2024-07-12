@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use placeholder::{
     app::{IndexBuffer, VertexBuffer},
-    game_engine::{BoundingBox, Entity, EntityName, SpritePosition, SpriteSheet},
+    game_engine::{BoundingBox, Entity, EntityName, SpritePosition, SpriteSheet, SpriteSheetName},
 };
 use threed::Vector;
 use winit::{
@@ -22,14 +22,44 @@ const FOCUS_LOW_COLOR: Color = Color::new_rgba(82, 5, 5, 160);
 const UNFOCUS_HIGH_COLOR: Color = Color::new_rgba(24, 25, 27, 255);
 const UNFOCUS_LOW_COLOR: Color = Color::new_rgba(0, 0, 0, 160);
 
+pub enum ButtonStyle {
+    /// BorderBox(FOCUS_HIGH_COLOR, FOCUS_LOW_COLOR, UNFOCUS_HIGH_COLOR, UNFOCUS_LOW_COLOR)
+    BorderBox(Color, Color, Color, Color),
+    /// Image(SpriteSheet, FOCUS_SPRITE, UNFOCUS_SPRITE)
+    Image(SpriteSheetName, SpritePosition, SpritePosition),
+    /// Image(FOCUS_COLOR, UNFOCUS_COLOR, SpriteSheet, FOCUS_SPRITE, UNFOCUS_SPRITE)
+    BackgroundImage(
+        Color,
+        Color,
+        SpriteSheetName,
+        SpritePosition,
+        SpritePosition,
+    ),
+    /// Plain(FOCUS_COLOR, UNFOCUS_COLOR)
+    Plain(Color, Color),
+    /// UnderLine(FOCUS_COLOR, UNFOCUS_COLOR)
+    UnderLine(Color, Color),
+}
+impl Default for ButtonStyle {
+    fn default() -> Self {
+        Self::BorderBox(
+            FOCUS_HIGH_COLOR,
+            FOCUS_LOW_COLOR,
+            UNFOCUS_HIGH_COLOR,
+            UNFOCUS_LOW_COLOR,
+        )
+    }
+}
+
+const BORDER_THICKNESS: f32 = 4.0;
+
 pub struct Button {
     position: Vector<f32>,
     name: EntityName,
     text: Text,
     is_dirty: bool,
     is_focused: bool,
-    low_color: Option<&'static Color>,
-    high_color: Option<&'static Color>,
+    style: ButtonStyle,
 }
 impl Button {
     pub fn new(
@@ -37,8 +67,9 @@ impl Button {
         name: EntityName,
         size: PhysicalSize<u16>,
         position: Vector<f32>,
-        font_size: u8,
+        font_size: crate::ui::text::FontSize,
         fit_to_content: bool,
+        style: ButtonStyle,
     ) -> Self {
         Self {
             position: position.clone(),
@@ -54,21 +85,42 @@ impl Button {
             ),
             is_dirty: true,
             is_focused: false,
-            low_color: Some(&UNFOCUS_LOW_COLOR),
-            high_color: Some(&UNFOCUS_HIGH_COLOR),
+            style,
         }
     }
 
     pub fn set_focus(&mut self, is_focused: bool) {
         self.is_focused = is_focused;
-        if self.is_focused {
-            self.text.color = FOCUS_HIGH_COLOR;
-            self.low_color = Some(&FOCUS_LOW_COLOR);
-            self.high_color = Some(&FOCUS_HIGH_COLOR);
-        } else {
-            self.text.color = UNFOCUS_HIGH_COLOR;
-            self.low_color = Some(&UNFOCUS_LOW_COLOR);
-            self.high_color = Some(&UNFOCUS_HIGH_COLOR);
+        match &self.style {
+            ButtonStyle::BorderBox(focus_high, _, unfocus_high, _) => {
+                if is_focused {
+                    self.text.color = focus_high.clone();
+                } else {
+                    self.text.color = unfocus_high.clone();
+                }
+            }
+            ButtonStyle::Plain(focus, unfocus) => {
+                if is_focused {
+                    self.text.color = focus.clone();
+                } else {
+                    self.text.color = unfocus.clone();
+                }
+            }
+            ButtonStyle::UnderLine(focus, unfocus) => {
+                if is_focused {
+                    self.text.color = focus.clone();
+                } else {
+                    self.text.color = unfocus.clone();
+                }
+            }
+            ButtonStyle::BackgroundImage(focus, unfocus, _, _, _) => {
+                if is_focused {
+                    self.text.color = focus.clone();
+                } else {
+                    self.text.color = unfocus.clone();
+                }
+            }
+            ButtonStyle::Image(_, _, _) => {}
         }
     }
 }
@@ -111,36 +163,91 @@ impl Entity<Type, Event> for Button {
         indices: &mut IndexBuffer,
         sprite_sheet: Vec<Option<&SpriteSheet>>,
     ) {
-        if !sprite_sheet[0].is_none() {
-            let sprite_sheet = SpriteSheet::default();
-            let bbox = self.bounding_box();
-            let border_thickness = 4.0;
-            render_ui_sprite(
-                &bbox,
-                vertices,
-                indices,
-                &sprite_sheet,
-                &SpritePosition::new(0, 0),
-                self.low_color,
-            );
-            render_ui_box_border(
-                &bbox,
-                vertices,
-                indices,
-                border_thickness,
-                self.high_color.unwrap(),
-            );
+        match &self.style {
+            ButtonStyle::BorderBox(focus_high, focus_low, unfocus_high, unfocus_low) => {
+                let low_color = Some(if self.is_focused {
+                    focus_low
+                } else {
+                    unfocus_low
+                });
+                let high_color = Some(if self.is_focused {
+                    focus_high
+                } else {
+                    unfocus_high
+                });
+                if !sprite_sheet[0].is_none() {
+                    let sprite_sheet = SpriteSheet::default();
+                    let bbox = self.bounding_box();
+                    render_ui_sprite(
+                        &bbox,
+                        vertices,
+                        indices,
+                        &sprite_sheet,
+                        &SpritePosition::new(0, 0),
+                        low_color,
+                    );
+                    render_ui_box_border(
+                        &bbox,
+                        vertices,
+                        indices,
+                        BORDER_THICKNESS,
+                        high_color.unwrap(),
+                    );
+                }
+            }
+            ButtonStyle::Plain(_, _) => {}
+            ButtonStyle::UnderLine(focus, unfocus) => {
+                let color = Some(if self.is_focused { focus } else { unfocus });
+                if !sprite_sheet[0].is_none() {
+                    let sprite_sheet = SpriteSheet::default();
+                    let mut bbox = self.bounding_box();
+                    bbox.anchor.y -= bbox.size.height / 2.0;
+                    bbox.size.height = BORDER_THICKNESS;
+                    render_ui_sprite(
+                        &bbox,
+                        vertices,
+                        indices,
+                        &sprite_sheet,
+                        &SpritePosition::new(0, 0),
+                        color,
+                    );
+                }
+            }
+            ButtonStyle::Image(_, _, _) => {
+                todo!("implement ButtonStyle::Image");
+            }
+            ButtonStyle::BackgroundImage(_, _, _, _, _) => {
+                todo!("implement ButtonStyle::BackgroundImage");
+            }
         }
+        let pos = self.text.position_mut();
+        pos.x -= BORDER_THICKNESS;
+        pos.y -= BORDER_THICKNESS;
         self.text.render(vertices, indices, sprite_sheet);
+        let pos = self.text.position_mut();
+        pos.x += BORDER_THICKNESS;
+        pos.y += BORDER_THICKNESS;
     }
     fn bounding_box(&self) -> BoundingBox {
-        self.text.bounding_box()
+        let mut bbox = self.text.bounding_box();
+        bbox.size.height += 2.0 * BORDER_THICKNESS;
+        bbox.size.width += 2.0 * BORDER_THICKNESS;
+        bbox.anchor -= Vector::new(BORDER_THICKNESS, BORDER_THICKNESS, 0.0);
+        bbox
     }
     fn name(&self) -> &EntityName {
         &self.name
     }
     fn sprite_sheets(&self) -> Vec<&placeholder::game_engine::SpriteSheetName> {
-        self.text.sprite_sheets()
+        let mut sprite_sheets = match &self.style {
+            ButtonStyle::Image(sprite_sheet, _, _)
+            | ButtonStyle::BackgroundImage(_, _, sprite_sheet, _, _) => {
+                vec![sprite_sheet]
+            }
+            _ => vec![],
+        };
+        sprite_sheets.extend_from_slice(&mut self.text.sprite_sheets());
+        sprite_sheets
     }
     fn entity_type(&self) -> Type {
         Type::Menu
@@ -149,7 +256,8 @@ impl Entity<Type, Event> for Button {
 impl FlexItem for Button {
     fn position_mut(&mut self) -> &mut Vector<f32> {
         self.is_dirty = true;
-        self.text.position_mut()
+        let pos = self.text.position_mut();
+        pos
     }
 
     fn is_dirty(&mut self) -> bool {

@@ -10,13 +10,14 @@ use winit::{
 
 use crate::{impl_flex_struct, vertex::render_ui_sprite, Event, Type};
 
-use super::{Alignment, FlexDirection, FlexItem};
+use super::{flex_box::FlexOrigin, Alignment, FlexDirection, FlexItem};
 
 mod button;
-pub use button::Button;
+pub use {button::Button, button::ButtonStyle};
 
 pub struct FlexButtonLine {
     flex_direction: FlexDirection,
+    flex_origin: FlexOrigin,
     /// Alignment of children orthogonal to the flex direction
     align_content: Alignment,
     background_image: Option<(SpriteSheetName, SpritePosition)>,
@@ -33,6 +34,7 @@ pub struct FlexButtonLine {
 impl FlexButtonLine {
     pub fn new(
         flex_direction: FlexDirection,
+        flex_origin: FlexOrigin,
         align_content: Alignment,
         background_image: Option<(SpriteSheetName, SpritePosition)>,
         gap: f32,
@@ -48,6 +50,7 @@ impl FlexButtonLine {
         }
         Self {
             flex_direction,
+            flex_origin,
             align_content,
             background_image,
             gap,

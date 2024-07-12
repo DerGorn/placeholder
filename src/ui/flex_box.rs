@@ -15,6 +15,11 @@ pub enum Alignment {
     End,
     Center,
 }
+pub enum FlexOrigin {
+    Start,
+    End,
+    Center,
+}
 
 pub trait FlexItem: Entity<Type, Event> {
     fn position_mut(&mut self) -> &mut Vector<f32>;
@@ -25,13 +30,35 @@ macro_rules! impl_flex_struct {
     ($name: ident) => {
         impl $name {
             fn flex(&mut self) {
+                // println!("Flexing {:?}", self.name);
                 let boxes = self.children.iter().map(|x| x.bounding_box());
-                let flex_origin = &self.position
-                    + Vector::new(
-                        -(self.dimensions.width as f32) / 2.0 + self.gap,
-                        self.dimensions.height as f32 / 2.0 + self.gap,
-                        0.0,
-                    );
+                // println!("Boxes: {:?}", boxes);
+
+                let flex_origin = match self.flex_origin {
+                    FlexOrigin::Start => {
+                        &self.position
+                            + Vector::new(
+                                -(self.dimensions.width as f32) / 2.0 + self.gap,
+                                self.dimensions.height as f32 / 2.0 + self.gap,
+                                0.0,
+                            )
+                    }
+                    FlexOrigin::End => {
+                        todo!("Implement FlexOrigin::End");
+                        &self.position
+                            - Vector::new(
+                                -(self.dimensions.width as f32) / 2.0 + self.gap,
+                                self.dimensions.height as f32 / 2.0 + self.gap,
+                                0.0,
+                            )
+                    }
+                    FlexOrigin::Center => {
+                        todo!("Implement FlexOrigin::Center");
+                        self.position.clone()
+                    }
+                };
+                // println!("Flex origin: {:?}", flex_origin);
+                // println!("Flex direction: {:?}", self.flex_direction);
                 let mut flex_points: Vec<Vector<f32>> = vec![flex_origin];
                 let mut alignment_points: Vec<Vector<f32>> = vec![];
                 let mut total_width = 0.0;
@@ -205,6 +232,7 @@ macro_rules! impl_flex_struct {
 
 pub struct FlexBox {
     flex_direction: FlexDirection,
+    flex_origin: FlexOrigin,
     /// Alignment of children orthogonal to the flex direction
     align_content: Alignment,
     background_image: Option<(SpriteSheetName, SpritePosition)>,
@@ -221,6 +249,7 @@ impl_flex_struct!(FlexBox);
 impl FlexBox {
     pub fn new(
         flex_direction: FlexDirection,
+        flex_origin: FlexOrigin,
         align_content: Alignment,
         background_image: Option<(SpriteSheetName, SpritePosition)>,
         gap: f32,
@@ -233,6 +262,7 @@ impl FlexBox {
         let number_of_sprites = children.iter().map(|x| x.sprite_sheets().len()).collect();
         Self {
             flex_direction,
+            flex_origin,
             align_content,
             background_image,
             gap,

@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 use threed::Vector;
 use transition::{Transition, TransitionTypes};
-use ui::{Alignment, Button, FlexBox, FlexButtonLine, FlexDirection, Image};
+use ui::{Alignment, Button, ButtonStyle, FlexBox, FlexButtonLine, FlexDirection, FlexOrigin, FontSize, Image};
 use winit::{dpi::PhysicalSize, window::WindowAttributes};
 
 use placeholder::graphics::{Index as I, Vertex as V};
@@ -167,83 +167,51 @@ impl GameState {
                 target_window: MAIN_WINDOW.into(),
                 entities: vec![Box::new(FlexBox::new(
                     FlexDirection::Y,
+                    FlexOrigin::Start,
                     Alignment::Center,
                     Some(("title_background".into(), SpritePosition::new(0, 0))),
-                    // None,
                     330.0,
                     false,
                     RESOLUTION.clone(),
                     Vector::new(0.0, 0.0, 0.0),
                     "MainMenuText".into(),
                     vec![
-                        // Box::new(Image::new(
-                        //     "title".into(),
-                        //     PhysicalSize::new(800, 200),
-                        //     Vector::new(0.0, 200.0, 0.0),
-                        //     ("title".into(), SpritePosition::new(0, 0)),
-                        //     Some(Color::new_rgba(82, 5, 5, 255)),
-                        // )),
+                        Box::new(Image::new(
+                            "title".into(),
+                            PhysicalSize::new(800, 200),
+                            Vector::scalar(0.0),
+                            ("title".into(), SpritePosition::new(0, 0)),
+                            Some(Color::new_rgba(82, 5, 5, 255)),
+                        )),
                         Box::new(FlexButtonLine::new(
                             FlexDirection::Y,
+                            FlexOrigin::Start,
                             Alignment::Center,
                             None,
                             20.0,
                             true,
-                            RESOLUTION,
-                            // PhysicalSize::new(800, 400),
+                            PhysicalSize::new(800, 600),
                             Vector::new(0.0, 0.0, 0.0),
                             "MainMenuButtons".into(),
                             vec![
                                 Box::new(Button::new(
-                                    String::from(
-"A AaAbAcAdAeAfAgAhAiAjAkAlAmAnAoApAqArAsAtAuAvAwAxAyAzA,A.A!A?A:
-B BaBbBcBdBeBfBgBhBiBjBkBlBmBnBoBpBqBrBsBtBuBvBwBxByBzB,B.B!B?B:
-C CaCbCcCdCeCfCgChCiCjCkClCmCnCoCpCqCrCsCtCuCvCwCxCyCzC,C.C!C?C:
-D DaDbDcDdDeDfDgDhDiDjDkDlDmDnDoDpDqDrDsDtDuDvDwDxDyDzD,D.D!D?D:
-E EaEbEcEdEeEfEgEhEiEjEkElEmEnEoEpEqErEsEtEuEvEwExEyEzE,E.E!E?E:
-F FaFbFcFdFeFfFgFhFiFjFkFlFmFnFoFpFqFrFsFtFuFvFwFxFyFzF,F.F!F?F:
-G GaGbGcGdGeGfGgGhGiGjGkGlGmGnGoGpGqGrGsGtGuGvGwGxGyGzG,G.G!G?G:
-H HaHbHcHdHeHfHgHhHiHjHkHlHmHnHoHpHqHrHsHtHuHvHwHxHyHzH,H.H!H?H:
-I IaIbIcIdIeIfIgIhIiIjIkIlImInIoIpIqIrIsItIuIvIwIxIyIzI,I.I!I?I:
-J JaJbJcJdJeJfJgJhJiJjJkJlJmJnJoJpJqJrJsJtJuJvJwJxJyJzJ,J.J!J?J:
-K KaKbKcKdKeKfKgKhKiKjKkKlKmKnKoKpKqKrKsKtKuKvKwKxKyKzK,K.K!K?K:
-L LaLbLcLdLeLfLgLhLiLjLkLlLmLnLoLpLqLrLsLtLuLvLwLxLyLzL,L.L!L?L:
-M MaMbMcMdMeMfMgMhMiMjMkMlMmMnMoMpMqMrMsMtMuMvMwMxMyMzM,M.M!M?M:
-N NaNbNcNdNeNfNgNhNiNjNkNlNmNnNoNpNqNrNsNtNuNvNwNxNyNzN,N.N!N?N:
-O OaObOcOdOeOfOgOhOiOjOkOlOmOnOoOpOqOrOsOtOuOvOwOxOyOzO,O.O!O?O:
-P PaPbPcPdPePfPgPhPiPjPkPlPmPnPoPpPqPrPsPtPuPvPwPxPyPzP,P.P!P?P:
-Q QaQbQcQdQeQfQgQhQiQjQkQlQmQnQoQpQqQrQsQtQuQvQwQxQyQzQ,Q.Q!Q?Q:
-R RaRbRcRdReRfRgRhRiRjRkRlRmRnRoRpRqRrRsRtRuRvRwRxRyRzR,R.R!R?R:
-S SaSbScSdSeSfSgShSiSjSkSlSmSnSoSpSqSrSsStSuSvSwSxSySzS,S.S!S?S:
-T TaTbTcTdTeTfTgThTiTjTkTlTmTnToTpTqTrTsTtTuTvTwTxTyTzT,T.T!T?T:
-I UaUbUcUdUeUfUgUhUiUjUkUlUmUnUoUpUqUrUsUtUuUvUwUxUyUzU,U.U!U?U:
-V VaVbVcVdVeVfVgVhViVjVkVlVmVnVoVpVqVrVsVtVuVvVwVxVyVzV,V.V!V?V:
-W WaWbWcWdWeWfWgWhWiWjWkWlWmWnWoWpWqWrWsWtWuWvWwWxWyWzW,W.W!W?W:
-X XaXbXcXdXeXfXgXhXiXjXkXlXmXnXoXpXqXrXsXtXuXvXwXxXyXzX,X.X!X?X:
-Y YaYbYcYdYeYfYgYhYiYjYkYlYmYnYoYpYqYrYsYtYuYvYwYxYyYzY,Y.Y!Y?Y:
-Z ZaZbZcZdZeZfZgZhZiZjZkZlZmZnZoZpZqZrZsZtZuZvZwZxZyZzZ,Z.Z!Z?Z:"),
+                                    String::from("New Game"),
                                     START_GAME_BUTTON.into(),
-                                    RESOLUTION,
+                                    PhysicalSize::new(800, 600),
                                     Vector::scalar(0.0),
-                                    32,
+                                    FontSize::new(40),
                                     true,
+                                    ButtonStyle::default(),
                                 )),
-                                // Box::new(Button::new(
-                                //     String::from(" New Game"),
-                                //     START_GAME_BUTTON.into(),
-                                //     PhysicalSize::new(800, 600),
-                                //     Vector::scalar(0.0),
-                                //     40,
-                                //     true,
-                                // )),
-                                // Box::new(Button::new(
-                                //     String::from(" End Game"),
-                                //     END_GAME_BUTTON.into(),
-                                //     PhysicalSize::new(800, 600),
-                                //     Vector::scalar(0.0),
-                                //     40,
-                                //     true,
-                                // )),
+                                Box::new(Button::new(
+                                    String::from("End Game"),
+                                    END_GAME_BUTTON.into(),
+                                    PhysicalSize::new(800, 600),
+                                    Vector::scalar(0.0),
+                                    FontSize::new(40),
+                                    true,
+                                    ButtonStyle::default(),
+                                )),
                             ],
                         )),
                     ],
@@ -456,7 +424,6 @@ fn main() {
             (
                 FONT.into(),
                 PathBuf::from("res/fonts/font.png"),
-                // PathBuf::from("res/fonts/pain.png"),
                 SpriteSheetDimensions::new(16, 16),
             ),
         ],
