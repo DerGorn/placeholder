@@ -54,11 +54,7 @@ pub struct Game<E: ExternalEvent, S: State<E>> {
     state: S,
 }
 impl<E: ExternalEvent, S: State<E>> Game<E, S> {
-    pub fn new(
-        ressources: RessourceDescriptor,
-        target_fps: u8,
-        state: S,
-    ) -> Self {
+    pub fn new(ressources: RessourceDescriptor, target_fps: u8, state: S) -> Self {
         let initial_scenes = state.start_scenes();
         Self {
             ressources,
@@ -173,10 +169,7 @@ impl<E: ExternalEvent, S: State<E>> Game<E, S> {
         name: &SpriteSheetName,
         window_manager: &mut WindowManager<GameEvent<E>>,
     ) {
-        let path = &self
-            .ressources
-            .get_sprite_sheet(&name)
-            .0;
+        let path = &self.ressources.get_sprite_sheet(&name).0;
         window_manager.send_event(GameEvent::RequestNewSpriteSheet(name.clone(), path.clone()));
     }
 
@@ -324,10 +317,7 @@ impl<E: ExternalEvent + 'static, S: State<E>> EventManager<GameEvent<E>> for Gam
                     .find(|(l, _)| label == *l)
                     .is_none()
                 {
-                    let dimensions = &self
-                        .ressources
-                        .get_sprite_sheet(&label)
-                        .1;
+                    let dimensions = &self.ressources.get_sprite_sheet(&label).1;
                     let sprite_sheet = SpriteSheet::new(id, dimensions);
                     self.sprite_sheets.push((label.clone(), sprite_sheet));
                 }
@@ -384,6 +374,19 @@ impl<E: ExternalEvent + 'static, S: State<E>> EventManager<GameEvent<E>> for Gam
                     self.pending_scenes.extend(scenes);
                     self.activate_scenes(window_manager);
                     return;
+                }
+                if let Some((scene, visibility)) = event.is_request_set_visibility_scene() {
+                    let render_scene = &self
+                        .active_scenes
+                        .iter()
+                        .find(|s| s.name == *scene)
+                        .unwrap_or_else(|| {
+                            self.suspended_scenes
+                                .iter_mut()
+                                .find(|s| s.name == *scene)
+                                .expect(&format!("Found no active nor suspended scene {:?}", scene))
+                        }).render_scene;
+                    window_manager.send_event(GameEvent::RequestSetVisibilityRenderScene(render_scene.clone(), visibility.clone()));
                 }
                 if let Some(suspendable_scene) = event.is_request_suspend_scene() {
                     info!("Suspending Scene {:?}", suspendable_scene);

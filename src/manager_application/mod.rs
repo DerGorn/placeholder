@@ -20,7 +20,7 @@ mod buffer;
 pub use buffer::{IndexBuffer, VertexBuffer};
 
 use crate::graphics_provider::{
-    GraphicsProvider, RenderSceneDescriptor, RenderSceneName, ShaderDescriptor, UniformBufferName
+    GraphicsProvider, RenderSceneDescriptor, RenderSceneName, ShaderDescriptor, UniformBufferName, Visibility,
 };
 
 pub struct ManagerApplication<E: ApplicationEvent + 'static, M: EventManager<E>> {
@@ -103,9 +103,7 @@ impl<'a, E: ApplicationEvent + 'static, M: EventManager<E>> ApplicationHandler<E
         }
         match event.is_request_new_texture() {
             Some((path, label)) => {
-                let id = self
-                    .graphics_provider
-                    .create_texture(path, label);
+                let id = self.graphics_provider.create_texture(path, label);
                 self.window_manager.send_event(E::new_texture(label, id));
             }
             None => {}
@@ -127,6 +125,12 @@ impl<'a, E: ApplicationEvent + 'static, M: EventManager<E>> ApplicationHandler<E
                 );
                 self.window_manager
                     .send_event(E::new_render_scene(render_scene))
+            }
+            None => {}
+        }
+        match event.is_request_set_visibility_render_scene() {
+            Some((render_scene, visibility)) => {
+                self.graphics_provider.set_visibility_render_scene(&render_scene, visibility);
             }
             None => {}
         }
@@ -200,5 +204,8 @@ pub trait ApplicationEvent: Debug {
         &'a RenderSceneDescriptor,
         &'a [(UniformBufferName, Vec<u8>, wgpu::ShaderStages)],
     )>;
+    fn is_request_set_visibility_render_scene<'a>(
+        &'a self,
+    ) -> Option<(&'a RenderSceneName, &'a Visibility)>;
     fn is_quit(&self) -> bool;
 }

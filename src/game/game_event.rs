@@ -5,7 +5,7 @@ use std::{
 };
 
 use crate::app::{IndexBuffer, VertexBuffer};
-use crate::graphics_provider::{RenderSceneDescriptor, UniformBufferName};
+use crate::graphics_provider::{RenderSceneDescriptor, UniformBufferName, Visibility};
 use crate::{
     app::{ApplicationEvent, WindowDescriptor},
     graphics::{RenderSceneName, ShaderDescriptor},
@@ -34,6 +34,7 @@ pub enum GameEvent<E: ExternalEvent> {
         ///Initial uniforms for the render scene
         Vec<(UniformBufferName, Vec<u8>, wgpu::ShaderStages)>,
     ),
+    RequestSetVisibilityRenderScene(RenderSceneName, Visibility),
     External(E),
     EndGame,
 }
@@ -71,6 +72,15 @@ impl<E: ExternalEvent> ApplicationEvent for GameEvent<E> {
         } else {
             None
         }
+    }
+
+    fn is_request_set_visibility_render_scene<'a>(&'a self) -> Option<(&'a RenderSceneName, &'a Visibility)> {
+        if let Self::RequestSetVisibilityRenderScene(render_scene, visibility) = self {
+            Some((render_scene, visibility))
+        } else {
+            None
+        }
+            
     }
 
     fn is_request_new_render_scene<'a>(
@@ -121,6 +131,7 @@ impl<E: ExternalEvent> ApplicationEvent for GameEvent<E> {
 
 pub trait ExternalEvent: Debug + Send {
     type EntityType: EntityType;
+    fn is_request_set_visibility_scene<'a>(&'a self) -> Option<(&'a SceneName, &'a Visibility)>;
     ///Suspended scenes will now longer update their buffers, but will still be rendered in their
     ///current state
     fn is_request_suspend_scene<'a>(&'a self) -> Option<&'a SceneName>;

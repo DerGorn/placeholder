@@ -2,7 +2,7 @@ use wgpu::util::DeviceExt;
 
 use crate::create_name_struct;
 
-use super::{IndexBufferWriter, VertexBufferWriter};
+use super::{IndexBufferWriter, VertexBufferWriter, Visibility};
 
 create_name_struct!(RenderSceneName);
 create_name_struct!(UniformBufferName);
@@ -30,6 +30,7 @@ pub struct RenderScene {
         wgpu::BindGroupLayout,
         wgpu::BindGroup,
     )>,
+    visibility: Visibility,
 }
 impl RenderScene {
     pub fn new(
@@ -63,14 +64,19 @@ impl RenderScene {
             vertex_buffer_layout: descriptor.vertex_buffer_layout,
             use_textures: descriptor.use_textures,
             uniform_buffers: Vec::new(),
+            visibility: Visibility::Visible,
         }
+    }
+
+    pub fn set_visibility(&mut self, visibility: &Visibility) {
+        self.visibility = visibility.clone();
     }
 
     pub fn use_textures(&self) -> bool {
         self.use_textures
     }
 
-    fn bing_groups<'a>(
+    fn bind_groups<'a>(
         &'a self,
         texture_bind_group: &'a wgpu::BindGroup,
     ) -> Vec<&'a wgpu::BindGroup> {
@@ -144,9 +150,13 @@ impl RenderScene {
         render_pass: &mut wgpu::RenderPass<'a>,
         texture_bind_group: &'a wgpu::BindGroup,
     ) {
+        match self.visibility {
+            Visibility::Hidden => return,
+            Visibility::Visible => (),
+        };
         if let Some(render_pipeline) = &self.render_pipeline {
             render_pass.set_pipeline(render_pipeline);
-            let bind_groups = self.bing_groups(texture_bind_group);
+            let bind_groups = self.bind_groups(texture_bind_group);
             for (i, bind_group) in bind_groups.iter().enumerate() {
                 render_pass.set_bind_group(i as u32, bind_group, &[]);
             }

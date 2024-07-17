@@ -22,6 +22,7 @@ const FOCUS_LOW_COLOR: Color = Color::new_rgba(82, 5, 5, 160);
 const UNFOCUS_HIGH_COLOR: Color = Color::new_rgba(24, 25, 27, 255);
 const UNFOCUS_LOW_COLOR: Color = Color::new_rgba(0, 0, 0, 160);
 
+#[allow(dead_code)]
 pub enum ButtonStyle {
     /// BorderBox(FOCUS_HIGH_COLOR, FOCUS_LOW_COLOR, UNFOCUS_HIGH_COLOR, UNFOCUS_LOW_COLOR)
     BorderBox(Color, Color, Color, Color),
@@ -71,7 +72,7 @@ impl Button {
         fit_to_content: bool,
         style: ButtonStyle,
     ) -> Self {
-        Self {
+        let mut button = Self {
             position: position.clone(),
             name: name.clone(),
             text: Text::new(
@@ -86,42 +87,9 @@ impl Button {
             is_dirty: true,
             is_focused: false,
             style,
-        }
-    }
-
-    pub fn set_focus(&mut self, is_focused: bool) {
-        self.is_focused = is_focused;
-        match &self.style {
-            ButtonStyle::BorderBox(focus_high, _, unfocus_high, _) => {
-                if is_focused {
-                    self.text.color = focus_high.clone();
-                } else {
-                    self.text.color = unfocus_high.clone();
-                }
-            }
-            ButtonStyle::Plain(focus, unfocus) => {
-                if is_focused {
-                    self.text.color = focus.clone();
-                } else {
-                    self.text.color = unfocus.clone();
-                }
-            }
-            ButtonStyle::UnderLine(focus, unfocus) => {
-                if is_focused {
-                    self.text.color = focus.clone();
-                } else {
-                    self.text.color = unfocus.clone();
-                }
-            }
-            ButtonStyle::BackgroundImage(focus, unfocus, _, _, _) => {
-                if is_focused {
-                    self.text.color = focus.clone();
-                } else {
-                    self.text.color = unfocus.clone();
-                }
-            }
-            ButtonStyle::Image(_, _, _) => {}
-        }
+        };
+        button.set_focus(false);
+        button
     }
 }
 impl Debug for Button {
@@ -177,7 +145,8 @@ impl Entity<Type, Event> for Button {
                 });
                 if !sprite_sheet[0].is_none() {
                     let sprite_sheet = SpriteSheet::default();
-                    let bbox = self.bounding_box();
+                    let mut bbox = self.bounding_box();
+                    bbox.anchor += Vector::new(BORDER_THICKNESS, BORDER_THICKNESS, 0.0);
                     render_ui_sprite(
                         &bbox,
                         vertices,
@@ -196,21 +165,23 @@ impl Entity<Type, Event> for Button {
                 }
             }
             ButtonStyle::Plain(_, _) => {}
-            ButtonStyle::UnderLine(focus, unfocus) => {
-                let color = Some(if self.is_focused { focus } else { unfocus });
-                if !sprite_sheet[0].is_none() {
-                    let sprite_sheet = SpriteSheet::default();
-                    let mut bbox = self.bounding_box();
-                    bbox.anchor.y -= bbox.size.height / 2.0;
-                    bbox.size.height = BORDER_THICKNESS;
-                    render_ui_sprite(
-                        &bbox,
-                        vertices,
-                        indices,
-                        &sprite_sheet,
-                        &SpritePosition::new(0, 0),
-                        color,
-                    );
+            ButtonStyle::UnderLine(focus, _) => {
+                if self.is_focused {
+                    let color = Some(focus);
+                    if !sprite_sheet[0].is_none() {
+                        let sprite_sheet = SpriteSheet::default();
+                        let mut bbox = self.bounding_box();
+                        bbox.anchor.y -= bbox.size.height / 2.0;
+                        bbox.size.height = BORDER_THICKNESS;
+                        render_ui_sprite(
+                            &bbox,
+                            vertices,
+                            indices,
+                            &sprite_sheet,
+                            &SpritePosition::new(0, 0),
+                            color,
+                        );
+                    }
                 }
             }
             ButtonStyle::Image(_, _, _) => {
@@ -220,19 +191,19 @@ impl Entity<Type, Event> for Button {
                 todo!("implement ButtonStyle::BackgroundImage");
             }
         }
-        let pos = self.text.position_mut();
-        pos.x -= BORDER_THICKNESS;
-        pos.y -= BORDER_THICKNESS;
+        let pos = self.text.position();
+        let shifted_pos = Vector::new(pos.x - BORDER_THICKNESS, pos.y - BORDER_THICKNESS, 0.0);
+        self.text.set_position(&shifted_pos);
         self.text.render(vertices, indices, sprite_sheet);
-        let pos = self.text.position_mut();
-        pos.x += BORDER_THICKNESS;
-        pos.y += BORDER_THICKNESS;
+        self.text.set_position(&pos);
     }
     fn bounding_box(&self) -> BoundingBox {
         let mut bbox = self.text.bounding_box();
-        bbox.size.height += 2.0 * BORDER_THICKNESS;
-        bbox.size.width += 2.0 * BORDER_THICKNESS;
-        bbox.anchor -= Vector::new(BORDER_THICKNESS, BORDER_THICKNESS, 0.0);
+        if let ButtonStyle::BorderBox(_, _, _, _) = self.style {
+            bbox.size.height += 2.0 * BORDER_THICKNESS;
+            bbox.size.width += 2.0 * BORDER_THICKNESS;
+            bbox.anchor -= Vector::new(BORDER_THICKNESS, BORDER_THICKNESS, 0.0);
+        }
         bbox
     }
     fn name(&self) -> &EntityName {
@@ -254,13 +225,51 @@ impl Entity<Type, Event> for Button {
     }
 }
 impl FlexItem for Button {
-    fn position_mut(&mut self) -> &mut Vector<f32> {
+    fn set_position(&mut self, position: &Vector<f32>) {
         self.is_dirty = true;
-        let pos = self.text.position_mut();
-        pos
+        self.text.set_position(position);
     }
 
     fn is_dirty(&mut self) -> bool {
         self.text.is_dirty()
+    }
+
+    fn set_focus(&mut self, is_focused: bool) {
+        self.is_focused = is_focused;
+        match &self.style {
+            ButtonStyle::BorderBox(focus_high, _, unfocus_high, _) => {
+                if is_focused {
+                    self.text.color = focus_high.clone();
+                } else {
+                    self.text.color = unfocus_high.clone();
+                }
+            }
+            ButtonStyle::Plain(focus, unfocus) => {
+                if is_focused {
+                    self.text.color = focus.clone();
+                } else {
+                    self.text.color = unfocus.clone();
+                }
+            }
+            ButtonStyle::UnderLine(focus, unfocus) => {
+                if is_focused {
+                    self.text.color = focus.clone();
+                } else {
+                    self.text.color = unfocus.clone();
+                }
+            }
+            ButtonStyle::BackgroundImage(focus, unfocus, _, _, _) => {
+                if is_focused {
+                    self.text.color = focus.clone();
+                } else {
+                    self.text.color = unfocus.clone();
+                }
+            }
+            ButtonStyle::Image(_, _, _) => {}
+        }
+    }
+
+    fn has_focus(&self) -> bool {
+        self.is_focused
     }
 }

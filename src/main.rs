@@ -2,14 +2,18 @@ use env_logger::Env;
 use placeholder::app::{ManagerApplication, WindowDescriptor};
 use placeholder::graphics::{RenderSceneDescriptor, ShaderDescriptor, UniformBufferName};
 use rodio::{Decoder, OutputStream, Sink, Source};
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
+use std::str::Chars;
 use std::time::Duration;
 use threed::Vector;
 use transition::{Transition, TransitionTypes};
-use ui::{Alignment, Button, ButtonStyle, FlexBox, FlexButtonLine, FlexDirection, FlexOrigin, FontSize, Image};
+use ui::{
+    Alignment, Button, ButtonStyle, FlexBox, FlexButtonLine, FlexDirection, FlexOrigin, FontSize,
+    Image,
+};
 use winit::{dpi::PhysicalSize, window::WindowAttributes};
 
 use placeholder::graphics::{Index as I, Vertex as V};
@@ -45,10 +49,18 @@ use ui::Text;
 mod color;
 use color::Color;
 
+mod game_state;
+use game_state::{BattleState, GameState, Skill};
+
+mod event;
+use event::Event;
+
+use crate::event::BattleEvent;
+
 type Index = u16;
 
 #[derive(Debug, PartialEq)]
-enum Type {
+pub enum Type {
     Background,
     Player,
     Enemy,
@@ -60,181 +72,85 @@ impl EntityType for Type {}
 enum EnemyType {
     Frog,
 }
-#[derive(Debug)]
-enum Event {
-    EndGame,
-    RequestNewScenes(Vec<Scene<Self>>),
-    NewScene(SceneName),
-    UpdateUniformBuffer(UniformBufferName, Vec<u8>),
-    InitiateBattle(EnemyType, EntityName, SceneName),
-    AnimationEnded(EntityName),
-    RequestSuspendScene(SceneName),
-    RequestActivateSuspendedScene(SceneName),
-    RequestDeleteScene(SceneName),
-    RequestDeleteEntity(EntityName, SceneName),
-    ButtonPressed(EntityName),
-}
-impl ExternalEvent for Event {
-    type EntityType = Type;
-    fn is_request_suspend_scene<'a>(&'a self) -> Option<&'a SceneName> {
-        match self {
-            Event::RequestSuspendScene(scene) => Some(scene),
-            _ => None,
-        }
-    }
-    fn is_request_activate_suspended_scene<'a>(&'a self) -> Option<&'a SceneName> {
-        match self {
-            Event::RequestActivateSuspendedScene(scene) => Some(scene),
-            _ => None,
-        }
-    }
-    fn is_request_delete_scene<'a>(&'a self) -> Option<&'a SceneName> {
-        match self {
-            Event::RequestDeleteScene(scene) => Some(scene),
-            _ => None,
-        }
-    }
-    fn is_request_new_scenes<'a>(&'a self) -> bool {
-        match self {
-            Event::RequestNewScenes(_) => true,
-            _ => false,
-        }
-    }
-
-    fn consume_scenes_request(self) -> Option<Vec<Scene<Self>>>
-    where
-        Self: Sized,
-    {
-        match self {
-            Event::RequestNewScenes(scenes) => Some(scenes),
-            _ => None,
-        }
-    }
-
-    fn new_scene(scene: &Scene<Self>) -> Self
-    where
-        Self: Sized,
-    {
-        Self::NewScene(scene.name.clone())
-    }
-
-    fn is_update_uniform_buffer<'a>(
-        &'a self,
-    ) -> Option<(&'a placeholder::graphics::UniformBufferName, &'a [u8])> {
-        match self {
-            Event::UpdateUniformBuffer(name, contents) => Some((name, contents)),
-            _ => None,
-        }
-    }
-    fn is_delete_entity<'a>(&'a self) -> Option<(&'a EntityName, &'a SceneName)> {
-        match self {
-            Event::RequestDeleteEntity(entity, scene) => Some((entity, scene)),
-            _ => None,
-        }
-    }
-
-    fn is_end_game(&self) -> bool {
-        matches!(self, Event::EndGame)
-    }
-}
 
 const TRANSITION_NAME: &str = "BattleTransition";
-struct PlayerState {
-    health: u8,
-    attack: u8,
-}
-impl PlayerState {
-    fn new() -> Self {
-        Self {
-            health: 0,
-            attack: 0,
-        }
-    }
-}
-#[derive(Default)]
-enum GameState {
-    #[default]
-    MainMenu,
-}
-impl GameState {
-    fn get_start_scenes(&self) -> Vec<Scene<Event>> {
-        match self {
-            GameState::MainMenu => vec![Scene {
-                z_index: 1,
-                shader_descriptor: SHADER_UI_TEXTURE,
-                name: MAIN_MENU_SCENE.into(),
-                render_scene: MAIN_MENU_SCENE.into(),
-                target_window: MAIN_WINDOW.into(),
-                entities: vec![Box::new(FlexBox::new(
-                    FlexDirection::Y,
-                    FlexOrigin::Start,
-                    Alignment::Center,
-                    Some(("title_background".into(), SpritePosition::new(0, 0))),
-                    330.0,
-                    false,
-                    RESOLUTION.clone(),
-                    Vector::new(0.0, 0.0, 0.0),
-                    "MainMenuText".into(),
-                    vec![
-                        Box::new(Image::new(
-                            "title".into(),
-                            PhysicalSize::new(800, 200),
-                            Vector::scalar(0.0),
-                            ("title".into(), SpritePosition::new(0, 0)),
-                            Some(Color::new_rgba(82, 5, 5, 255)),
-                        )),
-                        Box::new(FlexButtonLine::new(
-                            FlexDirection::Y,
-                            FlexOrigin::Start,
-                            Alignment::Center,
-                            None,
-                            20.0,
-                            true,
-                            PhysicalSize::new(800, 600),
-                            Vector::new(0.0, 0.0, 0.0),
-                            "MainMenuButtons".into(),
-                            vec![
-                                Box::new(Button::new(
-                                    String::from("New Game"),
-                                    START_GAME_BUTTON.into(),
-                                    PhysicalSize::new(800, 600),
-                                    Vector::scalar(0.0),
-                                    FontSize::new(40),
-                                    true,
-                                    ButtonStyle::default(),
-                                )),
-                                Box::new(Button::new(
-                                    String::from("End Game"),
-                                    END_GAME_BUTTON.into(),
-                                    PhysicalSize::new(800, 600),
-                                    Vector::scalar(0.0),
-                                    FontSize::new(40),
-                                    true,
-                                    ButtonStyle::default(),
-                                )),
-                            ],
-                        )),
-                    ],
-                ))],
-            }],
-        }
-    }
-}
 const SHADER_UI_TEXTURE: ShaderDescriptor = ShaderDescriptor {
     file: "res/shader/ui_texture.wgsl",
     vertex_shader: "vs_main",
     fragment_shader: "fs_main",
     uniforms: &[UUI_CAMERA],
 };
+#[derive(PartialEq)]
+enum CharacterAlignment {
+    Friendly,
+    Enemy,
+}
+struct Character {
+    name: &'static str,
+    alignment: CharacterAlignment,
+
+    max_health: u16,
+    health: u16,
+    max_stamina: u16,
+    stamina: u16,
+    exhaustion_threshold: u16,
+    exhaustion: u16,
+
+    speed: u16,
+    attack: u16,
+}
+struct SkilledCharacter {
+    character: Character,
+
+    skills: Vec<Box<dyn Skill>>,
+}
+impl SkilledCharacter {
+    pub fn activate_skill(&mut self, skill_index: usize, target: Option<&mut SkilledCharacter>) {
+        self.skills[skill_index].evaluate(target.map(|c| &mut c.character), &mut self.character);
+    }
+}
+impl Debug for Character {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} {{ HP: {}/{}, ST: {}/{}, EX: {}  ||  SPD: {}, ATK: {} }}",
+            self.name,
+            self.health,
+            self.max_health,
+            self.stamina,
+            self.max_stamina,
+            self.exhaustion,
+            self.speed,
+            self.attack
+        )
+    }
+}
+const CHARACTER_DISPLAY_LINES: f32 = 4.0;
+impl Display for Character {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}
+HP: {}/{}
+ST: {}/{}
+EX: {}",
+            self.name,
+            self.health,
+            self.max_health,
+            self.stamina,
+            self.max_stamina,
+            self.exhaustion,
+        )
+    }
+}
+
 struct GameLogic {
-    player: PlayerState,
     pending_battle: Option<(EnemyType, EntityName, SceneName)>,
     game_state: GameState,
 }
 impl GameLogic {
     fn new() -> Self {
         Self {
-            player: PlayerState::new(),
             pending_battle: None,
             game_state: GameState::default(),
         }
@@ -245,6 +161,7 @@ impl GameLogic {
             Event::ButtonPressed(entity) => match entity.as_str() {
                 END_GAME_BUTTON => vec![Event::EndGame],
                 START_GAME_BUTTON => {
+                    todo!("Start game");
                     vec![
                         Event::RequestDeleteScene(MAIN_MENU_SCENE.into()),
                         Event::RequestNewScenes(vec![Scene {
@@ -262,7 +179,155 @@ impl GameLogic {
             _ => vec![],
         }
     }
+
+    fn battle_event(&mut self, event: Event) -> Vec<Event> {
+        match &mut self.game_state {
+            GameState::Battle(battle_state) => {
+                let player_index = battle_state
+                    .characters
+                    .iter()
+                    .position(|c| c.character.name == "Player")
+                    .unwrap();
+                let enemy_index = battle_state
+                    .characters
+                    .iter()
+                    .position(|c| c.character.name == "Enemy")
+                    .unwrap();
+                println!("enemy_index: {}", enemy_index);
+                println!("player_index: {}", player_index);
+                match event {
+                    Event::BattleEvent(BattleEvent::FinishedPlanning) => {
+                        println!("Playing out Turn");
+                        let mut actions = vec![];
+                        for (order_index, character_index) in
+                            battle_state.character_order.iter().enumerate()
+                        {
+                            match battle_state.actions.iter().find(|a| a.0 == order_index) {
+                                Some((_, skill, target_index)) => {
+                                    actions.push((character_index, skill, target_index))
+                                }
+                                None => actions.push((character_index, &0, &player_index)),
+                            };
+                        }
+                        println!("Actions: {:?}", actions);
+                        for action in actions {
+                            let (source_index, skill_index, target_index) = action;
+                            let (source, target) = if source_index == target_index {
+                                let (_, right) =
+                                    battle_state.characters.split_at_mut(*target_index);
+                                let (left, _) = right.split_at_mut(1);
+                                let source = &mut left[0];
+                                (source, None)
+                            } else {
+                                let (left, target) =
+                                    battle_state.characters.split_at_mut(*target_index);
+                                let (target, right) = target.split_at_mut(1);
+                                let target = &mut target[0];
+                                if source_index < target_index {
+                                    (&mut left[*source_index], Some(target))
+                                } else {
+                                    (&mut right[source_index - target_index - 1], Some(target))
+                                }
+                            };
+                            source.activate_skill(*skill_index, target);
+                        }
+                        battle_state.characters.retain(|c| c.character.health > 0);
+                        if battle_state
+                            .characters
+                            .iter()
+                            .all(|c| c.character.alignment == CharacterAlignment::Friendly)
+                        {
+                            println!("Player Wins");
+                        } else if battle_state
+                            .characters
+                            .iter()
+                            .all(|c| c.character.alignment == CharacterAlignment::Enemy)
+                        {
+                            println!("Player Loses");
+                        } else {
+                            battle_state.turn_counter += 1;
+                            battle_state.actions.clear();
+                            battle_state.generate_character_order();
+                            return vec![Event::ButtonPressed(BATTLE_PRINT_STATE_BUTTON.into())];
+                        }
+                        vec![Event::EndGame]
+                    }
+                    Event::ButtonPressed(entity) => match entity.as_str() {
+                        END_GAME_BUTTON => vec![Event::EndGame],
+                        BATTLE_PRINT_STATE_BUTTON => {
+                            println!("TURN: {}", battle_state.turn_counter);
+                            println!("TurnOrder: {:?}", battle_state.character_order);
+                            println!("----------------------------------\n");
+                            for (i, p) in
+                                battle_state.characters.iter().enumerate().filter(|(_, c)| {
+                                    c.character.alignment == CharacterAlignment::Friendly
+                                })
+                            {
+                                println!("{i}: {:?}", p.character);
+                            }
+                            println!("\n----------------------------------\n");
+                            for (i, e) in
+                                battle_state.characters.iter().enumerate().filter(|(_, c)| {
+                                    c.character.alignment == CharacterAlignment::Enemy
+                                })
+                            {
+                                println!("{i}: {:?}", e.character);
+                            }
+                            vec![]
+                        }
+                        BATTLE_ATTACK_BUTTON => {
+                            let remaining_actions = battle_state
+                                .character_order
+                                .iter()
+                                .enumerate()
+                                .filter(|(i, ci)| {
+                                    ci == &&player_index
+                                        && battle_state.actions.iter().find(|a| a.0 == *i).is_none()
+                                })
+                                .collect::<Vec<_>>();
+                            let action = remaining_actions[0];
+                            battle_state.actions.push((action.0, 0, enemy_index));
+                            if remaining_actions.len() == 1 {
+                                vec![Event::BattleEvent(BattleEvent::FinishedPlanning)]
+                            } else {
+                                vec![]
+                            }
+                        }
+                        BATTLE_ATTACK_TWO_BUTTON => {
+                            let enemy_two_index = battle_state
+                                .characters
+                                .iter()
+                                .position(|c| c.character.name == "Enemy Two")
+                                .unwrap();
+                            let remaining_actions = battle_state
+                                .character_order
+                                .iter()
+                                .enumerate()
+                                .filter(|(i, ci)| {
+                                    ci == &&player_index
+                                        && battle_state.actions.iter().find(|a| a.0 == *i).is_none()
+                                })
+                                .collect::<Vec<_>>();
+                            let action = remaining_actions[0];
+                            battle_state.actions.push((action.0, 0, enemy_two_index));
+                            if remaining_actions.len() == 1 {
+                                vec![Event::BattleEvent(BattleEvent::FinishedPlanning)]
+                            } else {
+                                vec![]
+                            }
+                        }
+                        _ => vec![],
+                    },
+                    _ => vec![],
+                }
+            }
+            _ => vec![],
+        }
+    }
 }
+const BATTLE_PRINT_STATE_BUTTON: &str = "BattlePrintState";
+const BATTLE_ATTACK_BUTTON: &str = "BattleAttack";
+const BATTLE_ATTACK_TWO_BUTTON: &str = "BattleAttackTwo";
 impl State<Event> for GameLogic {
     fn start_scenes(&self) -> Vec<Scene<Event>> {
         self.game_state.get_start_scenes()
@@ -270,6 +335,7 @@ impl State<Event> for GameLogic {
     fn handle_event(&mut self, event: Event) -> Vec<Event> {
         match self.game_state {
             GameState::MainMenu => self.main_menu_event(event),
+            GameState::Battle(_) => self.battle_event(event),
         }
         // match event {
         //     Event::InitiateBattle(enemy, entity, scene) => {

@@ -103,7 +103,7 @@ impl Entity<Type, Event> for Text {
             anchor: anchor.clone(),
             size: PhysicalSize::new(font_size, font_size),
         };
-        let width = self.position.x + (self.size.width as f32 ) / 2.0;
+        let width = self.position.x + (self.size.width as f32) / 2.0;
         let height = self.size.height / font_size as u16;
         for chars in self.text.as_bytes().windows(2) {
             let current = chars[0];
@@ -140,7 +140,7 @@ impl Entity<Type, Event> for Text {
             text_width = char_bounding_box.anchor.x;
         }
         if self.fit_to_content {
-            let height = ((char_y + 1) * font_size as u16).min(self.max_size.height);
+            let height = (((char_y as f32 + 1.25) * font_size) as u16).min(self.max_size.height);
             let width =
                 ((text_width - anchor.x) as u16 + font_size as u16 / 4).min(self.max_size.width);
             if width != self.size.width || height != self.size.height {
@@ -170,13 +170,17 @@ impl Entity<Type, Event> for Text {
     }
 }
 impl FlexItem for Text {
-    fn position_mut(&mut self) -> &mut Vector<f32> {
-        &mut self.position
+    fn set_position(&mut self, position: &Vector<f32>) {
+        self.position = position.clone();
     }
-
     fn is_dirty(&mut self) -> bool {
         let dirt = self.is_dirty;
         self.is_dirty = false;
         dirt
+    }
+    fn set_focus(&mut self, _focus: bool) {
+    }
+    fn has_focus(&self) -> bool {
+        false
     }
 }

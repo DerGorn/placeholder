@@ -24,6 +24,12 @@ mod render_scene;
 use render_scene::RenderScene;
 pub use render_scene::{RenderSceneDescriptor, RenderSceneName, UniformBufferName};
 
+#[derive(Debug, Clone)]
+pub enum Visibility {
+    Visible,
+    Hidden,
+}
+
 pub struct GraphicsProvider {
     instance: wgpu::Instance,
     adapter: Option<wgpu::Adapter>,
@@ -51,6 +57,12 @@ impl GraphicsProvider {
             render_scenes: Vec::new(),
             uniform_buffers: Vec::new(),
             texture_provider: None,
+        }
+    }
+
+    pub fn set_visibility_render_scene(&mut self, render_scene: &RenderSceneName, visibility: &Visibility) {
+        if let Some((_, scene, _, _)) = self.render_scenes.iter_mut().find(|(_, r, _, _)| r.name() == render_scene) {
+            scene.set_visibility(visibility);
         }
     }
 

@@ -8,4 +8,4 @@ mod img;
 pub use img::Image;
 
 mod flex_button_line;
-pub use {flex_button_line::FlexButtonLine, flex_button_line::Button, flex_button_line::ButtonStyle};
+pub use {flex_button_line::FlexButtonLine, flex_button_line::FlexButtonLineManager, flex_button_line::Button, flex_button_line::ButtonStyle};

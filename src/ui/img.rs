@@ -79,13 +79,20 @@ impl Entity<Type, Event> for Image {
     }
 }
 impl FlexItem for Image {
-    fn position_mut(&mut self) -> &mut Vector<f32> {
-        &mut self.position
+    fn set_position(&mut self, position: &Vector<f32>) {
+        self.position = position.clone();
     }
 
     fn is_dirty(&mut self) -> bool {
         let dirt = self.is_dirty;
         self.is_dirty = false;
         dirt
+    }
+    
+    fn set_focus(&mut self, _focus: bool) {
+    }
+
+    fn has_focus(&self) -> bool {
+        false
     }
 }
