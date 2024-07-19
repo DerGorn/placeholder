@@ -5,13 +5,21 @@ use winit::dpi::PhysicalSize;
 use crate::{
     color::Color,
     ui::{
-        Alignment, Button, ButtonStyle, FlexBox, FlexButtonLine, FlexButtonLineManager, FlexDirection, FlexOrigin, FontSize, Image
+        Alignment, Button, ButtonStyle, FlexBox, FlexButtonLine, FlexButtonLineManager,
+        FlexDirection, FlexOrigin, FontSize, Image,
     },
-    Character, CharacterAlignment, Event, SkilledCharacter, BATTLE_SCENE, CHARACTER_DISPLAY_LINES,
-    END_GAME_BUTTON, MAIN_MENU_SCENE, MAIN_WINDOW, RESOLUTION, SHADER_UI_TEXTURE,
-    START_GAME_BUTTON,
+    Character, CharacterAlignment, Event, SkilledCharacter, BATTLE_DETAIL_OVERLAY_SCENE,
+    BATTLE_SCENE, CHARACTER_DISPLAY_LINES, END_GAME_BUTTON, MAIN_MENU_SCENE, MAIN_WINDOW,
+    RESOLUTION, SHADER_UI_TEXTURE, START_GAME_BUTTON,
 };
 
+#[derive(Debug)]
+pub enum UIState {
+    CharacterSelection,
+    CharacterDetail,
+    ActionSelection,
+    TargetSelection,
+}
 pub struct BattleState {
     pub characters: Vec<SkilledCharacter>,
     /// Index into characters
@@ -65,7 +73,7 @@ impl Skill for AttackSkill {
 pub enum GameState {
     MainMenu,
     /// Battle(FRIENDS, ENEMIES)
-    Battle(BattleState),
+    Battle(BattleState, UIState),
 }
 impl Default for GameState {
     fn default() -> Self {
@@ -165,7 +173,7 @@ impl Default for GameState {
             actions: vec![],
         };
         battle_state.generate_character_order();
-        Self::Battle(battle_state)
+        Self::Battle(battle_state, UIState::CharacterSelection)
     }
 }
 impl GameState {
@@ -230,17 +238,15 @@ impl GameState {
                     ],
                 ))],
             }],
-
-            GameState::Battle(battle_state) => {
+            GameState::Battle(battle_state, UIState::CharacterSelection) => {
                 let font_size = 32;
                 let character_text_height = (CHARACTER_DISPLAY_LINES + 0.25) * font_size as f32;
 
                 let enemies = battle_state
                     .characters
                     .iter()
-                    .enumerate()
-                    .filter(|(_, c)| c.character.alignment == CharacterAlignment::Enemy)
-                    .map(|(i, c)| (format!("Enemy {i}"), c.character.to_string()))
+                    .filter(|c| c.character.alignment == CharacterAlignment::Enemy)
+                    .map(|c| (format!("{}", c.character.name), c.character.to_string()))
                     .map(|(name, content)| {
                         Box::new(Button::new(
                             content,
@@ -257,9 +263,8 @@ impl GameState {
                 let friends = battle_state
                     .characters
                     .iter()
-                    .enumerate()
-                    .filter(|(_, c)| c.character.alignment == CharacterAlignment::Friendly)
-                    .map(|(i, c)| (format!("Friend {i}"), c.character.to_string()))
+                    .filter(|c| c.character.alignment == CharacterAlignment::Friendly)
+                    .map(|c| (format!("{}", c.character.name), c.character.to_string()))
                     .map(|(name, content)| {
                         Box::new(Button::new(
                             content,
@@ -312,75 +317,27 @@ impl GameState {
                     true,
                     vec![Box::new(enemies), Box::new(friends)],
                 );
-                vec![Scene {
-                    name: BATTLE_SCENE.into(),
-                    render_scene: BATTLE_SCENE.into(),
-                    target_window: MAIN_WINDOW.into(),
-                    z_index: 0,
-                    shader_descriptor: SHADER_UI_TEXTURE,
-                    entities: vec![Box::new(characters)],
-                    // entities: vec![Box::new(FlexButtonLine::new(
-                    //     FlexDirection::Y,
-                    //     FlexOrigin::Start,
-                    //     Alignment::Center,
-                    //     None,
-                    //     20.0,
-                    //     true,
-                    //     PhysicalSize::new(400, 300),
-                    //     Vector::new(0.0, 0.0, 0.0),
-                    //     "BattleButtons".into(),
-                    //     vec![
-                    //         Box::new(Button::new(
-                    //             String::from("Attack Enemy"),
-                    //             BATTLE_ATTACK_BUTTON.into(),
-                    //             PhysicalSize::new(400, 300),
-                    //             Vector::scalar(0.0),
-                    //             FontSize::new(20),
-                    //             true,
-                    //             ButtonStyle::UnderLine(
-                    //                 Color::from_str("white"),
-                    //                 Color::new_rgba(0, 0, 0, 180),
-                    //             ),
-                    //         )),
-                    //         Box::new(Button::new(
-                    //             String::from("Attack Enemy Two"),
-                    //             BATTLE_ATTACK_TWO_BUTTON.into(),
-                    //             PhysicalSize::new(400, 300),
-                    //             Vector::scalar(0.0),
-                    //             FontSize::new(20),
-                    //             true,
-                    //             ButtonStyle::UnderLine(
-                    //                 Color::from_str("white"),
-                    //                 Color::new_rgba(0, 0, 0, 180),
-                    //             ),
-                    //         )),
-                    //         Box::new(Button::new(
-                    //             String::from("Print State"),
-                    //             BATTLE_PRINT_STATE_BUTTON.into(),
-                    //             PhysicalSize::new(400, 300),
-                    //             Vector::scalar(0.0),
-                    //             FontSize::new(20),
-                    //             true,
-                    //             ButtonStyle::UnderLine(
-                    //                 Color::from_str("white"),
-                    //                 Color::new_rgba(0, 0, 0, 180),
-                    //             ),
-                    //         )),
-                    //         Box::new(Button::new(
-                    //             String::from("End Game"),
-                    //             END_GAME_BUTTON.into(),
-                    //             PhysicalSize::new(800, 600),
-                    //             Vector::scalar(0.0),
-                    //             FontSize::new(20),
-                    //             true,
-                    //             ButtonStyle::UnderLine(
-                    //                 Color::from_str("white"),
-                    //                 Color::new_rgba(0, 0, 0, 180),
-                    //             ),
-                    //         )),
-                    //     ],
-                    // ))],
-                }]
+                vec![
+                    Scene {
+                        name: BATTLE_DETAIL_OVERLAY_SCENE.into(),
+                        shader_descriptor: SHADER_UI_TEXTURE,
+                        render_scene: BATTLE_DETAIL_OVERLAY_SCENE.into(),
+                        target_window: MAIN_WINDOW.into(),
+                        entities: vec![],
+                        z_index: 0,
+                    },
+                    Scene {
+                        name: BATTLE_SCENE.into(),
+                        render_scene: BATTLE_SCENE.into(),
+                        target_window: MAIN_WINDOW.into(),
+                        z_index: 0,
+                        shader_descriptor: SHADER_UI_TEXTURE,
+                        entities: vec![Box::new(characters)],
+                    },
+                ]
+            }
+            GameState::Battle(_, ui_state) => {
+                todo!("Implement UI for battle state: {:?}", ui_state)
             }
         }
     }

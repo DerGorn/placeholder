@@ -1,7 +1,8 @@
 use placeholder::{
-    game_engine::{EntityName, ExternalEvent, Scene, SceneName},
+    game_engine::{Entity, EntityName, ExternalEvent, Scene, SceneName},
     graphics::{UniformBufferName, Visibility},
 };
+use winit::keyboard::KeyCode;
 
 use crate::{EnemyType, Type};
 
@@ -23,17 +24,15 @@ pub enum Event {
     RequestDeleteScene(SceneName),
     RequestDeleteEntity(EntityName, SceneName),
     RequestSetVisibilityScene(SceneName, Visibility),
-    ButtonPressed(EntityName),
+    ButtonPressed(EntityName, KeyCode),
     BattleEvent(BattleEvent),
+    RequestAddEntities(Vec<Box<dyn Entity<Type, Self>>>, SceneName),
 }
 impl ExternalEvent for Event {
     type EntityType = Type;
     fn is_request_set_visibility_scene<'a>(&'a self) -> Option<(&'a SceneName, &'a Visibility)> {
         match self {
-            Event::RequestSetVisibilityScene(scene, visibility) => Some((
-                scene,
-                visibility,
-            )),
+            Event::RequestSetVisibilityScene(scene, visibility) => Some((scene, visibility)),
             _ => None,
         }
     }
@@ -90,6 +89,17 @@ impl ExternalEvent for Event {
     fn is_delete_entity<'a>(&'a self) -> Option<(&'a EntityName, &'a SceneName)> {
         match self {
             Event::RequestDeleteEntity(entity, scene) => Some((entity, scene)),
+            _ => None,
+        }
+    }
+    fn is_add_entities<'a>(&'a self) -> bool {
+        matches!(self, Event::RequestAddEntities(_, _))
+    }
+    fn consume_add_entities_request(self) -> Option<(Vec<Box<dyn Entity<Self::EntityType, Self>>>, SceneName)>
+    where
+        Self: Sized{
+        match self {
+            Event::RequestAddEntities(entities, scene ) => Some((entities, scene)),
             _ => None,
         }
     }

@@ -12,7 +12,7 @@ use crate::{
 };
 use winit::window::WindowId;
 
-use super::{EntityName, EntityType, Scene, SceneName};
+use super::{Entity, EntityName, EntityType, Scene, SceneName};
 
 use super::ressource_descriptor::{SpriteSheetName, WindowName};
 
@@ -150,5 +150,10 @@ pub trait ExternalEvent: Debug + Send {
         &'a self,
     ) -> Option<(&'a UniformBufferName, &'a [u8])>;
     fn is_delete_entity<'a>(&'a self) -> Option<(&'a EntityName, &'a SceneName)>;
+    fn is_add_entities<'a>(&'a self) -> bool;
+    /// Should only be called if is_add_entities returns true
+    fn consume_add_entities_request(self) -> Option<(Vec<Box<dyn Entity<Self::EntityType, Self>>>, SceneName)>
+    where
+        Self: Sized;
     fn is_end_game(&self) -> bool;
 }

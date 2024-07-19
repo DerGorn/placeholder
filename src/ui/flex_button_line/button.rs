@@ -104,8 +104,8 @@ impl Entity<Type, Event> for Button {
     fn handle_key_input(&mut self, input: &winit::event::KeyEvent) -> Vec<Event> {
         if self.is_focused && input.state == winit::event::ElementState::Pressed {
             match input.physical_key {
-                PhysicalKey::Code(KeyCode::Space) | PhysicalKey::Code(KeyCode::Enter) => {
-                    vec![Event::ButtonPressed(self.name.clone())]
+                PhysicalKey::Code(key_code) => {
+                    vec![Event::ButtonPressed(self.name.clone(), key_code)]
                 }
                 _ => vec![],
             }

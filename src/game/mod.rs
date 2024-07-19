@@ -370,9 +370,27 @@ impl<E: ExternalEvent + 'static, S: State<E>> EventManager<GameEvent<E>> for Gam
                     info!("Creating new Scenes");
                     let scenes = event
                         .consume_scenes_request()
-                        .expect("Somehow generated no Scene");
+                        .expect("Bad implementation of ExternalEvent::is_request_new_scenes() should only return true, if ExternalEvent::consume_scenes_request() returns Some(scenes)");
                     self.pending_scenes.extend(scenes);
                     self.activate_scenes(window_manager);
+                    return;
+                }
+                if event.is_add_entities() {
+                    info!("Adding new entities to scene");
+                    let (mut entities, scene) = event
+                        .consume_add_entities_request()
+                        .expect("Bad implementation of ExternalEvent::is_add_entities() should only return true, if ExternalEvent::consume_add_entities_request() returns Some(entities, scene)");
+                    let scene = &mut self
+                        .active_scenes
+                        .iter_mut()
+                        .find(|s| s.name == scene)
+                        .unwrap_or_else(|| {
+                            self.suspended_scenes
+                                .iter_mut()
+                                .find(|s| s.name == scene)
+                                .expect(&format!("Found no active nor suspended scene {:?}", scene))
+                        });
+                    scene.entities.append(&mut entities);
                     return;
                 }
                 if let Some((scene, visibility)) = event.is_request_set_visibility_scene() {
@@ -385,8 +403,12 @@ impl<E: ExternalEvent + 'static, S: State<E>> EventManager<GameEvent<E>> for Gam
                                 .iter_mut()
                                 .find(|s| s.name == *scene)
                                 .expect(&format!("Found no active nor suspended scene {:?}", scene))
-                        }).render_scene;
-                    window_manager.send_event(GameEvent::RequestSetVisibilityRenderScene(render_scene.clone(), visibility.clone()));
+                        })
+                        .render_scene;
+                    window_manager.send_event(GameEvent::RequestSetVisibilityRenderScene(
+                        render_scene.clone(),
+                        visibility.clone(),
+                    ));
                 }
                 if let Some(suspendable_scene) = event.is_request_suspend_scene() {
                     info!("Suspending Scene {:?}", suspendable_scene);
