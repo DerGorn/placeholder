@@ -265,7 +265,8 @@ impl GameLogic {
                     }
                     Event::ButtonPressed(entity, key_code) => {
                         if matches!(key_code, KeyCode::Enter | KeyCode::Space) {
-                            match entity.as_str() {
+                            let name = entity.as_str();
+                            match name {
                                 END_GAME_BUTTON => return vec![Event::EndGame],
                                 BATTLE_PRINT_STATE_BUTTON => {
                                     println!("TURN: {}", battle_state.turn_counter);
@@ -334,6 +335,61 @@ impl GameLogic {
                                         )];
                                     }
                                 }
+                                 _ if battle_state
+                                .characters
+                                .iter()
+                                .any(|c| c.character.name == name)=>
+                            {
+                                    let character = battle_state
+                                        .characters
+                                        .iter()
+                                        .find(|c| c.character.name == name)
+                                        .unwrap();
+                                if !matches!(ui_state, UIState::CharacterSelection) {
+                                    return vec![];
+                                }
+                                let skills = character.skills.iter().enumerate().map(|(i, s)| {
+                                    let name = s.name();
+                                    let name = name.as_str();
+                                    Box::new(Button::new(
+                                        name.to_string(),
+                                        name.into(),
+                                        PhysicalSize::new(400, 100),
+                                        Vector::<f32>::y_axis() * 100.0 * i as f32,
+                                        FontSize::new(32),
+                                        true,
+                                        ButtonStyle::default(),
+                                    ))
+                                }).collect();
+                                *ui_state = UIState::ActionSelection;
+                                return vec![
+                                    Event::RequestSuspendScene(BATTLE_SCENE.into()),
+                                    Event::RequestSetVisibilityScene(
+                                        BATTLE_ACTION_SELECTION_OVERLAY_SCENE.into(),
+                                        Visibility::Visible,
+                                    ),
+                                    Event::RequestActivateSuspendedScene(BATTLE_ACTION_SELECTION_OVERLAY_SCENE.into()),
+                                    Event::RequestAddEntities(
+                                        vec![Box::new(
+                                            FlexButtonLine::new(
+                                                FlexDirection::Y,
+                                                FlexOrigin::Center,
+                                                Alignment::Center,
+                                                None,
+                                                0.0,
+                                                true,
+                                                PhysicalSize::new(400, 100),
+                                                Vector::scalar(0.0),
+                                                "ActionSelectionLine".into(),
+                                                true,
+                                                skills,
+                                            ),
+                                        )],
+                                        BATTLE_ACTION_SELECTION_OVERLAY_SCENE.into(),
+                                    ),
+                                ];
+                            }
+
                                 _ => {}
                             }
                         } else if matches!(key_code, KeyCode::KeyC) {
@@ -343,7 +399,9 @@ impl GameLogic {
                                 .iter()
                                 .find(|c| c.character.name == name)
                             {
-                                println!("{:?}", character.character);
+                                if !matches!(ui_state, UIState::CharacterSelection) {
+                                    return vec![];
+                                }
                                 *ui_state = UIState::CharacterDetail;
                                 return vec![
                                     Event::RequestSuspendScene(BATTLE_SCENE.into()),
@@ -366,17 +424,17 @@ impl GameLogic {
                                             None,
                                             0.0,
                                             true,
-                                            PhysicalSize::new(1000, 1000),
+                                            PhysicalSize::new(100, 100),
                                             Vector::scalar(0.0),
                                             "CharacterDetailLine".into(),
                                             true,
                                             vec![Box::new(Button::new(
-                                                format!("{}", character.character),
+                                                format!("{:#?}", character.character),
                                                 BATTLE_DETAIL_OVERLAY.into(),
-                                                PhysicalSize::new(1000, 1000),
+                                                RESOLUTION,
                                                 Vector::scalar(0.0),
-                                                FontSize::new(40),
-                                                true,
+                                                FontSize::new(32),
+                                                false,
                                                 ButtonStyle::default(),
                                             ))],
                                         ))],
@@ -385,26 +443,29 @@ impl GameLogic {
                                 ];
                             }
                         } else if matches!(key_code, KeyCode::KeyX) {
-                            *ui_state = UIState::CharacterSelection;
-                            return vec![
-                                Event::RequestSuspendScene(BATTLE_DETAIL_OVERLAY_SCENE.into()),
-                                Event::RequestSetVisibilityScene(
-                                    BATTLE_DETAIL_OVERLAY_SCENE.into(),
-                                    Visibility::Hidden,
-                                ),
-                                Event::RequestSetVisibilityScene(
-                                    BATTLE_SCENE.into(),
-                                    Visibility::Visible,
-                                ),
-                                Event::RequestActivateSuspendedScene(
-                                    BATTLE_SCENE.into(),
-                                ),
-                                Event::RequestDeleteEntity(
-                                    "CharacterDetailLine".into(),
-                                    BATTLE_DETAIL_OVERLAY_SCENE.into(),
-                                ),
-                            ];
-                        }
+                            if entity.as_str() == BATTLE_DETAIL_OVERLAY {
+                                if !matches!(ui_state, UIState::CharacterDetail) {
+                                    return vec![];
+                                }
+                                *ui_state = UIState::CharacterSelection;
+                                return vec![
+                                    Event::RequestSuspendScene(BATTLE_DETAIL_OVERLAY_SCENE.into()),
+                                    Event::RequestSetVisibilityScene(
+                                        BATTLE_DETAIL_OVERLAY_SCENE.into(),
+                                        Visibility::Hidden,
+                                    ),
+                                    Event::RequestSetVisibilityScene(
+                                        BATTLE_SCENE.into(),
+                                        Visibility::Visible,
+                                    ),
+                                    Event::RequestActivateSuspendedScene(BATTLE_SCENE.into()),
+                                    Event::RequestDeleteEntity(
+                                        "CharacterDetailLine".into(),
+                                        BATTLE_DETAIL_OVERLAY_SCENE.into(),
+                                    ),
+                                ];
+                            }
+                        } 
                     }
                     _ => {}
                 }
@@ -419,6 +480,8 @@ const BATTLE_ATTACK_BUTTON: &str = "BattleAttack";
 const BATTLE_ATTACK_TWO_BUTTON: &str = "BattleAttackTwo";
 const BATTLE_DETAIL_OVERLAY_SCENE: &str = "BattleDetailOverlayScene";
 const BATTLE_DETAIL_OVERLAY: &str = "BattleDetailOverlay";
+const BATTLE_ACTION_SELECTION_OVERLAY_SCENE: &str = "BattleActionSelectionOverlayScene";
+const BATTLE_ACTION_SELECTION_OVERLAY: &str = "BattleActionSelectionOverlay";
 impl State<Event> for GameLogic {
     fn start_scenes(&self) -> Vec<Scene<Event>> {
         self.game_state.get_start_scenes()
@@ -542,6 +605,7 @@ fn main() {
                 vec![
                     BATTLE_SCENE.into(),
                     BATTLE_DETAIL_OVERLAY_SCENE.into(),
+                    BATTLE_ACTION_SELECTION_OVERLAY_SCENE.into(),
                     MAIN_MENU_SCENE.into(),
                 ],
                 None,

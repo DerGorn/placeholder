@@ -1,16 +1,12 @@
-use placeholder::game_engine::{Scene, SpritePosition};
+use placeholder::{create_name_struct, game_engine::{Scene, SpritePosition}};
 use threed::Vector;
 use winit::dpi::PhysicalSize;
 
 use crate::{
-    color::Color,
-    ui::{
+    color::Color, ui::{
         Alignment, Button, ButtonStyle, FlexBox, FlexButtonLine, FlexButtonLineManager,
         FlexDirection, FlexOrigin, FontSize, Image,
-    },
-    Character, CharacterAlignment, Event, SkilledCharacter, BATTLE_DETAIL_OVERLAY_SCENE,
-    BATTLE_SCENE, CHARACTER_DISPLAY_LINES, END_GAME_BUTTON, MAIN_MENU_SCENE, MAIN_WINDOW,
-    RESOLUTION, SHADER_UI_TEXTURE, START_GAME_BUTTON,
+    }, Character, CharacterAlignment, Event, SkilledCharacter, BATTLE_ACTION_SELECTION_OVERLAY_SCENE, BATTLE_DETAIL_OVERLAY_SCENE, BATTLE_SCENE, CHARACTER_DISPLAY_LINES, END_GAME_BUTTON, MAIN_MENU_SCENE, MAIN_WINDOW, RESOLUTION, SHADER_UI_TEXTURE, START_GAME_BUTTON
 };
 
 #[derive(Debug)]
@@ -55,11 +51,16 @@ impl BattleState {
         self.character_order = character_order;
     }
 }
+create_name_struct!(SkillName);
 pub trait Skill {
+    fn name(&self) -> SkillName;
     fn evaluate(&self, target: Option<&mut Character>, source: &mut Character);
 }
 pub struct AttackSkill {}
 impl Skill for AttackSkill {
+    fn name(&self) -> SkillName {
+        "Attack".into()
+    }
     fn evaluate(&self, target: Option<&mut Character>, source: &mut Character) {
         let attack = source.attack;
         if let Some(target) = target {
@@ -333,6 +334,14 @@ impl GameState {
                         z_index: 0,
                         shader_descriptor: SHADER_UI_TEXTURE,
                         entities: vec![Box::new(characters)],
+                    },
+                    Scene {
+                        name: BATTLE_ACTION_SELECTION_OVERLAY_SCENE.into(),
+                        shader_descriptor: SHADER_UI_TEXTURE,
+                        render_scene: BATTLE_ACTION_SELECTION_OVERLAY_SCENE.into(),
+                        target_window: MAIN_WINDOW.into(),
+                        entities: vec![],
+                        z_index: 1,
                     },
                 ]
             }
