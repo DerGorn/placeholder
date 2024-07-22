@@ -13,7 +13,8 @@ use crate::{
 pub enum UIState {
     CharacterSelection,
     CharacterDetail,
-    ActionSelection,
+    /// Index into BattleState.characters to indicate whos skills are being selected
+    ActionSelection(usize),
     TargetSelection,
 }
 pub struct BattleState {

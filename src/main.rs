@@ -148,15 +148,30 @@ EX: {}",
     }
 }
 
+struct KeyBindings {
+    accept: Vec<KeyCode>,
+    cancel: Vec<KeyCode>,
+}
+impl Default for KeyBindings {
+    fn default() -> Self {
+        Self {
+            accept: vec![KeyCode::Enter, KeyCode::Space],
+            cancel: vec![KeyCode::KeyX],
+        }
+    }
+}
+
 struct GameLogic {
     pending_battle: Option<(EnemyType, EntityName, SceneName)>,
     game_state: GameState,
+    key_bindings: KeyBindings,
 }
 impl GameLogic {
     fn new() -> Self {
         Self {
             pending_battle: None,
             game_state: GameState::default(),
+            key_bindings: KeyBindings::default(),
         }
     }
 
@@ -191,283 +206,332 @@ impl GameLogic {
     }
 
     fn battle_event(&mut self, event: Event) -> Vec<Event> {
-        match &mut self.game_state {
-            GameState::Battle(battle_state, ui_state) => {
-                let player_index = battle_state
+        let (battle_state, ui_state) = match &mut self.game_state {
+            GameState::Battle(battle_state, ui_state) => (battle_state, ui_state),
+            _ => return vec![],
+        };
+        let player_index = battle_state
+            .characters
+            .iter()
+            .position(|c| c.character.name == "Player")
+            .unwrap();
+        let enemy_index = battle_state
+            .characters
+            .iter()
+            .position(|c| c.character.name == "Enemy")
+            .unwrap();
+        match event {
+            Event::BattleEvent(BattleEvent::FinishedPlanning) => {
+                println!("Playing out Turn");
+                let mut actions = vec![];
+                for (order_index, character_index) in
+                    battle_state.character_order.iter().enumerate()
+                {
+                    match battle_state.actions.iter().find(|a| a.0 == order_index) {
+                        Some((_, skill, target_index)) => {
+                            actions.push((character_index, skill, target_index))
+                        }
+                        None => actions.push((character_index, &0, &player_index)),
+                    };
+                }
+                println!("Actions: {:?}", actions);
+                for action in actions {
+                    let (source_index, skill_index, target_index) = action;
+                    let (source, target) = if source_index == target_index {
+                        let (_, right) = battle_state.characters.split_at_mut(*target_index);
+                        let (left, _) = right.split_at_mut(1);
+                        let source = &mut left[0];
+                        (source, None)
+                    } else {
+                        let (left, target) = battle_state.characters.split_at_mut(*target_index);
+                        let (target, right) = target.split_at_mut(1);
+                        let target = &mut target[0];
+                        if source_index < target_index {
+                            (&mut left[*source_index], Some(target))
+                        } else {
+                            (&mut right[source_index - target_index - 1], Some(target))
+                        }
+                    };
+                    source.activate_skill(*skill_index, target);
+                }
+                battle_state.characters.retain(|c| c.character.health > 0);
+                if battle_state
                     .characters
                     .iter()
-                    .position(|c| c.character.name == "Player")
-                    .unwrap();
-                let enemy_index = battle_state
+                    .all(|c| c.character.alignment == CharacterAlignment::Friendly)
+                {
+                    println!("Player Wins");
+                } else if battle_state
                     .characters
                     .iter()
-                    .position(|c| c.character.name == "Enemy")
-                    .unwrap();
-                match event {
-                    Event::BattleEvent(BattleEvent::FinishedPlanning) => {
-                        println!("Playing out Turn");
-                        let mut actions = vec![];
-                        for (order_index, character_index) in
-                            battle_state.character_order.iter().enumerate()
-                        {
-                            match battle_state.actions.iter().find(|a| a.0 == order_index) {
-                                Some((_, skill, target_index)) => {
-                                    actions.push((character_index, skill, target_index))
-                                }
-                                None => actions.push((character_index, &0, &player_index)),
-                            };
-                        }
-                        println!("Actions: {:?}", actions);
-                        for action in actions {
-                            let (source_index, skill_index, target_index) = action;
-                            let (source, target) = if source_index == target_index {
-                                let (_, right) =
-                                    battle_state.characters.split_at_mut(*target_index);
-                                let (left, _) = right.split_at_mut(1);
-                                let source = &mut left[0];
-                                (source, None)
-                            } else {
-                                let (left, target) =
-                                    battle_state.characters.split_at_mut(*target_index);
-                                let (target, right) = target.split_at_mut(1);
-                                let target = &mut target[0];
-                                if source_index < target_index {
-                                    (&mut left[*source_index], Some(target))
-                                } else {
-                                    (&mut right[source_index - target_index - 1], Some(target))
-                                }
-                            };
-                            source.activate_skill(*skill_index, target);
-                        }
-                        battle_state.characters.retain(|c| c.character.health > 0);
+                    .all(|c| c.character.alignment == CharacterAlignment::Enemy)
+                {
+                    println!("Player Loses");
+                } else {
+                    battle_state.turn_counter += 1;
+                    battle_state.actions.clear();
+                    battle_state.generate_character_order();
+                    return vec![Event::ButtonPressed(
+                        BATTLE_PRINT_STATE_BUTTON.into(),
+                        KeyCode::Space,
+                    )];
+                }
+                return vec![Event::EndGame];
+            }
+            Event::ButtonPressed(entity, key_code) => {
+                match (key_code, entity.as_str(), &ui_state) {
+                    (accept, character, UIState::CharacterSelection)
                         if battle_state
                             .characters
                             .iter()
-                            .all(|c| c.character.alignment == CharacterAlignment::Friendly)
-                        {
-                            println!("Player Wins");
-                        } else if battle_state
+                            .any(|c| c.character.name == character)
+                            && self.key_bindings.accept.contains(&accept) =>
+                    {
+                        let character_index = battle_state
                             .characters
                             .iter()
-                            .all(|c| c.character.alignment == CharacterAlignment::Enemy)
-                        {
-                            println!("Player Loses");
-                        } else {
-                            battle_state.turn_counter += 1;
-                            battle_state.actions.clear();
-                            battle_state.generate_character_order();
-                            return vec![Event::ButtonPressed(
-                                BATTLE_PRINT_STATE_BUTTON.into(),
-                                KeyCode::Space,
-                            )];
-                        }
-                        return vec![Event::EndGame];
+                            .position(|c| c.character.name == character)
+                            .unwrap();
+                        let character = &battle_state.characters[character_index];
+                        let skills = character
+                            .skills
+                            .iter()
+                            .enumerate()
+                            .map(|(i, s)| {
+                                let name = s.name();
+                                let name = name.as_str();
+                                Box::new(Button::new(
+                                    name.to_string(),
+                                    name.into(),
+                                    PhysicalSize::new(400, 100),
+                                    Vector::<f32>::y_axis() * 100.0 * i as f32,
+                                    FontSize::new(32),
+                                    true,
+                                    ButtonStyle::default(),
+                                ))
+                            })
+                            .collect();
+                        *ui_state = UIState::ActionSelection(character_index);
+                        return vec![
+                            Event::RequestSuspendScene(BATTLE_SCENE.into()),
+                            Event::RequestActivateSuspendedScene(
+                                BATTLE_ACTION_SELECTION_OVERLAY_SCENE.into(),
+                            ),
+                            Event::RequestAddEntities(
+                                vec![Box::new(FlexButtonLine::new(
+                                    FlexDirection::Y,
+                                    FlexOrigin::Center,
+                                    Alignment::Center,
+                                    None,
+                                    0.0,
+                                    true,
+                                    PhysicalSize::new(400, 100),
+                                    Vector::scalar(0.0),
+                                    "ActionSelectionLine".into(),
+                                    true,
+                                    skills,
+                                ))],
+                                BATTLE_ACTION_SELECTION_OVERLAY_SCENE.into(),
+                            ),
+                            Event::RequestSetVisibilityScene(
+                                BATTLE_ACTION_SELECTION_OVERLAY_SCENE.into(),
+                                Visibility::Visible,
+                            ),
+                        ];
                     }
-                    Event::ButtonPressed(entity, key_code) => {
-                        if matches!(key_code, KeyCode::Enter | KeyCode::Space) {
-                            let name = entity.as_str();
-                            match name {
-                                END_GAME_BUTTON => return vec![Event::EndGame],
-                                BATTLE_PRINT_STATE_BUTTON => {
-                                    println!("TURN: {}", battle_state.turn_counter);
-                                    println!("TurnOrder: {:?}", battle_state.character_order);
-                                    println!("----------------------------------\n");
-                                    for (i, p) in battle_state.characters.iter().enumerate().filter(
-                                        |(_, c)| {
-                                            c.character.alignment == CharacterAlignment::Friendly
-                                        },
-                                    ) {
-                                        println!("{i}: {:?}", p.character);
-                                    }
-                                    println!("\n----------------------------------\n");
-                                    for (i, e) in battle_state.characters.iter().enumerate().filter(
-                                        |(_, c)| c.character.alignment == CharacterAlignment::Enemy,
-                                    ) {
-                                        println!("{i}: {:?}", e.character);
-                                    }
-                                }
-                                BATTLE_ATTACK_BUTTON => {
-                                    let remaining_actions = battle_state
-                                        .character_order
-                                        .iter()
-                                        .enumerate()
-                                        .filter(|(i, ci)| {
-                                            ci == &&player_index
-                                                && battle_state
-                                                    .actions
-                                                    .iter()
-                                                    .find(|a| a.0 == *i)
-                                                    .is_none()
-                                        })
-                                        .collect::<Vec<_>>();
-                                    let action = remaining_actions[0];
-                                    battle_state.actions.push((action.0, 0, enemy_index));
-                                    if remaining_actions.len() == 1 {
-                                        return vec![Event::BattleEvent(
-                                            BattleEvent::FinishedPlanning,
-                                        )];
-                                    }
-                                }
-                                BATTLE_ATTACK_TWO_BUTTON => {
-                                    let enemy_two_index = battle_state
-                                        .characters
-                                        .iter()
-                                        .position(|c| c.character.name == "Enemy Two")
-                                        .unwrap();
-                                    let remaining_actions = battle_state
-                                        .character_order
-                                        .iter()
-                                        .enumerate()
-                                        .filter(|(i, ci)| {
-                                            ci == &&player_index
-                                                && battle_state
-                                                    .actions
-                                                    .iter()
-                                                    .find(|a| a.0 == *i)
-                                                    .is_none()
-                                        })
-                                        .collect::<Vec<_>>();
-                                    let action = remaining_actions[0];
-                                    battle_state.actions.push((action.0, 0, enemy_two_index));
-                                    if remaining_actions.len() == 1 {
-                                        return vec![Event::BattleEvent(
-                                            BattleEvent::FinishedPlanning,
-                                        )];
-                                    }
-                                }
-                                 _ if battle_state
-                                .characters
-                                .iter()
-                                .any(|c| c.character.name == name)=>
-                            {
-                                    let character = battle_state
-                                        .characters
-                                        .iter()
-                                        .find(|c| c.character.name == name)
-                                        .unwrap();
-                                if !matches!(ui_state, UIState::CharacterSelection) {
-                                    return vec![];
-                                }
-                                let skills = character.skills.iter().enumerate().map(|(i, s)| {
-                                    let name = s.name();
-                                    let name = name.as_str();
-                                    Box::new(Button::new(
-                                        name.to_string(),
-                                        name.into(),
-                                        PhysicalSize::new(400, 100),
-                                        Vector::<f32>::y_axis() * 100.0 * i as f32,
-                                        FontSize::new(32),
-                                        true,
-                                        ButtonStyle::default(),
-                                    ))
-                                }).collect();
-                                *ui_state = UIState::ActionSelection;
-                                return vec![
-                                    Event::RequestSuspendScene(BATTLE_SCENE.into()),
-                                    Event::RequestSetVisibilityScene(
-                                        BATTLE_ACTION_SELECTION_OVERLAY_SCENE.into(),
-                                        Visibility::Visible,
-                                    ),
-                                    Event::RequestActivateSuspendedScene(BATTLE_ACTION_SELECTION_OVERLAY_SCENE.into()),
-                                    Event::RequestAddEntities(
-                                        vec![Box::new(
-                                            FlexButtonLine::new(
-                                                FlexDirection::Y,
-                                                FlexOrigin::Center,
-                                                Alignment::Center,
-                                                None,
-                                                0.0,
-                                                true,
-                                                PhysicalSize::new(400, 100),
-                                                Vector::scalar(0.0),
-                                                "ActionSelectionLine".into(),
-                                                true,
-                                                skills,
-                                            ),
-                                        )],
-                                        BATTLE_ACTION_SELECTION_OVERLAY_SCENE.into(),
-                                    ),
-                                ];
-                            }
-
-                                _ => {}
-                            }
-                        } else if matches!(key_code, KeyCode::KeyC) {
-                            let name = entity.as_str();
-                            if let Some(character) = battle_state
-                                .characters
-                                .iter()
-                                .find(|c| c.character.name == name)
-                            {
-                                if !matches!(ui_state, UIState::CharacterSelection) {
-                                    return vec![];
-                                }
-                                *ui_state = UIState::CharacterDetail;
-                                return vec![
-                                    Event::RequestSuspendScene(BATTLE_SCENE.into()),
-                                    Event::RequestSetVisibilityScene(
-                                        BATTLE_SCENE.into(),
-                                        Visibility::Hidden,
-                                    ),
-                                    Event::RequestSetVisibilityScene(
-                                        BATTLE_DETAIL_OVERLAY_SCENE.into(),
-                                        Visibility::Visible,
-                                    ),
-                                    Event::RequestActivateSuspendedScene(
-                                        BATTLE_DETAIL_OVERLAY_SCENE.into(),
-                                    ),
-                                    Event::RequestAddEntities(
-                                        vec![Box::new(FlexButtonLine::new(
-                                            FlexDirection::Y,
-                                            FlexOrigin::Center,
-                                            Alignment::Center,
-                                            None,
-                                            0.0,
-                                            true,
-                                            PhysicalSize::new(100, 100),
-                                            Vector::scalar(0.0),
-                                            "CharacterDetailLine".into(),
-                                            true,
-                                            vec![Box::new(Button::new(
-                                                format!("{:#?}", character.character),
-                                                BATTLE_DETAIL_OVERLAY.into(),
-                                                RESOLUTION,
-                                                Vector::scalar(0.0),
-                                                FontSize::new(32),
-                                                false,
-                                                ButtonStyle::default(),
-                                            ))],
-                                        ))],
-                                        BATTLE_DETAIL_OVERLAY_SCENE.into(),
-                                    ),
-                                ];
-                            }
-                        } else if matches!(key_code, KeyCode::KeyX) {
-                            if entity.as_str() == BATTLE_DETAIL_OVERLAY {
-                                if !matches!(ui_state, UIState::CharacterDetail) {
-                                    return vec![];
-                                }
-                                *ui_state = UIState::CharacterSelection;
-                                return vec![
-                                    Event::RequestSuspendScene(BATTLE_DETAIL_OVERLAY_SCENE.into()),
-                                    Event::RequestSetVisibilityScene(
-                                        BATTLE_DETAIL_OVERLAY_SCENE.into(),
-                                        Visibility::Hidden,
-                                    ),
-                                    Event::RequestSetVisibilityScene(
-                                        BATTLE_SCENE.into(),
-                                        Visibility::Visible,
-                                    ),
-                                    Event::RequestActivateSuspendedScene(BATTLE_SCENE.into()),
-                                    Event::RequestDeleteEntity(
-                                        "CharacterDetailLine".into(),
-                                        BATTLE_DETAIL_OVERLAY_SCENE.into(),
-                                    ),
-                                ];
-                            }
-                        } 
+                    (accept, skill, UIState::ActionSelection(character_index))
+                        if self.key_bindings.accept.contains(&accept) =>
+                    {
+                        let character = &battle_state.characters[*character_index];
+                        let skill = character
+                            .skills
+                            .iter()
+                            .find(|s| s.name() == skill.into())
+                            .unwrap();
+                        println!("Skill: {:?}", skill.name());
+                    }
+                    (cancel, _, UIState::ActionSelection(_))
+                        if self.key_bindings.cancel.contains(&cancel) =>
+                    {
+                        *ui_state = UIState::CharacterSelection;
+                        return vec![
+                            Event::RequestSuspendScene(
+                                BATTLE_ACTION_SELECTION_OVERLAY_SCENE.into(),
+                            ),
+                            Event::RequestSetVisibilityScene(
+                                BATTLE_ACTION_SELECTION_OVERLAY_SCENE.into(),
+                                Visibility::Hidden,
+                            ),
+                            Event::RequestSetVisibilityScene(
+                                BATTLE_SCENE.into(),
+                                Visibility::Visible,
+                            ),
+                            Event::RequestActivateSuspendedScene(BATTLE_SCENE.into()),
+                            Event::RequestDeleteEntity(
+                                "ActionSelectionLine".into(),
+                                BATTLE_ACTION_SELECTION_OVERLAY_SCENE.into(),
+                            ),
+                        ];
+                    }
+                    (cancel, BATTLE_DETAIL_OVERLAY, UIState::CharacterDetail)
+                        if self.key_bindings.cancel.contains(&cancel) =>
+                    {
+                        *ui_state = UIState::CharacterSelection;
+                        return vec![
+                            Event::RequestSuspendScene(BATTLE_DETAIL_OVERLAY_SCENE.into()),
+                            Event::RequestSetVisibilityScene(
+                                BATTLE_DETAIL_OVERLAY_SCENE.into(),
+                                Visibility::Hidden,
+                            ),
+                            Event::RequestSetVisibilityScene(
+                                BATTLE_SCENE.into(),
+                                Visibility::Visible,
+                            ),
+                            Event::RequestActivateSuspendedScene(BATTLE_SCENE.into()),
+                            Event::RequestDeleteEntity(
+                                "CharacterDetailLine".into(),
+                                BATTLE_DETAIL_OVERLAY_SCENE.into(),
+                            ),
+                        ];
                     }
                     _ => {}
+                };
+                if matches!(key_code, KeyCode::Enter | KeyCode::Space) {
+                    // let name = entity.as_str();
+                    // match name {
+                    //     END_GAME_BUTTON => return vec![Event::EndGame],
+                    //     BATTLE_PRINT_STATE_BUTTON => {
+                    //         println!("TURN: {}", battle_state.turn_counter);
+                    //         println!("TurnOrder: {:?}", battle_state.character_order);
+                    //         println!("----------------------------------\n");
+                    //         for (i, p) in
+                    //             battle_state.characters.iter().enumerate().filter(|(_, c)| {
+                    //                 c.character.alignment == CharacterAlignment::Friendly
+                    //             })
+                    //         {
+                    //             println!("{i}: {:?}", p.character);
+                    //         }
+                    //         println!("\n----------------------------------\n");
+                    //         for (i, e) in
+                    //             battle_state.characters.iter().enumerate().filter(|(_, c)| {
+                    //                 c.character.alignment == CharacterAlignment::Enemy
+                    //             })
+                    //         {
+                    //             println!("{i}: {:?}", e.character);
+                    //         }
+                    //     }
+                    //     BATTLE_ATTACK_BUTTON => {
+                    //         let remaining_actions = battle_state
+                    //             .character_order
+                    //             .iter()
+                    //             .enumerate()
+                    //             .filter(|(i, ci)| {
+                    //                 ci == &&player_index
+                    //                     && battle_state.actions.iter().find(|a| a.0 == *i).is_none()
+                    //             })
+                    //             .collect::<Vec<_>>();
+                    //         let action = remaining_actions[0];
+                    //         battle_state.actions.push((action.0, 0, enemy_index));
+                    //         if remaining_actions.len() == 1 {
+                    //             return vec![Event::BattleEvent(BattleEvent::FinishedPlanning)];
+                    //         }
+                    //     }
+                    //     BATTLE_ATTACK_TWO_BUTTON => {
+                    //         let enemy_two_index = battle_state
+                    //             .characters
+                    //             .iter()
+                    //             .position(|c| c.character.name == "Enemy Two")
+                    //             .unwrap();
+                    //         let remaining_actions = battle_state
+                    //             .character_order
+                    //             .iter()
+                    //             .enumerate()
+                    //             .filter(|(i, ci)| {
+                    //                 ci == &&player_index
+                    //                     && battle_state.actions.iter().find(|a| a.0 == *i).is_none()
+                    //             })
+                    //             .collect::<Vec<_>>();
+                    //         let action = remaining_actions[0];
+                    //         battle_state.actions.push((action.0, 0, enemy_two_index));
+                    //         if remaining_actions.len() == 1 {
+                    //             return vec![Event::BattleEvent(BattleEvent::FinishedPlanning)];
+                    //         }
+                    //     }
+                    //     _ => {}
+                    // }
+                } else if matches!(key_code, KeyCode::KeyC) {
+                    let name = entity.as_str();
+                    if let Some(character) = battle_state
+                        .characters
+                        .iter()
+                        .find(|c| c.character.name == name)
+                    {
+                        if !matches!(ui_state, UIState::CharacterSelection) {
+                            return vec![];
+                        }
+                        *ui_state = UIState::CharacterDetail;
+                        return vec![
+                            Event::RequestSuspendScene(BATTLE_SCENE.into()),
+                            Event::RequestSetVisibilityScene(
+                                BATTLE_SCENE.into(),
+                                Visibility::Hidden,
+                            ),
+                            Event::RequestSetVisibilityScene(
+                                BATTLE_DETAIL_OVERLAY_SCENE.into(),
+                                Visibility::Visible,
+                            ),
+                            Event::RequestActivateSuspendedScene(
+                                BATTLE_DETAIL_OVERLAY_SCENE.into(),
+                            ),
+                            Event::RequestAddEntities(
+                                vec![Box::new(FlexButtonLine::new(
+                                    FlexDirection::Y,
+                                    FlexOrigin::Center,
+                                    Alignment::Center,
+                                    None,
+                                    0.0,
+                                    true,
+                                    PhysicalSize::new(100, 100),
+                                    Vector::scalar(0.0),
+                                    "CharacterDetailLine".into(),
+                                    true,
+                                    vec![Box::new(Button::new(
+                                        format!("{:#?}", character.character),
+                                        BATTLE_DETAIL_OVERLAY.into(),
+                                        RESOLUTION,
+                                        Vector::scalar(0.0),
+                                        FontSize::new(32),
+                                        false,
+                                        ButtonStyle::default(),
+                                    ))],
+                                ))],
+                                BATTLE_DETAIL_OVERLAY_SCENE.into(),
+                            ),
+                        ];
+                    }
+                } else if matches!(key_code, KeyCode::KeyX) {
+                    // if entity.as_str() == BATTLE_DETAIL_OVERLAY {
+                    //     if !matches!(ui_state, UIState::CharacterDetail) {
+                    //         return vec![];
+                    //     }
+                    //     *ui_state = UIState::CharacterSelection;
+                    //     return vec![
+                    //         Event::RequestSuspendScene(BATTLE_DETAIL_OVERLAY_SCENE.into()),
+                    //         Event::RequestSetVisibilityScene(
+                    //             BATTLE_DETAIL_OVERLAY_SCENE.into(),
+                    //             Visibility::Hidden,
+                    //         ),
+                    //         Event::RequestSetVisibilityScene(
+                    //             BATTLE_SCENE.into(),
+                    //             Visibility::Visible,
+                    //         ),
+                    //         Event::RequestActivateSuspendedScene(BATTLE_SCENE.into()),
+                    //         Event::RequestDeleteEntity(
+                    //             "CharacterDetailLine".into(),
+                    //             BATTLE_DETAIL_OVERLAY_SCENE.into(),
+                    //         ),
+                    //     ];
+                    // }
                 }
             }
             _ => {}
