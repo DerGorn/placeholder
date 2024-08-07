@@ -488,12 +488,46 @@ impl<E: ExternalEvent + 'static, S: State<E>> EventManager<GameEvent<E>> for Gam
                                 .expect(&format!("Found no active nor suspended scene {:?}", scene))
                         });
                     scene.entities.retain(|e| e.name() != entity);
+                    for e in scene.entities.iter_mut() {
+                        e.delete_child_entity(entity);
+                    }
+                }
+                if let Some(scene) = event.is_request_render_scene() {
+                    if let Some(scene) = self.active_scenes.iter_mut().find(|s| s.name == *scene) {
+                        scene.simple_render(&self.sprite_sheets, window_manager)
+                    } else {
+                        warn!("Tried to render Scene {:?}, but it is not active", scene);
+                    }
                 }
                 if event.is_end_game() {
                     window_manager.send_event(GameEvent::EndGame);
                     return;
                 }
-                let response_events = self.state.handle_event(event);
+                let response_events = if event.is_entity_event() {
+                    let (target, event) = event.consume_entity_event().unwrap();
+                    let mut target_entity = None;
+                    for scene in &mut self.active_scenes {
+                        match scene.entities.iter_mut().find(|e| e.name() == &target) {
+                            Some(entity) => {
+                                target_entity = Some(entity);
+                                break;
+                            }
+                            None => continue,
+                        }
+                    }
+                    if let Some(target) = target_entity {
+                        target.handle_event(event)
+                    } else {
+                        warn!(
+                            "Tried to send event to entity {:?}, but it does not exist in an active scene",
+                            target
+                        );
+                        vec![]
+                    }
+                } else {
+                    self.state.handle_event(event)
+                };
+
                 for event in response_events {
                     window_manager.send_event(GameEvent::External(event));
                 }

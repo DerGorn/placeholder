@@ -12,6 +12,11 @@ pub enum BattleEvent {
 }
 
 #[derive(Debug)]
+pub enum EntityEvent {
+    BattleHighlightValidSkillTargets(Vec<EntityName>),
+}
+
+#[derive(Debug)]
 pub enum Event {
     EndGame,
     RequestNewScenes(Vec<Scene<Self>>),
@@ -27,9 +32,18 @@ pub enum Event {
     ButtonPressed(EntityName, KeyCode),
     BattleEvent(BattleEvent),
     RequestAddEntities(Vec<Box<dyn Entity<Type, Self>>>, SceneName),
+    EntityEvent(EntityName, EntityEvent),
+    RequestRenderScene(SceneName),
 }
 impl ExternalEvent for Event {
     type EntityType = Type;
+    type EntityEvent = EntityEvent;
+    fn is_request_render_scene<'a>(&'a self) -> Option<&'a SceneName> {
+        match self {
+            Event::RequestRenderScene(scene) => Some(scene),
+            _ => None,
+        }
+    }
     fn is_request_set_visibility_scene<'a>(&'a self) -> Option<(&'a SceneName, &'a Visibility)> {
         match self {
             Event::RequestSetVisibilityScene(scene, visibility) => Some((scene, visibility)),
@@ -95,16 +109,30 @@ impl ExternalEvent for Event {
     fn is_add_entities<'a>(&'a self) -> bool {
         matches!(self, Event::RequestAddEntities(_, _))
     }
-    fn consume_add_entities_request(self) -> Option<(Vec<Box<dyn Entity<Self::EntityType, Self>>>, SceneName)>
+    fn consume_add_entities_request(
+        self,
+    ) -> Option<(Vec<Box<dyn Entity<Self::EntityType, Self>>>, SceneName)>
     where
-        Self: Sized{
+        Self: Sized,
+    {
         match self {
-            Event::RequestAddEntities(entities, scene ) => Some((entities, scene)),
+            Event::RequestAddEntities(entities, scene) => Some((entities, scene)),
             _ => None,
         }
     }
 
     fn is_end_game(&self) -> bool {
         matches!(self, Event::EndGame)
+    }
+
+    fn is_entity_event<'a>(&'a self) -> bool {
+        matches!(self, Event::EntityEvent(_, _))
+    }
+    // add code here
+    fn consume_entity_event(self) -> Option<(EntityName, EntityEvent)> {
+        match self {
+            Event::EntityEvent(entity, event) => Some((entity, event)),
+            _ => None,
+        }
     }
 }

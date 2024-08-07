@@ -377,6 +377,12 @@ impl Entity<Type, Event> for FlexBox {
     fn entity_type(&self) -> Type {
         Type::Menu
     }
+    fn delete_child_entity(&mut self, name: &EntityName) {
+        self.children.retain(|child| child.name() != name);
+        for child in &mut self.children {
+            child.delete_child_entity(name);
+        }
+    }
 }
 impl FlexItem for FlexBox {
     fn set_position(&mut self, position: &Vector<f32>) {
@@ -390,8 +396,7 @@ impl FlexItem for FlexBox {
         self.is_dirty = false;
         dirt
     }
-    fn set_focus(&mut self, _focus: bool) {
-    }
+    fn set_focus(&mut self, _focus: bool) {}
     fn has_focus(&self) -> bool {
         false
     }

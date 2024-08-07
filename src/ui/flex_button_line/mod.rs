@@ -83,7 +83,7 @@ pub struct FlexInputManager<T: FlexItem> {
     gap: f32,
     dimensions: PhysicalSize<u16>,
     position: Vector<f32>,
-    children: Vec<Box<T>>,
+    pub children: Vec<Box<T>>,
     name: EntityName,
     shrink_to_content: bool,
     number_of_sprites: Vec<usize>,
@@ -149,6 +149,12 @@ impl<T: FlexItem> Debug for FlexInputManager<T> {
     }
 }
 impl<T: FlexItem> Entity<Type, Event> for FlexInputManager<T> {
+    fn delete_child_entity(&mut self, name: &EntityName) {
+        self.children.retain(|child| child.name() != name);
+        for child in &mut self.children {
+            child.delete_child_entity(name);
+        }
+    }
     fn handle_key_input(&mut self, input: &winit::event::KeyEvent) -> Vec<Event> {
         if !self.has_focus {
             return vec![];

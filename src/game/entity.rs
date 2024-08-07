@@ -44,4 +44,8 @@ pub trait Entity<T: EntityType, E: ExternalEvent>: Debug + Send {
     fn position(&self) -> Vector<f32> {
         self.bounding_box().anchor
     }
+    fn delete_child_entity(&mut self, _name: &EntityName) {}
+    fn handle_event(&mut self, _event: E::EntityEvent) -> Vec<E> {
+        vec![]
+    }
 }

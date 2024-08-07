@@ -131,6 +131,11 @@ impl<E: ExternalEvent> ApplicationEvent for GameEvent<E> {
 
 pub trait ExternalEvent: Debug + Send {
     type EntityType: EntityType;
+    type EntityEvent: Debug;
+    fn is_request_render_scene<'a>(&'a self) -> Option<&'a SceneName>;
+    fn is_entity_event<'a>(&'a self) -> bool;
+    /// Should only be called if is_entity_event returns true
+    fn consume_entity_event(self) -> Option<(EntityName, Self::EntityEvent)>;
     fn is_request_set_visibility_scene<'a>(&'a self) -> Option<(&'a SceneName, &'a Visibility)>;
     ///Suspended scenes will now longer update their buffers, but will still be rendered in their
     ///current state

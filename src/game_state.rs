@@ -1,21 +1,48 @@
-use placeholder::{create_name_struct, game_engine::{Scene, SpritePosition}};
+use placeholder::{
+    create_name_struct,
+    game_engine::{Scene, SpritePosition},
+};
 use threed::Vector;
 use winit::dpi::PhysicalSize;
 
 use crate::{
-    color::Color, ui::{
+    battle_manager::BattleManager, color::Color, ui::{
         Alignment, Button, ButtonStyle, FlexBox, FlexButtonLine, FlexButtonLineManager,
         FlexDirection, FlexOrigin, FontSize, Image,
     }, Character, CharacterAlignment, Event, SkilledCharacter, BATTLE_ACTION_SELECTION_OVERLAY_SCENE, BATTLE_DETAIL_OVERLAY_SCENE, BATTLE_SCENE, CHARACTER_DISPLAY_LINES, END_GAME_BUTTON, MAIN_MENU_SCENE, MAIN_WINDOW, RESOLUTION, SHADER_UI_TEXTURE, START_GAME_BUTTON
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum UIState {
     CharacterSelection,
-    CharacterDetail,
+    /// SourceState
+    CharacterDetail(Box<UIState>),
     /// Index into BattleState.characters to indicate whos skills are being selected
     ActionSelection(usize),
-    TargetSelection,
+    /// Index into BattleState.characters to indicate whos skills are being selected; Index into
+    /// characters skill list
+    TargetSelection(usize, usize),
+}
+pub struct BattleAction {
+    time: f32,
+    character_index: usize,
+    skill_index: usize,
+    target_character_index: usize,
+}
+impl BattleAction {
+    pub fn new(
+        time: f32,
+        character_index: usize,
+        skill_index: usize,
+        target_character_index: usize,
+    ) -> Self {
+        Self {
+            time,
+            character_index,
+            skill_index,
+            target_character_index,
+        }
+    }
 }
 pub struct BattleState {
     pub characters: Vec<SkilledCharacter>,
@@ -53,12 +80,23 @@ impl BattleState {
     }
 }
 create_name_struct!(SkillName);
+#[derive(Debug)]
+pub enum TargetGroup {
+    Ownself,
+    Friends,
+    Enemies,
+}
 pub trait Skill {
     fn name(&self) -> SkillName;
     fn evaluate(&self, target: Option<&mut Character>, source: &mut Character);
+    /// Relative TargetGroups
+    fn target_groups(&self) -> Vec<TargetGroup>;
 }
 pub struct AttackSkill {}
 impl Skill for AttackSkill {
+    fn target_groups(&self) -> Vec<TargetGroup> {
+        vec![TargetGroup::Enemies]
+    }
     fn name(&self) -> SkillName {
         "Attack".into()
     }
@@ -244,81 +282,7 @@ impl GameState {
                 let font_size = 32;
                 let character_text_height = (CHARACTER_DISPLAY_LINES + 0.25) * font_size as f32;
 
-                let enemies = battle_state
-                    .characters
-                    .iter()
-                    .filter(|c| c.character.alignment == CharacterAlignment::Enemy)
-                    .map(|c| (format!("{}", c.character.name), c.character.to_string()))
-                    .map(|(name, content)| {
-                        Box::new(Button::new(
-                            content,
-                            name.into(),
-                            PhysicalSize::new(400, character_text_height as u16),
-                            Vector::scalar(0.0),
-                            FontSize::new(font_size),
-                            false,
-                            ButtonStyle::default(),
-                            // ButtonStyle::Plain(Color::from_str("white"), Color::from_str("black")),
-                        ))
-                    })
-                    .collect::<Vec<_>>();
-                let friends = battle_state
-                    .characters
-                    .iter()
-                    .filter(|c| c.character.alignment == CharacterAlignment::Friendly)
-                    .map(|c| (format!("{}", c.character.name), c.character.to_string()))
-                    .map(|(name, content)| {
-                        Box::new(Button::new(
-                            content,
-                            name.into(),
-                            PhysicalSize::new(400, character_text_height as u16),
-                            Vector::scalar(0.0),
-                            FontSize::new(font_size),
-                            false,
-                            ButtonStyle::default(),
-                            // ButtonStyle::Plain(Color::from_str("white"), Color::from_str("black")),
-                        ))
-                    })
-                    .collect::<Vec<_>>();
-                let enemies = FlexButtonLine::new(
-                    FlexDirection::X,
-                    FlexOrigin::Start,
-                    Alignment::Center,
-                    None,
-                    50.0,
-                    true,
-                    RESOLUTION,
-                    Vector::new(0.0, 0.0, 0.0),
-                    "EnemyButtons".into(),
-                    false,
-                    enemies,
-                );
-                let friends = FlexButtonLine::new(
-                    FlexDirection::X,
-                    FlexOrigin::Start,
-                    Alignment::Center,
-                    None,
-                    50.0,
-                    true,
-                    RESOLUTION,
-                    Vector::new(0.0, 0.0, 0.0),
-                    "FriendButtons".into(),
-                    true,
-                    friends,
-                );
-                let characters = FlexButtonLineManager::new(
-                    FlexDirection::Y,
-                    FlexOrigin::Start,
-                    Alignment::Center,
-                    None,
-                    RESOLUTION.height as f32 - 200.0 - 2.0 * character_text_height,
-                    false,
-                    PhysicalSize::new(RESOLUTION.width, RESOLUTION.height - 200),
-                    Vector::new(0.0, 0.0, 0.0),
-                    "CharacterButtons".into(),
-                    true,
-                    vec![Box::new(enemies), Box::new(friends)],
-                );
+                let characters = BattleManager::new(battle_state, font_size, character_text_height);
                 vec![
                     Scene {
                         name: BATTLE_DETAIL_OVERLAY_SCENE.into(),

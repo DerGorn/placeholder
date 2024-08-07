@@ -1,4 +1,5 @@
 use env_logger::Env;
+use log::debug;
 use placeholder::app::{ManagerApplication, WindowDescriptor};
 use placeholder::graphics::{
     RenderSceneDescriptor, ShaderDescriptor, UniformBufferName, Visibility,
@@ -58,8 +59,11 @@ use game_state::{BattleState, GameState, Skill};
 mod event;
 use event::Event;
 
-use crate::event::BattleEvent;
-use crate::game_state::UIState;
+mod battle_manager;
+use crate::battle_manager::BATTLE_MANAGER;
+use crate::event::{BattleEvent, EntityEvent};
+use crate::game_state::{BattleAction, TargetGroup, UIState};
+use battle_manager::BattleManager;
 
 type Index = u16;
 
@@ -69,6 +73,7 @@ pub enum Type {
     Player,
     Enemy,
     Menu,
+    Controller,
 }
 impl EntityType for Type {}
 
@@ -151,12 +156,14 @@ EX: {}",
 struct KeyBindings {
     accept: Vec<KeyCode>,
     cancel: Vec<KeyCode>,
+    check: Vec<KeyCode>,
 }
 impl Default for KeyBindings {
     fn default() -> Self {
         Self {
             accept: vec![KeyCode::Enter, KeyCode::Space],
             cancel: vec![KeyCode::KeyX],
+            check: vec![KeyCode::KeyC],
         }
     }
 }
@@ -214,11 +221,6 @@ impl GameLogic {
             .characters
             .iter()
             .position(|c| c.character.name == "Player")
-            .unwrap();
-        let enemy_index = battle_state
-            .characters
-            .iter()
-            .position(|c| c.character.name == "Enemy")
             .unwrap();
         match event {
             Event::BattleEvent(BattleEvent::FinishedPlanning) => {
@@ -278,8 +280,11 @@ impl GameLogic {
                 }
                 return vec![Event::EndGame];
             }
-            Event::ButtonPressed(entity, key_code) => {
-                match (key_code, entity.as_str(), &ui_state) {
+            Event::ButtonPressed(button, key_code) => {
+                match (key_code, button.as_str(), &ui_state) {
+                    (accept, END_GAME_BUTTON, _) if self.key_bindings.accept.contains(&accept) => {
+                        return vec![Event::EndGame];
+                    }
                     (accept, character, UIState::CharacterSelection)
                         if battle_state
                             .characters
@@ -343,12 +348,104 @@ impl GameLogic {
                         if self.key_bindings.accept.contains(&accept) =>
                     {
                         let character = &battle_state.characters[*character_index];
-                        let skill = character
+                        let skill_index = character
                             .skills
                             .iter()
-                            .find(|s| s.name() == skill.into())
+                            .position(|s| s.name() == skill.into())
                             .unwrap();
-                        println!("Skill: {:?}", skill.name());
+                        let skill = &character.skills[skill_index];
+                        let targets =
+                            skill
+                                .target_groups()
+                                .into_iter()
+                                .fold(vec![], |mut targets, group| {
+                                    let valid_targets =
+                                        battle_state.characters.iter().filter(|c| match group {
+                                            TargetGroup::Friends => {
+                                                c.character.alignment
+                                                    == character.character.alignment
+                                                    && c.character.name != character.character.name
+                                            }
+                                            TargetGroup::Enemies => {
+                                                c.character.alignment
+                                                    != character.character.alignment
+                                                    && c.character.name != character.character.name
+                                            }
+                                            TargetGroup::Ownself => {
+                                                c.character.name == character.character.name
+                                            }
+                                        });
+                                    targets.extend(valid_targets);
+                                    targets
+                                });
+                        let targets = targets
+                            .iter()
+                            .map(|c| c.character.name.into())
+                            .collect::<Vec<_>>();
+                        *ui_state = UIState::TargetSelection(*character_index, skill_index);
+                        return vec![
+                            Event::RequestSuspendScene(
+                                BATTLE_ACTION_SELECTION_OVERLAY_SCENE.into(),
+                            ),
+                            Event::RequestActivateSuspendedScene(BATTLE_SCENE.into()),
+                            Event::EntityEvent(
+                                BATTLE_MANAGER.into(),
+                                EntityEvent::BattleHighlightValidSkillTargets(targets),
+                            ),
+                        ];
+                    }
+                    (accept, target, UIState::TargetSelection(character_index, skill_index))
+                        if self.key_bindings.accept.contains(&accept) =>
+                    {
+                        let source = &battle_state.characters[*character_index];
+                        let skill = &source.skills[*skill_index];
+                        let target_index = &battle_state
+                            .characters
+                            .iter()
+                            .position(|c| c.character.name == target)
+                            .unwrap();
+                        let target = &battle_state.characters[*target_index];
+                        let is_valid_target =
+                            skill.target_groups().iter().any(|group| match group {
+                                TargetGroup::Friends => {
+                                    target.character.alignment == source.character.alignment
+                                        && target.character.name != source.character.name
+                                }
+                                TargetGroup::Enemies => {
+                                    target.character.alignment != source.character.alignment
+                                        && target.character.name != source.character.name
+                                }
+                                TargetGroup::Ownself => {
+                                    target.character.name == source.character.name
+                                }
+                            });
+                        if !is_valid_target {
+                            debug!(
+                                "Invalid target: {} for {:?} of {}",
+                                target.character.name,
+                                skill.name(),
+                                source.character.name
+                            );
+                            return vec![];
+                        }
+                        let action =
+                            BattleAction::new(0.0, *character_index, *skill_index, *target_index);
+                    }
+                    (cancel, _, UIState::TargetSelection(character_index, _))
+                        if self.key_bindings.cancel.contains(&cancel) =>
+                    {
+                        *ui_state = UIState::ActionSelection(*character_index);
+                        return vec![
+                            Event::EntityEvent(
+                                BATTLE_MANAGER.into(),
+                                EntityEvent::BattleHighlightValidSkillTargets(vec![]),
+                            ),
+                            Event::RequestRenderScene(BATTLE_SCENE.into()),
+                            Event::RequestActivateSuspendedScene(
+                                BATTLE_ACTION_SELECTION_OVERLAY_SCENE.into(),
+                            ),
+                            Event::RequestSuspendScene(BATTLE_SCENE.into()),
+                        ];
                     }
                     (cancel, _, UIState::ActionSelection(_))
                         if self.key_bindings.cancel.contains(&cancel) =>
@@ -373,11 +470,20 @@ impl GameLogic {
                             ),
                         ];
                     }
-                    (cancel, BATTLE_DETAIL_OVERLAY, UIState::CharacterDetail)
+                    (cancel, BATTLE_DETAIL_OVERLAY, UIState::CharacterDetail(source_state))
                         if self.key_bindings.cancel.contains(&cancel) =>
                     {
-                        *ui_state = UIState::CharacterSelection;
-                        return vec![
+                        let mut events = if matches!(**source_state, UIState::TargetSelection(_, _))
+                        {
+                            vec![Event::RequestSetVisibilityScene(
+                                BATTLE_ACTION_SELECTION_OVERLAY_SCENE.into(),
+                                Visibility::Visible,
+                            )]
+                        } else {
+                            vec![]
+                        };
+                        *ui_state = (**source_state).clone();
+                        events.extend([
                             Event::RequestSuspendScene(BATTLE_DETAIL_OVERLAY_SCENE.into()),
                             Event::RequestSetVisibilityScene(
                                 BATTLE_DETAIL_OVERLAY_SCENE.into(),
@@ -392,34 +498,85 @@ impl GameLogic {
                                 "CharacterDetailLine".into(),
                                 BATTLE_DETAIL_OVERLAY_SCENE.into(),
                             ),
-                        ];
+                        ]);
+                        return events;
+                    }
+                    (check, name, source_state)
+                        if self.key_bindings.check.contains(&check)
+                            && match source_state {
+                                UIState::CharacterSelection | UIState::TargetSelection(_, _) => {
+                                    true
+                                }
+                                _ => false,
+                            } =>
+                    {
+                        if let Some(character) = battle_state
+                            .characters
+                            .iter()
+                            .find(|c| c.character.name == name)
+                        {
+                            let mut events =
+                                if matches!(**source_state, UIState::TargetSelection(_, _)) {
+                                    vec![
+                                        Event::RequestSuspendScene(
+                                            BATTLE_ACTION_SELECTION_OVERLAY_SCENE.into(),
+                                        ),
+                                        Event::RequestSetVisibilityScene(
+                                            BATTLE_ACTION_SELECTION_OVERLAY_SCENE.into(),
+                                            Visibility::Hidden,
+                                        ),
+                                    ]
+                                } else {
+                                    vec![]
+                                };
+                            *ui_state =
+                                UIState::CharacterDetail(Box::new((**source_state).clone()));
+                            events.extend([
+                                Event::RequestSuspendScene(BATTLE_SCENE.into()),
+                                Event::RequestSetVisibilityScene(
+                                    BATTLE_SCENE.into(),
+                                    Visibility::Hidden,
+                                ),
+                                Event::RequestSetVisibilityScene(
+                                    BATTLE_DETAIL_OVERLAY_SCENE.into(),
+                                    Visibility::Visible,
+                                ),
+                                Event::RequestActivateSuspendedScene(
+                                    BATTLE_DETAIL_OVERLAY_SCENE.into(),
+                                ),
+                                Event::RequestAddEntities(
+                                    vec![Box::new(FlexButtonLine::new(
+                                        FlexDirection::Y,
+                                        FlexOrigin::Center,
+                                        Alignment::Center,
+                                        None,
+                                        0.0,
+                                        true,
+                                        PhysicalSize::new(100, 100),
+                                        Vector::scalar(0.0),
+                                        "CharacterDetailLine".into(),
+                                        true,
+                                        vec![Box::new(Button::new(
+                                            format!("{:#?}", character.character),
+                                            BATTLE_DETAIL_OVERLAY.into(),
+                                            RESOLUTION,
+                                            Vector::scalar(0.0),
+                                            FontSize::new(32),
+                                            false,
+                                            ButtonStyle::default(),
+                                        ))],
+                                    ))],
+                                    BATTLE_DETAIL_OVERLAY_SCENE.into(),
+                                ),
+                            ]);
+                            return events;
+                        }
                     }
                     _ => {}
                 };
                 if matches!(key_code, KeyCode::Enter | KeyCode::Space) {
                     // let name = entity.as_str();
                     // match name {
-                    //     END_GAME_BUTTON => return vec![Event::EndGame],
-                    //     BATTLE_PRINT_STATE_BUTTON => {
-                    //         println!("TURN: {}", battle_state.turn_counter);
-                    //         println!("TurnOrder: {:?}", battle_state.character_order);
-                    //         println!("----------------------------------\n");
-                    //         for (i, p) in
-                    //             battle_state.characters.iter().enumerate().filter(|(_, c)| {
-                    //                 c.character.alignment == CharacterAlignment::Friendly
-                    //             })
-                    //         {
-                    //             println!("{i}: {:?}", p.character);
-                    //         }
-                    //         println!("\n----------------------------------\n");
-                    //         for (i, e) in
-                    //             battle_state.characters.iter().enumerate().filter(|(_, c)| {
-                    //                 c.character.alignment == CharacterAlignment::Enemy
-                    //             })
-                    //         {
-                    //             println!("{i}: {:?}", e.character);
-                    //         }
-                    //     }
                     //     BATTLE_ATTACK_BUTTON => {
                     //         let remaining_actions = battle_state
                     //             .character_order
@@ -436,101 +593,7 @@ impl GameLogic {
                     //             return vec![Event::BattleEvent(BattleEvent::FinishedPlanning)];
                     //         }
                     //     }
-                    //     BATTLE_ATTACK_TWO_BUTTON => {
-                    //         let enemy_two_index = battle_state
-                    //             .characters
-                    //             .iter()
-                    //             .position(|c| c.character.name == "Enemy Two")
-                    //             .unwrap();
-                    //         let remaining_actions = battle_state
-                    //             .character_order
-                    //             .iter()
-                    //             .enumerate()
-                    //             .filter(|(i, ci)| {
-                    //                 ci == &&player_index
-                    //                     && battle_state.actions.iter().find(|a| a.0 == *i).is_none()
-                    //             })
-                    //             .collect::<Vec<_>>();
-                    //         let action = remaining_actions[0];
-                    //         battle_state.actions.push((action.0, 0, enemy_two_index));
-                    //         if remaining_actions.len() == 1 {
-                    //             return vec![Event::BattleEvent(BattleEvent::FinishedPlanning)];
-                    //         }
-                    //     }
                     //     _ => {}
-                    // }
-                } else if matches!(key_code, KeyCode::KeyC) {
-                    let name = entity.as_str();
-                    if let Some(character) = battle_state
-                        .characters
-                        .iter()
-                        .find(|c| c.character.name == name)
-                    {
-                        if !matches!(ui_state, UIState::CharacterSelection) {
-                            return vec![];
-                        }
-                        *ui_state = UIState::CharacterDetail;
-                        return vec![
-                            Event::RequestSuspendScene(BATTLE_SCENE.into()),
-                            Event::RequestSetVisibilityScene(
-                                BATTLE_SCENE.into(),
-                                Visibility::Hidden,
-                            ),
-                            Event::RequestSetVisibilityScene(
-                                BATTLE_DETAIL_OVERLAY_SCENE.into(),
-                                Visibility::Visible,
-                            ),
-                            Event::RequestActivateSuspendedScene(
-                                BATTLE_DETAIL_OVERLAY_SCENE.into(),
-                            ),
-                            Event::RequestAddEntities(
-                                vec![Box::new(FlexButtonLine::new(
-                                    FlexDirection::Y,
-                                    FlexOrigin::Center,
-                                    Alignment::Center,
-                                    None,
-                                    0.0,
-                                    true,
-                                    PhysicalSize::new(100, 100),
-                                    Vector::scalar(0.0),
-                                    "CharacterDetailLine".into(),
-                                    true,
-                                    vec![Box::new(Button::new(
-                                        format!("{:#?}", character.character),
-                                        BATTLE_DETAIL_OVERLAY.into(),
-                                        RESOLUTION,
-                                        Vector::scalar(0.0),
-                                        FontSize::new(32),
-                                        false,
-                                        ButtonStyle::default(),
-                                    ))],
-                                ))],
-                                BATTLE_DETAIL_OVERLAY_SCENE.into(),
-                            ),
-                        ];
-                    }
-                } else if matches!(key_code, KeyCode::KeyX) {
-                    // if entity.as_str() == BATTLE_DETAIL_OVERLAY {
-                    //     if !matches!(ui_state, UIState::CharacterDetail) {
-                    //         return vec![];
-                    //     }
-                    //     *ui_state = UIState::CharacterSelection;
-                    //     return vec![
-                    //         Event::RequestSuspendScene(BATTLE_DETAIL_OVERLAY_SCENE.into()),
-                    //         Event::RequestSetVisibilityScene(
-                    //             BATTLE_DETAIL_OVERLAY_SCENE.into(),
-                    //             Visibility::Hidden,
-                    //         ),
-                    //         Event::RequestSetVisibilityScene(
-                    //             BATTLE_SCENE.into(),
-                    //             Visibility::Visible,
-                    //         ),
-                    //         Event::RequestActivateSuspendedScene(BATTLE_SCENE.into()),
-                    //         Event::RequestDeleteEntity(
-                    //             "CharacterDetailLine".into(),
-                    //             BATTLE_DETAIL_OVERLAY_SCENE.into(),
-                    //         ),
-                    //     ];
                     // }
                 }
             }
@@ -619,7 +682,7 @@ const FROG: &str = "Frog";
 const FONT: &str = "Font";
 const END_GAME_BUTTON: &str = "EndGameButton";
 const START_GAME_BUTTON: &str = "StartGameButton";
-const RESOLUTION: PhysicalSize<u16> = PhysicalSize::new(1920, 1080);
+const RESOLUTION: PhysicalSize<u16> = PhysicalSize::new(1000, 800);
 const FLOAT_RESOULTION: PhysicalSize<f32> =
     PhysicalSize::new(RESOLUTION.width as f32, RESOLUTION.height as f32);
 fn main() {
