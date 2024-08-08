@@ -1,60 +1,46 @@
 use env_logger::Env;
 use log::debug;
 use placeholder::app::{ManagerApplication, WindowDescriptor};
-use placeholder::graphics::{
-    RenderSceneDescriptor, ShaderDescriptor, UniformBufferName, Visibility,
-};
-use rodio::{Decoder, OutputStream, Sink, Source};
+use placeholder::graphics::{RenderSceneDescriptor, ShaderDescriptor, Visibility};
+// use rodio::{Decoder, OutputStream, Sink, Source};
 use std::fmt::{Debug, Display};
-use std::fs::File;
-use std::io::BufReader;
+// use std::fs::File;
+// use std::io::BufReader;
 use std::path::PathBuf;
-use std::str::Chars;
-use std::time::Duration;
 use threed::Vector;
-use transition::{Transition, TransitionTypes};
-use ui::{
-    Alignment, Button, ButtonStyle, FlexBox, FlexButtonLine, FlexDirection, FlexOrigin, FontSize,
-    Image,
-};
+use ui::{Alignment, Button, ButtonStyle, FlexButtonLine, FlexDirection, FlexOrigin, FontSize};
 use winit::keyboard::KeyCode;
 use winit::{dpi::PhysicalSize, window::WindowAttributes};
 
 use placeholder::graphics::{Index as I, Vertex as V};
 
 use placeholder::game_engine::{
-    CameraDescriptor, EntityName, EntityType, ExternalEvent, Game, RessourceDescriptor, Scene,
-    SceneName, SpritePosition, SpriteSheetDimensions, State, VelocityController,
+    CameraDescriptor, EntityName, EntityType, Game, RessourceDescriptor, Scene, SceneName,
+    SpriteSheetDimensions, State,
 };
 
 mod static_camera;
 use static_camera::static_camera;
 
 mod animation;
-use animation::Animation;
 
 mod background;
-use background::Background;
 
 mod transition;
 
 mod enemy;
-use enemy::Enemy;
 
 mod player;
-use player::Player;
 
 mod vertex;
 use vertex::{SimpleVertex, UiVertex, Vertex};
 
 mod ui;
-use ui::Text;
 
 mod color;
-use color::Color;
 
 mod game_state;
-use game_state::{BattleState, GameState, Skill};
+use game_state::{GameState, Skill};
 
 mod event;
 use event::Event;
@@ -63,7 +49,6 @@ mod battle_manager;
 use crate::battle_manager::BATTLE_MANAGER;
 use crate::event::{BattleEvent, EntityEvent};
 use crate::game_state::{BattleAction, TargetGroup, UIState};
-use battle_manager::BattleManager;
 
 type Index = u16;
 
@@ -190,17 +175,17 @@ impl GameLogic {
                         END_GAME_BUTTON => vec![Event::EndGame],
                         START_GAME_BUTTON => {
                             todo!("Start game");
-                            vec![
-                                Event::RequestDeleteScene(MAIN_MENU_SCENE.into()),
-                                Event::RequestNewScenes(vec![Scene {
-                                    name: BATTLE_SCENE.into(),
-                                    render_scene: BATTLE_SCENE.into(),
-                                    target_window: MAIN_WINDOW.into(),
-                                    z_index: 0,
-                                    shader_descriptor: SHADER_UI_TEXTURE,
-                                    entities: vec![],
-                                }]),
-                            ]
+                            // vec![
+                            //     Event::RequestDeleteScene(MAIN_MENU_SCENE.into()),
+                            //     Event::RequestNewScenes(vec![Scene {
+                            //         name: BATTLE_SCENE.into(),
+                            //         render_scene: BATTLE_SCENE.into(),
+                            //         target_window: MAIN_WINDOW.into(),
+                            //         z_index: 0,
+                            //         shader_descriptor: SHADER_UI_TEXTURE,
+                            //         entities: vec![],
+                            //     }]),
+                            // ]
                         }
                         _ => vec![],
                     }
@@ -217,68 +202,98 @@ impl GameLogic {
             GameState::Battle(battle_state, ui_state) => (battle_state, ui_state),
             _ => return vec![],
         };
-        let player_index = battle_state
-            .characters
-            .iter()
-            .position(|c| c.character.name == "Player")
-            .unwrap();
         match event {
+            Event::NewScene(scene) if scene.as_str() == BATTLE_SCENE => {
+                let target_index = battle_state
+                    .characters
+                    .iter()
+                    .position(|c| c.character.alignment == CharacterAlignment::Friendly)
+                    .unwrap();
+                let target = &battle_state.characters[target_index];
+                for (source_index, character) in battle_state.characters.iter().enumerate() {
+                    if character.character.alignment != CharacterAlignment::Enemy {
+                        continue;
+                    }
+                    let skill_index = 0;
+                    let skill = character.skills.get(skill_index).unwrap();
+                    let action = BattleAction::new(
+                        skill.get_time(Some(&target.character), &character.character),
+                        source_index,
+                        skill_index,
+                        target_index,
+                    );
+                    battle_state.actions.queue_action(action);
+                }
+                return vec![Event::EntityEvent(
+                    BATTLE_MANAGER.into(),
+                    EntityEvent::BattleHighlightValidSkillTargets(
+                        battle_state
+                            .characters
+                            .iter()
+                            .enumerate()
+                            .filter(|(i, _)| !battle_state.actions.contains_character(*i))
+                            .map(|(_, c)| c.character.name.into())
+                            .collect(),
+                    ),
+                )];
+            }
             Event::BattleEvent(BattleEvent::FinishedPlanning) => {
-                println!("Playing out Turn");
-                let mut actions = vec![];
-                for (order_index, character_index) in
-                    battle_state.character_order.iter().enumerate()
-                {
-                    match battle_state.actions.iter().find(|a| a.0 == order_index) {
-                        Some((_, skill, target_index)) => {
-                            actions.push((character_index, skill, target_index))
-                        }
-                        None => actions.push((character_index, &0, &player_index)),
-                    };
-                }
-                println!("Actions: {:?}", actions);
-                for action in actions {
-                    let (source_index, skill_index, target_index) = action;
-                    let (source, target) = if source_index == target_index {
-                        let (_, right) = battle_state.characters.split_at_mut(*target_index);
-                        let (left, _) = right.split_at_mut(1);
-                        let source = &mut left[0];
-                        (source, None)
-                    } else {
-                        let (left, target) = battle_state.characters.split_at_mut(*target_index);
-                        let (target, right) = target.split_at_mut(1);
-                        let target = &mut target[0];
-                        if source_index < target_index {
-                            (&mut left[*source_index], Some(target))
-                        } else {
-                            (&mut right[source_index - target_index - 1], Some(target))
-                        }
-                    };
-                    source.activate_skill(*skill_index, target);
-                }
-                battle_state.characters.retain(|c| c.character.health > 0);
-                if battle_state
-                    .characters
-                    .iter()
-                    .all(|c| c.character.alignment == CharacterAlignment::Friendly)
-                {
-                    println!("Player Wins");
-                } else if battle_state
-                    .characters
-                    .iter()
-                    .all(|c| c.character.alignment == CharacterAlignment::Enemy)
-                {
-                    println!("Player Loses");
-                } else {
-                    battle_state.turn_counter += 1;
-                    battle_state.actions.clear();
-                    battle_state.generate_character_order();
-                    return vec![Event::ButtonPressed(
-                        BATTLE_PRINT_STATE_BUTTON.into(),
-                        KeyCode::Space,
-                    )];
-                }
-                return vec![Event::EndGame];
+                todo!("One time step");
+                // println!("Playing out Turn");
+                // let mut actions = vec![];
+                // for (order_index, character_index) in
+                //     battle_state.character_order.iter().enumerate()
+                // {
+                //     match battle_state.actions.iter().find(|a| a.0 == order_index) {
+                //         Some((_, skill, target_index)) => {
+                //             actions.push((character_index, skill, target_index))
+                //         }
+                //         None => actions.push((character_index, &0, &player_index)),
+                //     };
+                // }
+                // println!("Actions: {:?}", actions);
+                // for action in actions {
+                //     let (source_index, skill_index, target_index) = action;
+                //     let (source, target) = if source_index == target_index {
+                //         let (_, right) = battle_state.characters.split_at_mut(*target_index);
+                //         let (left, _) = right.split_at_mut(1);
+                //         let source = &mut left[0];
+                //         (source, None)
+                //     } else {
+                //         let (left, target) = battle_state.characters.split_at_mut(*target_index);
+                //         let (target, right) = target.split_at_mut(1);
+                //         let target = &mut target[0];
+                //         if source_index < target_index {
+                //             (&mut left[*source_index], Some(target))
+                //         } else {
+                //             (&mut right[source_index - target_index - 1], Some(target))
+                //         }
+                //     };
+                //     source.activate_skill(*skill_index, target);
+                // }
+                // battle_state.characters.retain(|c| c.character.health > 0);
+                // if battle_state
+                //     .characters
+                //     .iter()
+                //     .all(|c| c.character.alignment == CharacterAlignment::Friendly)
+                // {
+                //     println!("Player Wins");
+                // } else if battle_state
+                //     .characters
+                //     .iter()
+                //     .all(|c| c.character.alignment == CharacterAlignment::Enemy)
+                // {
+                //     println!("Player Loses");
+                // } else {
+                //     battle_state.turn_counter += 1;
+                //     battle_state.actions.clear();
+                //     battle_state.generate_character_order();
+                //     return vec![Event::ButtonPressed(
+                //         BATTLE_PRINT_STATE_BUTTON.into(),
+                //         KeyCode::Space,
+                //     )];
+                // }
+                // return vec![Event::EndGame];
             }
             Event::ButtonPressed(button, key_code) => {
                 match (key_code, button.as_str(), &ui_state) {
@@ -289,7 +304,8 @@ impl GameLogic {
                         if battle_state
                             .characters
                             .iter()
-                            .any(|c| c.character.name == character)
+                            .position(|c| c.character.name == character)
+                            .map_or(false, |i| !battle_state.actions.contains_character(i))
                             && self.key_bindings.accept.contains(&accept) =>
                     {
                         let character_index = battle_state
@@ -428,8 +444,46 @@ impl GameLogic {
                             );
                             return vec![];
                         }
-                        let action =
-                            BattleAction::new(0.0, *character_index, *skill_index, *target_index);
+                        let action = BattleAction::new(
+                            skill.get_time(Some(&target.character), &source.character),
+                            *character_index,
+                            *skill_index,
+                            *target_index,
+                        );
+                        battle_state.actions.queue_action(action);
+                        let actionless_characters: Vec<EntityName> = battle_state
+                            .characters
+                            .iter()
+                            .enumerate()
+                            .filter(|(i, _)| !battle_state.actions.contains_character(*i))
+                            .map(|(_, c)| c.character.name.into())
+                            .collect();
+
+                        *ui_state = UIState::CharacterSelection;
+                        let mut events = vec![
+                            Event::RequestSetVisibilityScene(
+                                BATTLE_ACTION_SELECTION_OVERLAY_SCENE.into(),
+                                Visibility::Hidden,
+                            ),
+                            Event::RequestSuspendScene(
+                                BATTLE_ACTION_SELECTION_OVERLAY_SCENE.into(),
+                            ),
+                            Event::RequestDeleteEntity(
+                                "ActionSelectionLine".into(),
+                                BATTLE_ACTION_SELECTION_OVERLAY_SCENE.into(),
+                            ),
+                        ];
+                        events.append(&mut if actionless_characters.is_empty() {
+                            vec![Event::BattleEvent(BattleEvent::FinishedPlanning)]
+                        } else {
+                            vec![Event::EntityEvent(
+                                BATTLE_MANAGER.into(),
+                                EntityEvent::BattleHighlightValidSkillTargets(
+                                    actionless_characters,
+                                ),
+                            )]
+                        });
+                        return events;
                     }
                     (cancel, _, UIState::TargetSelection(character_index, _))
                         if self.key_bindings.cancel.contains(&cancel) =>

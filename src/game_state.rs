@@ -6,10 +6,15 @@ use threed::Vector;
 use winit::dpi::PhysicalSize;
 
 use crate::{
-    battle_manager::BattleManager, color::Color, ui::{
+    battle_manager::BattleManager,
+    color::Color,
+    ui::{
         Alignment, Button, ButtonStyle, FlexBox, FlexButtonLine, FlexButtonLineManager,
         FlexDirection, FlexOrigin, FontSize, Image,
-    }, Character, CharacterAlignment, Event, SkilledCharacter, BATTLE_ACTION_SELECTION_OVERLAY_SCENE, BATTLE_DETAIL_OVERLAY_SCENE, BATTLE_SCENE, CHARACTER_DISPLAY_LINES, END_GAME_BUTTON, MAIN_MENU_SCENE, MAIN_WINDOW, RESOLUTION, SHADER_UI_TEXTURE, START_GAME_BUTTON
+    },
+    Character, CharacterAlignment, Event, SkilledCharacter, BATTLE_ACTION_SELECTION_OVERLAY_SCENE,
+    BATTLE_DETAIL_OVERLAY_SCENE, BATTLE_SCENE, CHARACTER_DISPLAY_LINES, END_GAME_BUTTON,
+    MAIN_MENU_SCENE, MAIN_WINDOW, RESOLUTION, SHADER_UI_TEXTURE, START_GAME_BUTTON,
 };
 
 #[derive(Debug, Clone)]
@@ -44,40 +49,27 @@ impl BattleAction {
         }
     }
 }
+pub struct BattleActionManager {
+    actions: Vec<BattleAction>,
+}
+impl BattleActionManager {
+    pub fn queue_action(&mut self, action: BattleAction) {
+        self.actions.push(action);
+        self.actions.sort_by(|a, b| a.time.partial_cmp(&b.time).expect("Encountered NaN time"));
+    }
+
+    pub fn get_actions(&self) -> &[BattleAction] {
+        &self.actions
+    }
+    
+    pub fn contains_character(&self, character_index: usize) -> bool {
+        self.actions.iter().any(|a| a.character_index == character_index)
+    }
+}
 pub struct BattleState {
     pub characters: Vec<SkilledCharacter>,
-    /// Index into characters
-    pub character_order: Vec<usize>,
-    pub turn_counter: u8,
-    /// (Index into character_order, Index into characters[character_order] skill list, Index into
-    /// characters for target)
-    pub actions: Vec<(usize, usize, usize)>,
-}
-impl BattleState {
-    pub fn generate_character_order(&mut self) {
-        let mut character_order = vec![];
-        let mut tempos = self
-            .characters
-            .iter()
-            .enumerate()
-            .map(|(i, c)| (i as isize, 1.0 / c.character.speed as f32))
-            .collect::<Vec<_>>();
-        tempos.sort_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap());
-        let last_char = tempos.first().unwrap().0;
-        loop {
-            let (next_char, next_time) = tempos.pop().unwrap();
-            character_order.push(next_char as usize);
-            if next_char == last_char {
-                break;
-            }
-            tempos.push((
-                next_char,
-                next_time + 1.0 / self.characters[next_char as usize].character.speed as f32,
-            ));
-            tempos.sort_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap());
-        }
-        self.character_order = character_order;
-    }
+    pub current_time: f32,
+    pub actions: BattleActionManager,
 }
 create_name_struct!(SkillName);
 #[derive(Debug)]
@@ -91,6 +83,7 @@ pub trait Skill {
     fn evaluate(&self, target: Option<&mut Character>, source: &mut Character);
     /// Relative TargetGroups
     fn target_groups(&self) -> Vec<TargetGroup>;
+    fn get_time(&self, target: Option<&Character>, source: &Character) -> f32;
 }
 pub struct AttackSkill {}
 impl Skill for AttackSkill {
@@ -107,6 +100,29 @@ impl Skill for AttackSkill {
         } else {
             source.health -= attack.min(source.health);
         }
+    }
+    fn get_time(&self, _target: Option<&Character>, source: &Character) -> f32 {
+        source.speed as f32
+    }
+}
+pub struct HealSkill {}
+impl Skill for HealSkill {
+    fn target_groups(&self) -> Vec<TargetGroup> {
+        vec![TargetGroup::Friends, TargetGroup::Ownself]
+    }
+    fn name(&self) -> SkillName {
+        "Heal".into()
+    }
+    fn evaluate(&self, target: Option<&mut Character>, source: &mut Character) {
+        let heal = 10;
+        if let Some(target) = target {
+            target.health += heal.min(target.max_health - target.health);
+        } else {
+            source.health += heal.min(source.max_health - source.health);
+        }
+    }
+    fn get_time(&self, _target: Option<&Character>, source: &Character) -> f32 {
+        source.speed as f32
     }
 }
 
@@ -133,7 +149,7 @@ impl Default for GameState {
                 speed: 10,
             },
 
-            skills: vec![Box::new(AttackSkill {})],
+            skills: vec![Box::new(AttackSkill {}), Box::new(HealSkill {})],
         };
         let player_two = SkilledCharacter {
             character: Character {
@@ -206,13 +222,11 @@ impl Default for GameState {
         };
 
         let characters = vec![player, player_two, player_three, enemy, enemy_two];
-        let mut battle_state = BattleState {
+        let battle_state = BattleState {
             characters,
-            character_order: vec![],
-            turn_counter: 1,
-            actions: vec![],
+            current_time: 0.0,
+            actions: BattleActionManager { actions: vec![] },
         };
-        battle_state.generate_character_order();
         Self::Battle(battle_state, UIState::CharacterSelection)
     }
 }
