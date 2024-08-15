@@ -33,7 +33,7 @@ impl<E: ExternalEvent> Scene<E> {
         entities.sort_by(|a, b| a.z().partial_cmp(&b.z()).expect("NaN NaN NaN"));
         for i in 0..entities.len() {
             let (_, right) = entities.split_at_mut(i);
-            let (entity, _) = right.split_first_mut().unwrap();
+            let (entity, _) = right.split_first_mut().expect("i out of bounds");
             let sprite_sheets = entity
                 .sprite_sheets()
                 .iter()

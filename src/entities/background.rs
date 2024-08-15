@@ -4,7 +4,7 @@ use placeholder::{
 };
 use std::fmt::Debug;
 use threed::Vector;
-use winit::{dpi::PhysicalSize, event::KeyEvent};
+use winit::dpi::PhysicalSize;
 
 use crate::{vertex::render_sprite, Event, Type};
 

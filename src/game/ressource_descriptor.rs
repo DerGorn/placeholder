@@ -62,15 +62,17 @@ impl RessourceDescriptor {
             .iter()
             .find(|(sprite_sheet_name, _, _)| sprite_sheet_name == name)
             .map(|(_, path, dimensions)| (path.clone(), dimensions.clone()))
-            .or_else(|| {
+            .unwrap_or_else(|| {
                 info!(
                     "SpriteSheet {:?} not found. Using default...",
                     name.as_str()
                 );
-                let path = self.image_directory.join(name.as_str()).with_extension("png");
-                Some((path, SpriteSheetDimensions::new(1, 1)))
+                let path = self
+                    .image_directory
+                    .join(name.as_str())
+                    .with_extension("png");
+                (path, SpriteSheetDimensions::new(1, 1))
             })
-            .unwrap()
     }
 }
 

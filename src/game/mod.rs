@@ -18,6 +18,7 @@ use winit::{dpi::PhysicalSize, event::WindowEvent, window::WindowId};
 use self::camera::Camera;
 pub use self::{
     bounding_box::BoundingBox,
+    camera::static_camera,
     camera::CameraDescriptor,
     entity::{Entity, EntityName, EntityType},
     game_event::{ExternalEvent, GameEvent},
@@ -330,7 +331,7 @@ impl<E: ExternalEvent + 'static, S: State<E>> EventManager<GameEvent<E>> for Gam
                     entities.sort_by(|a, b| a.z().partial_cmp(&b.z()).expect("NaN NaN NaN"));
                     for i in 0..entities.len() {
                         let (left, right) = entities.split_at_mut(i);
-                        let (entity, right) = right.split_first_mut().unwrap();
+                        let (entity, right) = right.split_first_mut().expect("i out of bounds");
                         let interactions = left.iter().chain(right.iter()).map(|e| &*e).collect();
                         let events = entity.update(&interactions, &delta_t, &scene.name);
                         for event in events {
@@ -504,7 +505,7 @@ impl<E: ExternalEvent + 'static, S: State<E>> EventManager<GameEvent<E>> for Gam
                     return;
                 }
                 let response_events = if event.is_entity_event() {
-                    let (target, event) = event.consume_entity_event().unwrap();
+                    let (target, event) = event.consume_entity_event().expect("unreachable");
                     let mut target_entity = None;
                     for scene in &mut self.active_scenes {
                         match scene.entities.iter_mut().find(|e| e.name() == &target) {

@@ -4,7 +4,7 @@ use placeholder::{
 };
 use winit::keyboard::KeyCode;
 
-use crate::{game_state::BattleAction, Character, EnemyType, Type};
+use crate::{battle_action::BattleAction, Character, EnemyType, Type};
 
 #[derive(Debug)]
 pub enum BattleEvent {

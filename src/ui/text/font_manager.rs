@@ -1040,25 +1040,25 @@ pub fn render_character(
     // };
     let new_vertices = [
         UiVertex::new(
-            Vector::new(x - x_offset, y + y_offset, 0.0),
+            &Vector::new(x - x_offset, y + y_offset, 0.0),
             &texture_coords[0],
             texture,
             color.clone(),
         ),
         UiVertex::new(
-            Vector::new(x + x_offset, y + y_offset, 0.0),
+            &Vector::new(x + x_offset, y + y_offset, 0.0),
             &texture_coords[1],
             texture,
             color.clone(),
         ),
         UiVertex::new(
-            Vector::new(x + x_offset, y - y_offset, 0.0),
+            &Vector::new(x + x_offset, y - y_offset, 0.0),
             &texture_coords[2],
             texture,
             color.clone(),
         ),
         UiVertex::new(
-            Vector::new(x - x_offset, y - y_offset, 0.0),
+            &Vector::new(x - x_offset, y - y_offset, 0.0),
             &texture_coords[3],
             texture,
             color.clone(),

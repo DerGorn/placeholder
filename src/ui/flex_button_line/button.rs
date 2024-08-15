@@ -247,7 +247,7 @@ impl Entity<Type, Event> for Button {
                         vertices,
                         indices,
                         BORDER_THICKNESS,
-                        high_color.unwrap(),
+                        high_color.expect("No high color"),
                     );
                 }
             }

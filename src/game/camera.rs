@@ -14,6 +14,14 @@ use super::{
     Direction, Entity, ExternalEvent, VelocityController,
 };
 
+pub fn static_camera(view_size: PhysicalSize<f32>) -> [[f32; 2]; 3] {
+    [
+        [2.0 / view_size.width, 0.0],
+        [0.0, 2.0 / view_size.height],
+        [0.0, 0.0],
+    ]
+}
+
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct CameraUniform {
@@ -103,7 +111,7 @@ impl Camera {
             target_entity: descriptor.target_entity.clone(),
         }
     }
-    
+
     pub fn reset_offset(&mut self) {
         self.velocity.stop_movement();
         self.offset_position = Vector::scalar(0.0);

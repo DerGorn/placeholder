@@ -5,16 +5,18 @@ use threed::Vector;
 use winit::dpi::PhysicalSize;
 
 use crate::{
+    character::CharacterAlignment,
     event::{BattleEvent, EntityEvent, Event},
     game_state::BattleState,
     ui::{
         Alignment, Button, ButtonStyle, FlexButtonLine, FlexButtonLineManager, FlexDirection,
         FlexOrigin, FontSize,
     },
-    CharacterAlignment, Type, RESOLUTION,
+    Type, RESOLUTION,
 };
 
 pub const BATTLE_MANAGER: &str = "Battle Manager";
+
 pub struct BattleManager {
     gui: Box<FlexButtonLineManager>,
 }
@@ -23,8 +25,8 @@ impl BattleManager {
         let enemies = battle_state
             .characters
             .iter()
-            .filter(|c| c.character.alignment == CharacterAlignment::Enemy)
-            .map(|c| (format!("{}", c.character.name), c.character.to_string()))
+            .filter(|c| c.character.alignment() == &CharacterAlignment::Enemy)
+            .map(|c| (format!("{}", c.character.name()), c.character.to_string()))
             .map(|(name, content)| {
                 Box::new(Button::new(
                     content,
@@ -34,15 +36,14 @@ impl BattleManager {
                     FontSize::new(font_size),
                     false,
                     ButtonStyle::default(),
-                    // ButtonStyle::Plain(Color::from_str("white"), Color::from_str("black")),
                 ))
             })
             .collect::<Vec<_>>();
         let friends = battle_state
             .characters
             .iter()
-            .filter(|c| c.character.alignment == CharacterAlignment::Friendly)
-            .map(|c| (format!("{}", c.character.name), c.character.to_string()))
+            .filter(|c| c.character.alignment() == &CharacterAlignment::Friendly)
+            .map(|c| (format!("{}", c.character.name()), c.character.to_string()))
             .map(|(name, content)| {
                 Box::new(Button::new(
                     content,
@@ -52,7 +53,6 @@ impl BattleManager {
                     FontSize::new(font_size),
                     false,
                     ButtonStyle::default(),
-                    // ButtonStyle::Plain(Color::from_str("white"), Color::from_str("black")),
                 ))
             })
             .collect::<Vec<_>>();
@@ -124,7 +124,7 @@ impl Entity<Type, Event> for BattleManager {
             }
             EntityEvent::AnimateAction(action, characters) => {
                 for character in characters {
-                    let character_line_index = match character.alignment {
+                    let character_line_index = match character.alignment() {
                         CharacterAlignment::Friendly => 1,
                         CharacterAlignment::Enemy => 0,
                     };
@@ -132,8 +132,11 @@ impl Entity<Type, Event> for BattleManager {
                     let chatacter_gui = character_line
                         .children
                         .iter_mut()
-                        .find(|c| c.name().as_str() == character.name)
-                        .unwrap();
+                        .find(|c| c.name().as_str() == character.name())
+                        .expect(&format!(
+                            "Character {:?} not found in gui",
+                            character.name()
+                        ));
                     chatacter_gui.set_content(character.to_string());
                 }
                 return vec![Event::BattleEvent(BattleEvent::ActionConsequences(action))];

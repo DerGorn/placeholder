@@ -2,7 +2,7 @@ mod graphics_provider;
 pub mod graphics {
     pub use super::graphics_provider::{
         GraphicsProvider, Index, RenderSceneDescriptor, RenderSceneName, ShaderDescriptor,
-        UniformBufferName, Vertex, Visibility
+        UniformBufferName, Vertex, Visibility,
     };
 }
 
@@ -17,8 +17,8 @@ pub mod app {
 mod game;
 pub mod game_engine {
     pub use super::game::{
-        BoundingBox, CameraDescriptor, Direction, Entity, EntityName, EntityType, ExternalEvent,
-        Game, RessourceDescriptor, Scene, SceneName, SpritePosition, SpriteSheet,
+        static_camera, BoundingBox, CameraDescriptor, Direction, Entity, EntityName, EntityType,
+        ExternalEvent, Game, RessourceDescriptor, Scene, SceneName, SpritePosition, SpriteSheet,
         SpriteSheetDimensions, SpriteSheetName, State, TextureCoordinates, VelocityController,
     };
 }

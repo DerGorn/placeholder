@@ -7,7 +7,7 @@ use placeholder::{
     },
 };
 use threed::Vector;
-use winit::{dpi::PhysicalSize, event::KeyEvent};
+use winit::dpi::PhysicalSize;
 
 use crate::{animation::Animation, vertex::render_sprite, EnemyType, Event, Type};
 

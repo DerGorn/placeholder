@@ -35,7 +35,7 @@ macro_rules! impl_flex_button_manager {
                 let number_of_sprites = children.iter().map(|x| x.sprite_sheets().len()).collect();
                 let mut focused_child = None;
                 if has_focus && children.len() > 0 {
-                    let index = children.iter().position(|c| c.has_focus()).or(Some(0)).unwrap();
+                    let index = children.iter().position(|c| c.has_focus()).unwrap_or(0);
                     for i in 0..children.len() {
                         children[i].set_focus(i == index);
                     }
@@ -168,7 +168,7 @@ impl<T: FlexItem> Entity<Type, Event> for FlexInputManager<T> {
             Some(index) => {
                 self.focused_child = Some(index.min(self.children.len() - 1));
                 if self.has_focus {
-                    self.focus_child(self.focused_child.unwrap());
+                    self.focus_child(self.focused_child.expect(&format!("{:?}.delete_child_entity with self.focused_child == None and self.active == true", self.name).as_str()));
                 }
             }
             None => {}
