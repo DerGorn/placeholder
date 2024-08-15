@@ -135,6 +135,11 @@ impl Button {
         self.update_text_color()
     }
 
+    pub fn set_content(&mut self, text: String) {
+        self.text.set_text(text);
+        self.is_dirty = true;
+    }
+
     fn update_text_color(&mut self) {
         let colors = match &self.style {
             ButtonStyle::BorderBox(style) => Some((

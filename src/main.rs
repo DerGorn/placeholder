@@ -40,7 +40,7 @@ mod ui;
 mod color;
 
 mod game_state;
-use game_state::{GameState, Skill};
+use game_state::{BattleActionManager, GameState, Skill};
 
 mod event;
 use event::Event;
@@ -74,11 +74,12 @@ const SHADER_UI_TEXTURE: ShaderDescriptor = ShaderDescriptor {
     fragment_shader: "fs_main",
     uniforms: &[UUI_CAMERA],
 };
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone)]
 enum CharacterAlignment {
     Friendly,
     Enemy,
 }
+#[derive(Clone)]
 struct Character {
     name: &'static str,
     alignment: CharacterAlignment,
@@ -93,10 +94,63 @@ struct Character {
     speed: u16,
     attack: u16,
 }
+trait KIBehavior {
+    fn ki(
+        &mut self,
+        character_index: usize,
+        character: &Character,
+        skills: &[Box<dyn Skill>],
+        action_manager: &mut BattleActionManager,
+        characters: &[&SkilledCharacter],
+        current_time: f32,
+    );
+}
+struct NoKI;
+impl KIBehavior for NoKI {
+    fn ki(
+        &mut self,
+        _character_index: usize,
+        _character: &Character,
+        _skills: &[Box<dyn Skill>],
+        _action_manager: &mut BattleActionManager,
+        _characters: &[&SkilledCharacter],
+        _current_time: f32,
+    ) {
+        // Do nothing
+    }
+}
+struct SimpleKI;
+impl KIBehavior for SimpleKI {
+    fn ki(
+        &mut self,
+        character_index: usize,
+        character: &Character,
+        skills: &[Box<dyn Skill>],
+        action_manager: &mut BattleActionManager,
+        characters: &[&SkilledCharacter],
+        current_time: f32,
+    ) {
+        let target_index = characters
+            .iter()
+            .position(|c| c.character.alignment == CharacterAlignment::Friendly)
+            .unwrap();
+        let target = &characters[target_index];
+        let skill_index = 0;
+        let skill = skills.get(skill_index).unwrap();
+        let action = BattleAction::new(
+            skill.get_time(Some(&target.character), &character, current_time),
+            character_index,
+            skill_index,
+            target_index,
+        );
+        action_manager.queue_action(action);
+    }
+}
 struct SkilledCharacter {
     character: Character,
 
     skills: Vec<Box<dyn Skill>>,
+    ki: Box<dyn KIBehavior>,
 }
 impl SkilledCharacter {
     pub fn activate_skill(&mut self, skill_index: usize, target: Option<&mut SkilledCharacter>) {
@@ -204,25 +258,21 @@ impl GameLogic {
         };
         match event {
             Event::NewScene(scene) if scene.as_str() == BATTLE_SCENE => {
-                let target_index = battle_state
-                    .characters
-                    .iter()
-                    .position(|c| c.character.alignment == CharacterAlignment::Friendly)
-                    .unwrap();
-                let target = &battle_state.characters[target_index];
-                for (source_index, character) in battle_state.characters.iter().enumerate() {
+                for source_index in 0..battle_state.characters.len() {
+                    let (left, right) = battle_state.characters.split_at_mut(source_index);
+                    let (character, right) = right.split_first_mut().unwrap();
+                    let characters = left.iter().chain(right.iter()).collect::<Vec<_>>();
                     if character.character.alignment != CharacterAlignment::Enemy {
                         continue;
                     }
-                    let skill_index = 0;
-                    let skill = character.skills.get(skill_index).unwrap();
-                    let action = BattleAction::new(
-                        skill.get_time(Some(&target.character), &character.character),
+                    character.ki.ki(
                         source_index,
-                        skill_index,
-                        target_index,
+                        &character.character,
+                        &character.skills,
+                        &mut battle_state.actions,
+                        &characters,
+                        battle_state.current_time,
                     );
-                    battle_state.actions.queue_action(action);
                 }
                 return vec![Event::EntityEvent(
                     BATTLE_MANAGER.into(),
@@ -237,63 +287,98 @@ impl GameLogic {
                     ),
                 )];
             }
-            Event::BattleEvent(BattleEvent::FinishedPlanning) => {
-                todo!("One time step");
-                // println!("Playing out Turn");
-                // let mut actions = vec![];
-                // for (order_index, character_index) in
-                //     battle_state.character_order.iter().enumerate()
-                // {
-                //     match battle_state.actions.iter().find(|a| a.0 == order_index) {
-                //         Some((_, skill, target_index)) => {
-                //             actions.push((character_index, skill, target_index))
-                //         }
-                //         None => actions.push((character_index, &0, &player_index)),
-                //     };
-                // }
-                // println!("Actions: {:?}", actions);
-                // for action in actions {
-                //     let (source_index, skill_index, target_index) = action;
-                //     let (source, target) = if source_index == target_index {
-                //         let (_, right) = battle_state.characters.split_at_mut(*target_index);
-                //         let (left, _) = right.split_at_mut(1);
-                //         let source = &mut left[0];
-                //         (source, None)
-                //     } else {
-                //         let (left, target) = battle_state.characters.split_at_mut(*target_index);
-                //         let (target, right) = target.split_at_mut(1);
-                //         let target = &mut target[0];
-                //         if source_index < target_index {
-                //             (&mut left[*source_index], Some(target))
-                //         } else {
-                //             (&mut right[source_index - target_index - 1], Some(target))
-                //         }
-                //     };
-                //     source.activate_skill(*skill_index, target);
-                // }
-                // battle_state.characters.retain(|c| c.character.health > 0);
-                // if battle_state
-                //     .characters
-                //     .iter()
-                //     .all(|c| c.character.alignment == CharacterAlignment::Friendly)
-                // {
-                //     println!("Player Wins");
-                // } else if battle_state
-                //     .characters
-                //     .iter()
-                //     .all(|c| c.character.alignment == CharacterAlignment::Enemy)
-                // {
-                //     println!("Player Loses");
-                // } else {
-                //     battle_state.turn_counter += 1;
-                //     battle_state.actions.clear();
-                //     battle_state.generate_character_order();
-                //     return vec![Event::ButtonPressed(
-                //         BATTLE_PRINT_STATE_BUTTON.into(),
-                //         KeyCode::Space,
-                //     )];
-                // }
-                // return vec![Event::EndGame];
+            Event::BattleEvent(BattleEvent::NextAction) => {
+                let action = battle_state.actions.pop();
+                battle_state.current_time = action.time();
+                action.act_out(&mut battle_state.characters);
+                let characters = battle_state
+                    .characters
+                    .iter()
+                    .enumerate()
+                    .filter(|(i, _)| i == &action.character_index() || i == &action.target_index())
+                    .map(|(_, c)| c.character.clone())
+                    .collect::<Vec<_>>();
+                return vec![Event::EntityEvent(
+                    BATTLE_MANAGER.into(),
+                    EntityEvent::AnimateAction(action, characters),
+                )];
+            }
+            Event::BattleEvent(BattleEvent::ActionConsequences(action)) => {
+                let dead_characters = battle_state
+                    .characters
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, c)| c.character.health <= 0)
+                    .collect::<Vec<_>>();
+                for (dead_character, _) in &dead_characters {
+                    battle_state.actions.remove_character(*dead_character)
+                }
+                let mut events = dead_characters
+                    .iter()
+                    .map(|(_, dead_character)| {
+                        Event::EntityEvent(
+                            BATTLE_MANAGER.into(),
+                            EntityEvent::CharacterDeath(dead_character.character.name.into()),
+                        )
+                    })
+                    .collect::<Vec<_>>();
+
+                let character = battle_state.characters[action.character_index()]
+                    .character
+                    .name;
+                battle_state.characters.retain(|c| c.character.health > 0);
+                if battle_state
+                    .characters
+                    .iter()
+                    .all(|c| c.character.alignment == CharacterAlignment::Friendly)
+                {
+                    todo!("Player Wins");
+                } else if battle_state
+                    .characters
+                    .iter()
+                    .all(|c| c.character.alignment == CharacterAlignment::Enemy)
+                {
+                    todo!("Player Loses");
+                } else if let Some(character_index) = battle_state
+                    .characters
+                    .iter()
+                    .position(|c| c.character.name == character)
+                {
+                    let (left, right) = battle_state.characters.split_at_mut(character_index);
+                    let (character, right) = right.split_first_mut().unwrap();
+                    let characters = left.iter().chain(right.iter()).collect::<Vec<_>>();
+                    match character.character.alignment {
+                        CharacterAlignment::Enemy => {
+                            character.ki.ki(
+                                character_index,
+                                &character.character,
+                                &mut character.skills,
+                                &mut battle_state.actions,
+                                &characters,
+                                battle_state.current_time,
+                            );
+                        }
+                        CharacterAlignment::Friendly => {
+                            events.push(Event::EntityEvent(
+                                BATTLE_MANAGER.into(),
+                                EntityEvent::BattleHighlightValidSkillTargets(
+                                    battle_state
+                                        .characters
+                                        .iter()
+                                        .enumerate()
+                                        .filter(|(i, _)| {
+                                            !battle_state.actions.contains_character(*i)
+                                        })
+                                        .map(|(_, c)| c.character.name.into())
+                                        .collect(),
+                                ),
+                            ));
+                            return events;
+                        }
+                    };
+                }
+                events.push(Event::BattleEvent(BattleEvent::NextAction));
+                return events;
             }
             Event::ButtonPressed(button, key_code) => {
                 match (key_code, button.as_str(), &ui_state) {
@@ -445,7 +530,11 @@ impl GameLogic {
                             return vec![];
                         }
                         let action = BattleAction::new(
-                            skill.get_time(Some(&target.character), &source.character),
+                            skill.get_time(
+                                Some(&target.character),
+                                &source.character,
+                                battle_state.current_time,
+                            ),
                             *character_index,
                             *skill_index,
                             *target_index,
@@ -474,7 +563,7 @@ impl GameLogic {
                             ),
                         ];
                         events.append(&mut if actionless_characters.is_empty() {
-                            vec![Event::BattleEvent(BattleEvent::FinishedPlanning)]
+                            vec![Event::BattleEvent(BattleEvent::NextAction)]
                         } else {
                             vec![Event::EntityEvent(
                                 BATTLE_MANAGER.into(),
@@ -736,7 +825,7 @@ const FROG: &str = "Frog";
 const FONT: &str = "Font";
 const END_GAME_BUTTON: &str = "EndGameButton";
 const START_GAME_BUTTON: &str = "StartGameButton";
-const RESOLUTION: PhysicalSize<u16> = PhysicalSize::new(1000, 800);
+const RESOLUTION: PhysicalSize<u16> = PhysicalSize::new(1920, 1080);
 const FLOAT_RESOULTION: PhysicalSize<f32> =
     PhysicalSize::new(RESOLUTION.width as f32, RESOLUTION.height as f32);
 fn main() {

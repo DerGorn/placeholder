@@ -150,9 +150,28 @@ impl<T: FlexItem> Debug for FlexInputManager<T> {
 }
 impl<T: FlexItem> Entity<Type, Event> for FlexInputManager<T> {
     fn delete_child_entity(&mut self, name: &EntityName) {
+        let original_len = self.children.len();
         self.children.retain(|child| child.name() != name);
         for child in &mut self.children {
             child.delete_child_entity(name);
+        }
+        self.number_of_sprites = self
+            .children
+            .iter()
+            .map(|x| x.sprite_sheets().len())
+            .collect();
+        self.flex();
+        if original_len == self.children.len() {
+            return;
+        }
+        match self.focused_child {
+            Some(index) => {
+                self.focused_child = Some(index.min(self.children.len() - 1));
+                if self.has_focus {
+                    self.focus_child(self.focused_child.unwrap());
+                }
+            }
+            None => {}
         }
     }
     fn handle_key_input(&mut self, input: &winit::event::KeyEvent) -> Vec<Event> {

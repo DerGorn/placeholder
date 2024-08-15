@@ -202,11 +202,11 @@ macro_rules! impl_flex_struct {
             delta_t: &std::time::Duration,
             scene: &placeholder::game_engine::SceneName,
         ) -> Vec<Event> {
-            if self.children.iter_mut().any(|c| c.is_dirty()) || self.is_dirty {
-                self.flex();
-            }
             for child in &mut self.children {
                 child.update(entities, delta_t, scene);
+            }
+            if self.children.iter_mut().any(|c| c.is_dirty()) || self.is_dirty {
+                self.flex();
             }
             vec![]
         }
@@ -214,23 +214,16 @@ macro_rules! impl_flex_struct {
             &mut self,
             vertices: &mut placeholder::app::VertexBuffer,
             indices: &mut placeholder::app::IndexBuffer,
-            sprite_sheet: Vec<Option<&placeholder::game_engine::SpriteSheet>>,
+            sprite_sheets: Vec<Option<&placeholder::game_engine::SpriteSheet>>,
         ) {
             let mut index = 0;
-            // $crate::vertex::render_ui_box_border(
-            //     &self.bounding_box(),
-            //     vertices,
-            //     indices,
-            //     4.0,
-            //     &$crate::color::Color::from_str("white"),
-            // );
-            self.render_background(vertices, indices, &sprite_sheet, &mut index);
+            self.render_background(vertices, indices, &sprite_sheets, &mut index);
             for i in 0..self.children.len() {
                 let item = &mut self.children[i];
                 let number_of_sprites = self.number_of_sprites[i];
-                let sprite_sheet = sprite_sheet
+                let sprite_sheet = sprite_sheets
                     .get(index..index + number_of_sprites)
-                    .expect("Got no option in sprite_sheets");
+                    .expect(&format!("Got no SpriteSheet in flex_render with\nsprite_sheets: {:?}\nindex: {:?}\nnumber_of_sprites: {:?}", sprite_sheets, index, number_of_sprites));
                 index += number_of_sprites;
                 item.render(vertices, indices, sprite_sheet.to_vec())
             }
@@ -382,6 +375,12 @@ impl Entity<Type, Event> for FlexBox {
         for child in &mut self.children {
             child.delete_child_entity(name);
         }
+        self.number_of_sprites = self
+            .children
+            .iter()
+            .map(|x| x.sprite_sheets().len())
+            .collect();
+        self.flex();
     }
 }
 impl FlexItem for FlexBox {

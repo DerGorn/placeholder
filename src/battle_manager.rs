@@ -5,7 +5,7 @@ use threed::Vector;
 use winit::dpi::PhysicalSize;
 
 use crate::{
-    event::{EntityEvent, Event},
+    event::{BattleEvent, EntityEvent, Event},
     game_state::BattleState,
     ui::{
         Alignment, Button, ButtonStyle, FlexButtonLine, FlexButtonLineManager, FlexDirection,
@@ -122,7 +122,25 @@ impl Entity<Type, Event> for BattleManager {
                     }
                 }
             }
-            _ => {}
+            EntityEvent::AnimateAction(action, characters) => {
+                for character in characters {
+                    let character_line_index = match character.alignment {
+                        CharacterAlignment::Friendly => 1,
+                        CharacterAlignment::Enemy => 0,
+                    };
+                    let character_line = &mut self.gui.children[character_line_index];
+                    let chatacter_gui = character_line
+                        .children
+                        .iter_mut()
+                        .find(|c| c.name().as_str() == character.name)
+                        .unwrap();
+                    chatacter_gui.set_content(character.to_string());
+                }
+                return vec![Event::BattleEvent(BattleEvent::ActionConsequences(action))];
+            }
+            EntityEvent::CharacterDeath(character) => {
+                self.gui.delete_child_entity(&character);
+            }
         }
         vec![]
     }
@@ -156,5 +174,8 @@ impl Entity<Type, Event> for BattleManager {
     }
     fn handle_key_input(&mut self, input: &winit::event::KeyEvent) -> Vec<Event> {
         self.gui.handle_key_input(input)
+    }
+    fn delete_child_entity(&mut self, name: &EntityName) {
+        self.gui.delete_child_entity(name)
     }
 }

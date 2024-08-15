@@ -25,6 +25,7 @@ impl SpriteSheetDimensions {
     }
 }
 
+#[derive(Debug)]
 pub struct SpriteSheet {
     texture: u32,
     pub sprites_per_row: u8,

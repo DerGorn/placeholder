@@ -12,9 +12,10 @@ use crate::{
         Alignment, Button, ButtonStyle, FlexBox, FlexButtonLine, FlexButtonLineManager,
         FlexDirection, FlexOrigin, FontSize, Image,
     },
-    Character, CharacterAlignment, Event, SkilledCharacter, BATTLE_ACTION_SELECTION_OVERLAY_SCENE,
-    BATTLE_DETAIL_OVERLAY_SCENE, BATTLE_SCENE, CHARACTER_DISPLAY_LINES, END_GAME_BUTTON,
-    MAIN_MENU_SCENE, MAIN_WINDOW, RESOLUTION, SHADER_UI_TEXTURE, START_GAME_BUTTON,
+    Character, CharacterAlignment, Event, NoKI, SimpleKI, SkilledCharacter,
+    BATTLE_ACTION_SELECTION_OVERLAY_SCENE, BATTLE_DETAIL_OVERLAY_SCENE, BATTLE_SCENE,
+    CHARACTER_DISPLAY_LINES, END_GAME_BUTTON, MAIN_MENU_SCENE, MAIN_WINDOW, RESOLUTION,
+    SHADER_UI_TEXTURE, START_GAME_BUTTON,
 };
 
 #[derive(Debug, Clone)]
@@ -28,6 +29,7 @@ pub enum UIState {
     /// characters skill list
     TargetSelection(usize, usize),
 }
+#[derive(Debug)]
 pub struct BattleAction {
     time: f32,
     character_index: usize,
@@ -48,6 +50,40 @@ impl BattleAction {
             target_character_index,
         }
     }
+
+    pub fn time(&self) -> f32 {
+        self.time
+    }
+
+    pub fn character_index(&self) -> usize {
+        self.character_index
+    }
+     
+    pub fn target_index(&self) -> usize {
+        self.target_character_index
+    }
+
+    pub fn act_out(&self, characters: &mut [SkilledCharacter]) {
+        let (source, target) = if self.character_index == self.target_character_index {
+            let (_, right) = characters.split_at_mut(self.target_character_index);
+            let (left, _) = right.split_at_mut(1);
+            let source = &mut left[0];
+            (source, None)
+        } else {
+            let (left, target) = characters.split_at_mut(self.target_character_index);
+            let (target, right) = target.split_at_mut(1);
+            let target = &mut target[0];
+            if self.character_index < self.target_character_index {
+                (&mut left[self.character_index], Some(target))
+            } else {
+                (
+                    &mut right[self.character_index - self.target_character_index - 1],
+                    Some(target),
+                )
+            }
+        };
+        source.activate_skill(self.skill_index, target)
+    }
 }
 pub struct BattleActionManager {
     actions: Vec<BattleAction>,
@@ -55,15 +91,26 @@ pub struct BattleActionManager {
 impl BattleActionManager {
     pub fn queue_action(&mut self, action: BattleAction) {
         self.actions.push(action);
-        self.actions.sort_by(|a, b| a.time.partial_cmp(&b.time).expect("Encountered NaN time"));
+        self.actions
+            .sort_by(|a, b| a.time.partial_cmp(&b.time).expect("Encountered NaN time"));
     }
 
     pub fn get_actions(&self) -> &[BattleAction] {
         &self.actions
     }
-    
+
     pub fn contains_character(&self, character_index: usize) -> bool {
-        self.actions.iter().any(|a| a.character_index == character_index)
+        self.actions
+            .iter()
+            .any(|a| a.character_index == character_index)
+    }
+
+    pub fn remove_character(&mut self, character_index: usize) {
+        self.actions.retain(|a| a.character_index != character_index);
+    }
+    
+    pub fn pop(&mut self) -> BattleAction {
+        self.actions.remove(0)
     }
 }
 pub struct BattleState {
@@ -83,7 +130,7 @@ pub trait Skill {
     fn evaluate(&self, target: Option<&mut Character>, source: &mut Character);
     /// Relative TargetGroups
     fn target_groups(&self) -> Vec<TargetGroup>;
-    fn get_time(&self, target: Option<&Character>, source: &Character) -> f32;
+    fn get_time(&self, target: Option<&Character>, source: &Character, current_time: f32) -> f32;
 }
 pub struct AttackSkill {}
 impl Skill for AttackSkill {
@@ -101,8 +148,8 @@ impl Skill for AttackSkill {
             source.health -= attack.min(source.health);
         }
     }
-    fn get_time(&self, _target: Option<&Character>, source: &Character) -> f32 {
-        source.speed as f32
+    fn get_time(&self, _target: Option<&Character>, source: &Character, current_time: f32) -> f32 {
+        current_time + source.speed as f32
     }
 }
 pub struct HealSkill {}
@@ -121,8 +168,8 @@ impl Skill for HealSkill {
             source.health += heal.min(source.max_health - source.health);
         }
     }
-    fn get_time(&self, _target: Option<&Character>, source: &Character) -> f32 {
-        source.speed as f32
+    fn get_time(&self, _target: Option<&Character>, source: &Character, current_time: f32) -> f32 {
+        current_time + source.speed as f32
     }
 }
 
@@ -134,6 +181,7 @@ pub enum GameState {
 impl Default for GameState {
     fn default() -> Self {
         let player = SkilledCharacter {
+            ki: Box::new(NoKI),
             character: Character {
                 name: "Player",
                 alignment: CharacterAlignment::Friendly,
@@ -152,6 +200,7 @@ impl Default for GameState {
             skills: vec![Box::new(AttackSkill {}), Box::new(HealSkill {})],
         };
         let player_two = SkilledCharacter {
+            ki: Box::new(NoKI),
             character: Character {
                 name: "Player Two",
                 alignment: CharacterAlignment::Friendly,
@@ -170,6 +219,7 @@ impl Default for GameState {
             skills: vec![Box::new(AttackSkill {})],
         };
         let player_three = SkilledCharacter {
+            ki: Box::new(NoKI),
             character: Character {
                 name: "Player Three",
                 alignment: CharacterAlignment::Friendly,
@@ -188,6 +238,7 @@ impl Default for GameState {
             skills: vec![Box::new(AttackSkill {})],
         };
         let enemy = SkilledCharacter {
+            ki: Box::new(SimpleKI),
             character: Character {
                 name: "Enemy",
                 alignment: CharacterAlignment::Enemy,
@@ -206,11 +257,12 @@ impl Default for GameState {
             skills: vec![Box::new(AttackSkill {})],
         };
         let enemy_two = SkilledCharacter {
+            ki: Box::new(SimpleKI),
             character: Character {
                 name: "Enemy Two",
                 alignment: CharacterAlignment::Enemy,
                 max_health: 20,
-                health: 20,
+                health: 4,
                 max_stamina: 0,
                 stamina: 0,
                 exhaustion_threshold: 0,
@@ -221,7 +273,8 @@ impl Default for GameState {
             skills: vec![Box::new(AttackSkill {})],
         };
 
-        let characters = vec![player, player_two, player_three, enemy, enemy_two];
+        let characters = vec![player_three, enemy, enemy_two];
+        // let characters = vec![player, player_two, player_three, enemy, enemy_two];
         let battle_state = BattleState {
             characters,
             current_time: 0.0,

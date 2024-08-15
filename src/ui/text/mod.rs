@@ -60,6 +60,11 @@ impl Text {
             is_dirty: true,
         }
     }
+
+    pub fn set_text(&mut self, text: String) {
+        self.text = text;
+        self.is_dirty = true;
+    }
 }
 impl Debug for Text {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
