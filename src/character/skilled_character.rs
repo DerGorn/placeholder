@@ -1,4 +1,5 @@
 use crate::battle_action::BattleActionManager;
+use std::fmt::Debug;
 
 use super::skills::Skill;
 
@@ -42,5 +43,12 @@ impl SkilledCharacter {
             &characters,
             current_time,
         );
+    }
+}
+impl Debug for SkilledCharacter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SkilledCharacter")
+            .field("character", &self.character)
+            .finish()
     }
 }

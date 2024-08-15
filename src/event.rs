@@ -4,18 +4,18 @@ use placeholder::{
 };
 use winit::keyboard::KeyCode;
 
-use crate::{battle_action::BattleAction, Character, EnemyType, Type};
+use crate::{Character, EnemyType, Type};
 
 #[derive(Debug)]
 pub enum BattleEvent {
     NextAction,
-    ActionConsequences(BattleAction),
+    ActionConsequences,
 }
 
 #[derive(Debug)]
 pub enum EntityEvent {
     BattleHighlightValidSkillTargets(Vec<EntityName>),
-    AnimateAction(BattleAction, Vec<Character>),
+    AnimateAction(Vec<Character>),
     CharacterDeath(EntityName),
 }
 

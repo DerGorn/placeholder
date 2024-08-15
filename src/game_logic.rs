@@ -124,10 +124,10 @@ impl GameLogic {
                     .collect::<Vec<_>>();
                 return vec![Event::EntityEvent(
                     BATTLE_MANAGER.into(),
-                    EntityEvent::AnimateAction(action, characters),
+                    EntityEvent::AnimateAction(characters),
                 )];
             }
-            Event::BattleEvent(BattleEvent::ActionConsequences(action)) => {
+            Event::BattleEvent(BattleEvent::ActionConsequences) => {
                 let dead_characters = battle_state
                     .characters
                     .iter()
@@ -147,9 +147,6 @@ impl GameLogic {
                     })
                     .collect::<Vec<_>>();
 
-                let character = battle_state.characters[action.character_index()]
-                    .character
-                    .name();
                 battle_state.characters.retain(|c| !c.character.is_dead());
                 if battle_state
                     .characters
@@ -163,12 +160,27 @@ impl GameLogic {
                     .all(|c| c.character.alignment() == &CharacterAlignment::Enemy)
                 {
                     todo!("Player Loses");
-                } else if let Some(character_index) = battle_state
+                }
+                let free_characters: Vec<_> = battle_state
                     .characters
                     .iter()
-                    .position(|c| c.character.name() == character)
-                {
-                    let (left, right) = battle_state.characters.split_at_mut(character_index);
+                    .enumerate()
+                    .filter(|(i, _)| !battle_state.actions.contains_character(*i))
+                    .collect();
+
+                let free_friendly_characters: Vec<_> = free_characters
+                    .iter()
+                    .filter(|(_, c)| c.character.alignment() == &CharacterAlignment::Friendly)
+                    .map(|(_, c)| c.character.name().into())
+                    .collect();
+
+                let free_enemies: Vec<usize> = free_characters
+                    .iter()
+                    .filter(|(_, c)| c.character.alignment() == &CharacterAlignment::Enemy)
+                    .map(|(i, _)| *i)
+                    .collect();
+                for enemy_index in free_enemies {
+                    let (left, right) = battle_state.characters.split_at_mut(enemy_index);
                     let (character, right) = right
                         .split_first_mut()
                         .expect("character_index out of bounds");
@@ -176,30 +188,22 @@ impl GameLogic {
                     match character.character.alignment() {
                         CharacterAlignment::Enemy => {
                             character.ki(
-                                character_index,
+                                enemy_index,
                                 &characters,
                                 &mut battle_state.actions,
                                 battle_state.current_time,
                             );
                         }
-                        CharacterAlignment::Friendly => {
-                            events.push(Event::EntityEvent(
-                                BATTLE_MANAGER.into(),
-                                EntityEvent::BattleHighlightValidSkillTargets(
-                                    battle_state
-                                        .characters
-                                        .iter()
-                                        .enumerate()
-                                        .filter(|(i, _)| {
-                                            !battle_state.actions.contains_character(*i)
-                                        })
-                                        .map(|(_, c)| c.character.name().into())
-                                        .collect(),
-                                ),
-                            ));
-                            return events;
-                        }
+                        CharacterAlignment::Friendly => {}
                     };
+                }
+
+                if !free_friendly_characters.is_empty() {
+                    events.push(Event::EntityEvent(
+                        BATTLE_MANAGER.into(),
+                        EntityEvent::BattleHighlightValidSkillTargets(free_friendly_characters),
+                    ));
+                    return events;
                 }
                 events.push(Event::BattleEvent(BattleEvent::NextAction));
                 return events;

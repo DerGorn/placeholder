@@ -85,7 +85,16 @@ impl BattleActionManager {
 
     pub fn remove_character(&mut self, character_index: usize) {
         self.actions
-            .retain(|a| a.character_index != character_index);
+            .retain(|a| a.character_index != character_index && a.target_character_index != character_index);
+        self.actions.iter_mut().for_each(|a| {
+            if a.character_index > character_index {
+            a.character_index -= 1;
+            }
+            if a.target_character_index > character_index {
+            a.target_character_index -= 1;
+            }
+        });
+            
     }
 
     pub fn pop(&mut self) -> BattleAction {

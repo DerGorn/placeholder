@@ -122,7 +122,7 @@ impl Entity<Type, Event> for BattleManager {
                     }
                 }
             }
-            EntityEvent::AnimateAction(action, characters) => {
+            EntityEvent::AnimateAction(characters) => {
                 for character in characters {
                     let character_line_index = match character.alignment() {
                         CharacterAlignment::Friendly => 1,
@@ -139,7 +139,7 @@ impl Entity<Type, Event> for BattleManager {
                         ));
                     chatacter_gui.set_content(character.to_string());
                 }
-                return vec![Event::BattleEvent(BattleEvent::ActionConsequences(action))];
+                return vec![Event::BattleEvent(BattleEvent::ActionConsequences)];
             }
             EntityEvent::CharacterDeath(character) => {
                 self.gui.delete_child_entity(&character);

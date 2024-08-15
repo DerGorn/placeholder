@@ -70,7 +70,7 @@ impl Default for GameState {
             Box::new(SimpleKI),
         );
         let enemy_two = SkilledCharacter::new(
-            Character::new("Enemy Two", CharacterAlignment::Enemy, 20, 0, 0, 12, 15),
+            Character::new("Enemy Two", CharacterAlignment::Enemy, 4, 0, 0, 12, 15),
             vec![Box::new(AttackSkill {})],
             Box::new(SimpleKI),
         );
