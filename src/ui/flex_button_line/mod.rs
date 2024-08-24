@@ -5,18 +5,21 @@ use threed::Vector;
 use winit::{dpi::PhysicalSize, keyboard::PhysicalKey};
 
 use crate::{
-    event::Event,
-    impl_flex_struct,
-    ui::{Alignment, FlexDirection, FlexItem, FlexOrigin},
-    vertex::render_ui_sprite,
-    Type,
+    character::ui::CharacterGui, event::Event, impl_flex_struct, ui::{Alignment, FlexDirection, FlexItem, FlexOrigin}, vertex::render_ui_sprite, Type
 };
 
 mod button;
 pub use button::{Button, ButtonStyle};
 
+use super::ProgressBar;
+pub mod button_styles {
+    pub use super::button::{
+        BackgroundImageStyle, BorderBoxStyle, ColorPair, ImageStyle, PlainStyle, UnderLineStyle,
+    };
+}
+
 macro_rules! impl_flex_button_manager {
-    ($name: ident, $child_type: ty, up: $($up_key:ident),+; down: $($down_key:ident),+) => {
+    ($name: ident, $child_type: ty, up: $($up_key:ident),*; down: $($down_key:ident),*) => {
         pub type $name = FlexInputManager<$child_type>;
         impl $name {
             pub fn new(
@@ -59,12 +62,12 @@ macro_rules! impl_flex_button_manager {
                     down_keys: vec![
                         $(
                             winit::keyboard::PhysicalKey::Code(winit::keyboard::KeyCode::$down_key),
-                        )+
+                        )*
                     ],
                     up_keys: vec![
                         $(
                             winit::keyboard::PhysicalKey::Code(winit::keyboard::KeyCode::$up_key),
-                        )+
+                        )*
                     ],
                 }
             }
@@ -73,6 +76,9 @@ macro_rules! impl_flex_button_manager {
 }
 impl_flex_button_manager!(FlexButtonLineManager, FlexButtonLine, up: KeyE; down: KeyQ);
 impl_flex_button_manager!(FlexButtonLine, Button, up: KeyW, KeyA; down: KeyS, KeyD);
+impl_flex_button_manager!(FlexProgressBarLine, ProgressBar, up: ; down:);
+impl_flex_button_manager!(FlexCharacterGuiLine, CharacterGui, up: KeyW, KeyA; down: KeyS, KeyD);
+impl_flex_button_manager!(FlexCharacterGuiLineManager, FlexCharacterGuiLine, up: KeyE; down: KeyQ);
 
 pub struct FlexInputManager<T: FlexItem> {
     flex_direction: FlexDirection,
@@ -96,7 +102,7 @@ pub struct FlexInputManager<T: FlexItem> {
     down_keys: Vec<PhysicalKey>,
 }
 impl<T: FlexItem> FlexInputManager<T> {
-    fn focus_child(&mut self, index: usize) {
+    pub fn focus_child(&mut self, index: usize) {
         if index >= self.children.len() {
             warn!(
                 "{:?}: Trying to focus non existing child {}",

@@ -2,7 +2,7 @@ mod graphics_provider;
 pub mod graphics {
     pub use super::graphics_provider::{
         GraphicsProvider, Index, RenderSceneDescriptor, RenderSceneName, ShaderDescriptor,
-        UniformBufferName, Vertex, Visibility,
+        UniformBufferName, Vertex, Visibility, DEFAULT_TEXTURE,
     };
 }
 

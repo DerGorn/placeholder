@@ -1,12 +1,20 @@
 use std::fmt::{Debug, Display};
 
 mod skilled_character;
-pub use skilled_character::SkilledCharacter;
+pub use skilled_character::{CharacterBuilder, CharacterGuiManager, SkilledCharacter, CHARACTER_FONT_SIZE, CHARACTER_TEXT_HEIGHT};
 
 mod ki;
 pub use ki::{KIBehavior, NoKI, SimpleKI};
 
 pub mod skills;
+
+pub mod characters {
+    pub use super::skilled_character::characters::*;
+}
+
+pub mod ui {
+    pub use super::skilled_character::ui::*;
+}
 
 #[derive(PartialEq, Clone)]
 pub enum CharacterAlignment {

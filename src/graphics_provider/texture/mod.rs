@@ -1,6 +1,7 @@
 use std::{fs, num::NonZeroU32, path::Path};
 
 use image::GenericImageView;
+pub const DEFAULT_TEXTURE: &str = "Default Texture Provider Texture";
 
 pub struct TextureProvider {
     pub bind_group_layout: Option<wgpu::BindGroupLayout>,
@@ -16,14 +17,14 @@ impl TextureProvider {
             height: 1,
             depth_or_array_layers: 1,
         };
-        let texture = Texture::from_bytes(device, queue, &bytes, size, None);
+        let texture = Texture::from_bytes(device, queue, &bytes, size, Some(DEFAULT_TEXTURE));
         let mut provider = Self {
             bind_group_layout: None,
             bind_group: None,
             textures: Vec::new(),
             current_id: 0,
         };
-        provider.register_texture(device, texture, None);
+        provider.register_texture(device, texture);
         provider
     }
 
@@ -39,9 +40,8 @@ impl TextureProvider {
         &mut self,
         device: &wgpu::Device,
         texture: Texture,
-        label: Option<&str>,
     ) -> u32 {
-        if let Some(index) = self.get_texture_index(label) {
+        if let Some(index) = self.get_texture_index(texture.label.as_deref()) {
             return index as u32;
         }
         self.textures.push(texture);
@@ -110,7 +110,7 @@ impl TextureProvider {
         }
         let texture = Texture::new(device, queue, path, label);
 
-        self.register_texture(device, texture, label)
+        self.register_texture(device, texture)
     }
 }
 
@@ -176,7 +176,7 @@ impl Texture {
     }
 
     fn new(device: &wgpu::Device, queue: &wgpu::Queue, path: &Path, label: Option<&str>) -> Self {
-        let bytes = fs::read(path).expect(&format!("Could not read: '{:?}'", path));
+        let bytes = fs::read(path).expect(&format!("Could not read: '{:?}' for texture {:?}", path, label));
         let img =
             image::load_from_memory(&bytes).expect(&format!("Could not load image: '{:?}", path));
 

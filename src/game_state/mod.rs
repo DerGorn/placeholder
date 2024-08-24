@@ -1,8 +1,7 @@
 use crate::battle_action::BattleActionManager;
+use crate::character::characters::BiaKarui;
 use crate::character::skills::AttackSkill;
-use crate::character::skills::HealSkill;
 use crate::character::CharacterAlignment;
-use crate::character::NoKI;
 use crate::character::SimpleKI;
 use crate::character::CHARACTER_DISPLAY_LINES;
 use placeholder::game_engine::{Scene, SpritePosition};
@@ -21,6 +20,8 @@ use crate::{
     RESOLUTION, SHADER_UI_TEXTURE, START_GAME_BUTTON,
 };
 
+use crate::character::CharacterBuilder;
+
 mod ui_state;
 pub use ui_state::UIState;
 
@@ -33,37 +34,7 @@ pub enum GameState {
 }
 impl Default for GameState {
     fn default() -> Self {
-        let player = SkilledCharacter::new(
-            Character::new("Player", CharacterAlignment::Friendly, 100, 10, 100, 10, 11),
-            vec![Box::new(AttackSkill {}), Box::new(HealSkill {})],
-            Box::new(NoKI),
-        );
-        let player_two = SkilledCharacter::new(
-            Character::new(
-                "Player Two",
-                CharacterAlignment::Friendly,
-                50,
-                20,
-                150,
-                20,
-                8,
-            ),
-            vec![Box::new(AttackSkill {})],
-            Box::new(NoKI),
-        );
-        let player_three = SkilledCharacter::new(
-            Character::new(
-                "Player Three",
-                CharacterAlignment::Friendly,
-                300,
-                2,
-                300,
-                2,
-                4,
-            ),
-            vec![Box::new(AttackSkill {})],
-            Box::new(NoKI),
-        );
+        let player = BiaKarui::default().build();
         let enemy = SkilledCharacter::new(
             Character::new("Enemy", CharacterAlignment::Enemy, 100, 5, 10, 5, 10),
             vec![Box::new(AttackSkill {})],
@@ -75,7 +46,7 @@ impl Default for GameState {
             Box::new(SimpleKI),
         );
 
-        let characters = vec![player, player_two, player_three, enemy, enemy_two];
+        let characters = vec![player, enemy, enemy_two];
         let battle_state = BattleState {
             characters,
             current_time: 0.0,
@@ -147,10 +118,7 @@ impl GameState {
                 ))],
             }],
             GameState::Battle(battle_state, UIState::CharacterSelection) => {
-                let font_size = 32;
-                let character_text_height = (CHARACTER_DISPLAY_LINES + 0.25) * font_size as f32;
-
-                let characters = BattleManager::new(battle_state, font_size, character_text_height);
+                let characters = BattleManager::new(battle_state);
                 vec![
                     Scene {
                         name: BATTLE_DETAIL_OVERLAY_SCENE.into(),

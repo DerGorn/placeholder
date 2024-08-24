@@ -15,6 +15,7 @@ mod shader_descriptor;
 pub use shader_descriptor::ShaderDescriptor;
 
 mod texture;
+pub use texture::DEFAULT_TEXTURE;
 use texture::TextureProvider;
 
 mod buffer_writer;

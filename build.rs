@@ -3,7 +3,6 @@ use fs_extra::copy_items;
 use fs_extra::dir::CopyOptions;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    println!("cargo:rerun-if-changed=res/*");
 
     let out_dir = env::var("OUT_DIR")?;
     let mut copy_options = CopyOptions::new();

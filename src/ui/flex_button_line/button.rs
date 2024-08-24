@@ -3,6 +3,7 @@ use std::fmt::Debug;
 use placeholder::{
     app::{IndexBuffer, VertexBuffer},
     game_engine::{BoundingBox, Entity, EntityName, SpritePosition, SpriteSheet, SpriteSheetName},
+    graphics::DEFAULT_TEXTURE,
 };
 use threed::Vector;
 use winit::{dpi::PhysicalSize, keyboard::PhysicalKey};
@@ -22,8 +23,8 @@ const HIGHLIGHT_HIGH_COLOR: Color = Color::new_rgba(255, 255, 0, 255);
 const HIGHLIGHT_LOW_COLOR: Color = Color::new_rgba(82, 82, 5, 160);
 
 pub struct ColorPair {
-    high: Color,
-    low: Color,
+    pub high: Color,
+    pub low: Color,
 }
 impl ColorPair {
     pub fn new(high: Color, low: Color) -> Self {
@@ -49,6 +50,19 @@ pub struct BackgroundImageStyle {
     focus_sprite: SpritePosition,
     unfocus_sprite: SpritePosition,
     highlight_sprite: SpritePosition,
+}
+impl Default for BackgroundImageStyle {
+    fn default() -> Self {
+        BackgroundImageStyle {
+            focus: FOCUS_HIGH_COLOR,
+            unfocus: UNFOCUS_HIGH_COLOR,
+            highlight: HIGHLIGHT_HIGH_COLOR,
+            sprite_sheet: DEFAULT_TEXTURE.into(),
+            focus_sprite: SpritePosition::new(0, 0),
+            unfocus_sprite: SpritePosition::new(0, 0),
+            highlight_sprite: SpritePosition::new(0, 0),
+        }
+    }
 }
 pub struct PlainStyle {
     focus: Color,
@@ -234,6 +248,8 @@ impl Entity<Type, Event> for Button {
                     let sprite_sheet = SpriteSheet::default();
                     let mut bbox = self.bounding_box();
                     bbox.anchor += Vector::new(BORDER_THICKNESS, BORDER_THICKNESS, 0.0);
+                    bbox.size.height -= 2.0 * BORDER_THICKNESS;
+                    bbox.size.width -= 2.0 * BORDER_THICKNESS;
                     render_ui_sprite(
                         &bbox,
                         vertices,
@@ -274,8 +290,25 @@ impl Entity<Type, Event> for Button {
             ButtonStyle::Image(_) => {
                 todo!("implement ButtonStyle::Image");
             }
-            ButtonStyle::BackgroundImage(_) => {
-                todo!("implement ButtonStyle::BackgroundImage");
+            ButtonStyle::BackgroundImage(style) => {
+                if let Some(sprite_sheet) = sprite_sheet[1] {
+                    let sprite_position = if self.is_highlighted {
+                        &style.highlight_sprite
+                    } else if self.is_focused {
+                        &style.focus_sprite
+                    } else {
+                        &style.unfocus_sprite
+                    };
+                    let bbox = self.bounding_box();
+                    render_ui_sprite(
+                        &bbox,
+                        vertices,
+                        indices,
+                        sprite_sheet,
+                        sprite_position,
+                        None,
+                    );
+                }
             }
         }
         let pos = self.text.position();
@@ -289,7 +322,7 @@ impl Entity<Type, Event> for Button {
         if let ButtonStyle::BorderBox(_) = self.style {
             bbox.size.height += 2.0 * BORDER_THICKNESS;
             bbox.size.width += 2.0 * BORDER_THICKNESS;
-            bbox.anchor -= Vector::new(BORDER_THICKNESS, BORDER_THICKNESS, 0.0);
+            bbox.anchor -= Vector::new(2.0 * BORDER_THICKNESS, BORDER_THICKNESS, 0.0);
         }
         bbox
     }
@@ -297,14 +330,14 @@ impl Entity<Type, Event> for Button {
         &self.name
     }
     fn sprite_sheets(&self) -> Vec<&placeholder::game_engine::SpriteSheetName> {
-        let mut sprite_sheets = match &self.style {
+        let mut sprite_sheets = self.text.sprite_sheets();
+        match &self.style {
             ButtonStyle::Image(ImageStyle { sprite_sheet, .. })
             | ButtonStyle::BackgroundImage(BackgroundImageStyle { sprite_sheet, .. }) => {
-                vec![sprite_sheet]
+                sprite_sheets.push(sprite_sheet);
             }
-            _ => vec![],
+            _ => {}
         };
-        sprite_sheets.extend_from_slice(&mut self.text.sprite_sheets());
         sprite_sheets
     }
     fn entity_type(&self) -> Type {

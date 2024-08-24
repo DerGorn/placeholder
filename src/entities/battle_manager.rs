@@ -5,12 +5,11 @@ use threed::Vector;
 use winit::dpi::PhysicalSize;
 
 use crate::{
-    character::CharacterAlignment,
+    character::{CharacterAlignment, CHARACTER_TEXT_HEIGHT},
     event::{BattleEvent, EntityEvent, Event},
     game_state::BattleState,
     ui::{
-        Alignment, Button, ButtonStyle, FlexButtonLine, FlexButtonLineManager, FlexDirection,
-        FlexOrigin, FontSize,
+        Alignment, FlexCharacterGuiLine, FlexCharacterGuiLineManager, FlexDirection, FlexOrigin
     },
     Type, RESOLUTION,
 };
@@ -18,45 +17,23 @@ use crate::{
 pub const BATTLE_MANAGER: &str = "Battle Manager";
 
 pub struct BattleManager {
-    gui: Box<FlexButtonLineManager>,
+    gui: Box<FlexCharacterGuiLineManager>,
 }
 impl BattleManager {
-    pub fn new(battle_state: &BattleState, font_size: u8, character_text_height: f32) -> Self {
+    pub fn new(battle_state: &BattleState) -> Self {
         let enemies = battle_state
             .characters
             .iter()
             .filter(|c| c.character.alignment() == &CharacterAlignment::Enemy)
-            .map(|c| (format!("{}", c.character.name()), c.character.to_string()))
-            .map(|(name, content)| {
-                Box::new(Button::new(
-                    content,
-                    name.into(),
-                    PhysicalSize::new(400, character_text_height as u16),
-                    Vector::scalar(0.0),
-                    FontSize::new(font_size),
-                    false,
-                    ButtonStyle::default(),
-                ))
-            })
+            .map(|c| c.gui.create_gui(c))
             .collect::<Vec<_>>();
         let friends = battle_state
             .characters
             .iter()
             .filter(|c| c.character.alignment() == &CharacterAlignment::Friendly)
-            .map(|c| (format!("{}", c.character.name()), c.character.to_string()))
-            .map(|(name, content)| {
-                Box::new(Button::new(
-                    content,
-                    name.into(),
-                    PhysicalSize::new(400, character_text_height as u16),
-                    Vector::scalar(0.0),
-                    FontSize::new(font_size),
-                    false,
-                    ButtonStyle::default(),
-                ))
-            })
+            .map(|c| c.gui.create_gui(c))
             .collect::<Vec<_>>();
-        let enemies = FlexButtonLine::new(
+        let enemies = FlexCharacterGuiLine::new(
             FlexDirection::X,
             FlexOrigin::Start,
             Alignment::Center,
@@ -70,7 +47,7 @@ impl BattleManager {
             enemies,
         );
 
-        let friends = FlexButtonLine::new(
+        let friends = FlexCharacterGuiLine::new(
             FlexDirection::X,
             FlexOrigin::Start,
             Alignment::Center,
@@ -84,12 +61,12 @@ impl BattleManager {
             friends,
         );
         Self {
-            gui: Box::new(FlexButtonLineManager::new(
+            gui: Box::new(FlexCharacterGuiLineManager::new(
                 FlexDirection::Y,
                 FlexOrigin::Start,
                 Alignment::Center,
                 None,
-                RESOLUTION.height as f32 - 200.0 - 2.0 * character_text_height,
+                RESOLUTION.height as f32 - 200.0 - 2.0 * CHARACTER_TEXT_HEIGHT,
                 false,
                 PhysicalSize::new(RESOLUTION.width, RESOLUTION.height - 200),
                 Vector::new(0.0, 0.0, 0.0),
@@ -112,13 +89,35 @@ impl Entity<Type, Event> for BattleManager {
     ) -> Vec<Event> {
         match event {
             EntityEvent::BattleHighlightValidSkillTargets(valid_targets) => {
-                for character_line in &mut self.gui.children {
-                    for character in &mut character_line.children {
+                let mut first = true;
+                let mut focus_target = None;
+                for (line_index, character_line) in self.gui.children.iter_mut().enumerate() {
+                    for (character_index, character) in
+                        character_line.children.iter_mut().enumerate()
+                    {
                         if valid_targets.contains(character.name()) {
                             character.set_highlighted(true);
+                            if first {
+                                focus_target = Some((line_index, character_index));
+                                first = false;
+                            }
                         } else {
                             character.set_highlighted(false);
                         }
+                    }
+                }
+                if let Some((line_index, character_index)) = focus_target {
+                    self.gui.focus_child(line_index);
+                    use crate::ui::FlexItem;
+                    if self.gui.children[line_index]
+                        .children
+                        .iter()
+                        .find(|c| c.has_focus())
+                        .map_or(true, |focused_child| {
+                            !valid_targets.contains(focused_child.name())
+                        })
+                    {
+                        self.gui.children[line_index].focus_child(character_index);
                     }
                 }
             }
@@ -137,7 +136,7 @@ impl Entity<Type, Event> for BattleManager {
                             "Character {:?} not found in gui",
                             character.name()
                         ));
-                    chatacter_gui.set_content(character.to_string());
+                    chatacter_gui.set_content(&character);
                 }
                 return vec![Event::BattleEvent(BattleEvent::ActionConsequences)];
             }
