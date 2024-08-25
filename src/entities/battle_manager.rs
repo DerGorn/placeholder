@@ -60,15 +60,17 @@ impl BattleManager {
             true,
             friends,
         );
+
+        let padding = 40;
         Self {
             gui: Box::new(FlexCharacterGuiLineManager::new(
                 FlexDirection::Y,
                 FlexOrigin::Start,
                 Alignment::Center,
                 None,
-                RESOLUTION.height as f32 - 200.0 - 2.0 * CHARACTER_TEXT_HEIGHT,
+                RESOLUTION.height as f32 / 3.0 - padding as f32,
                 false,
-                PhysicalSize::new(RESOLUTION.width, RESOLUTION.height - 200),
+                PhysicalSize::new(RESOLUTION.width, RESOLUTION.height - padding),
                 Vector::new(0.0, 0.0, 0.0),
                 BATTLE_MANAGER.into(),
                 true,

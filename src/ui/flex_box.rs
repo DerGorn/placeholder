@@ -248,6 +248,10 @@ macro_rules! impl_flex_struct {
             }
             events
         }
+        fn flex_set_position(&mut self, position: &Vector<f32>) {
+            self.position = position.clone();
+            self.flex();
+        }
     };
 }
 
@@ -385,10 +389,10 @@ impl Entity<Type, Event> for FlexBox {
 }
 impl FlexItem for FlexBox {
     fn set_position(&mut self, position: &Vector<f32>) {
-        if self.position != *position {
-            self.is_dirty = true
-        }
-        self.position = position.clone();
+        // if self.position != *position {
+        //     self.is_dirty = true
+        // }
+        self.flex_set_position(position);
     }
     fn is_dirty(&mut self) -> bool {
         let dirt = self.is_dirty;

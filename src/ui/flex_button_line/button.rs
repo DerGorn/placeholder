@@ -18,7 +18,7 @@ use crate::{
 const FOCUS_HIGH_COLOR: Color = Color::new_rgba(255, 0, 0, 255);
 const FOCUS_LOW_COLOR: Color = Color::new_rgba(82, 5, 5, 160);
 const UNFOCUS_HIGH_COLOR: Color = Color::new_rgba(24, 25, 27, 255);
-const UNFOCUS_LOW_COLOR: Color = Color::new_rgba(0, 0, 0, 160);
+pub const UNFOCUS_LOW_COLOR: Color = Color::new_rgba(0, 0, 0, 160);
 const HIGHLIGHT_HIGH_COLOR: Color = Color::new_rgba(255, 255, 0, 255);
 const HIGHLIGHT_LOW_COLOR: Color = Color::new_rgba(82, 82, 5, 160);
 
@@ -32,24 +32,25 @@ impl ColorPair {
     }
 }
 pub struct BorderBoxStyle {
-    focus: ColorPair,
-    unfocus: ColorPair,
-    highlight: ColorPair,
+    pub focus: ColorPair,
+    pub unfocus: ColorPair,
+    pub highlight: ColorPair,
 }
 pub struct ImageStyle {
-    sprite_sheet: SpriteSheetName,
-    focus_sprite: SpritePosition,
-    unfocus_sprite: SpritePosition,
-    highlight_sprite: SpritePosition,
+    pub sprite_sheet: SpriteSheetName,
+    pub focus_sprite: SpritePosition,
+    pub unfocus_sprite: SpritePosition,
+    pub highlight_sprite: SpritePosition,
 }
 pub struct BackgroundImageStyle {
-    focus: Color,
-    unfocus: Color,
-    highlight: Color,
-    sprite_sheet: SpriteSheetName,
-    focus_sprite: SpritePosition,
-    unfocus_sprite: SpritePosition,
-    highlight_sprite: SpritePosition,
+    pub focus: Color,
+    pub unfocus: Color,
+    pub highlight: Color,
+    pub sprite_sheet: SpriteSheetName,
+    pub focus_sprite: SpritePosition,
+    pub unfocus_sprite: SpritePosition,
+    pub highlight_sprite: SpritePosition,
+    pub with_border: bool,
 }
 impl Default for BackgroundImageStyle {
     fn default() -> Self {
@@ -61,18 +62,19 @@ impl Default for BackgroundImageStyle {
             focus_sprite: SpritePosition::new(0, 0),
             unfocus_sprite: SpritePosition::new(0, 0),
             highlight_sprite: SpritePosition::new(0, 0),
+            with_border: true,
         }
     }
 }
 pub struct PlainStyle {
-    focus: Color,
-    unfocus: Color,
-    highlight: Color,
+    pub focus: Color,
+    pub unfocus: Color,
+    pub highlight: Color,
 }
 pub struct UnderLineStyle {
-    focus: Color,
-    unfocus: Color,
-    highlight: Color,
+    pub focus: Color,
+    pub unfocus: Color,
+    pub highlight: Color,
 }
 
 #[allow(dead_code)]
@@ -299,7 +301,17 @@ impl Entity<Type, Event> for Button {
                     } else {
                         &style.unfocus_sprite
                     };
-                    let bbox = self.bounding_box();
+                    let border_color = Some(if self.is_focused {
+                        &style.focus
+                    } else if self.is_highlighted {
+                        &style.highlight
+                    } else {
+                        &style.unfocus
+                    });
+                    let mut bbox = self.bounding_box();
+                    bbox.anchor += Vector::new(BORDER_THICKNESS, BORDER_THICKNESS, 0.0);
+                    bbox.size.height -= 2.0 * BORDER_THICKNESS;
+                    bbox.size.width -= 2.0 * BORDER_THICKNESS;
                     render_ui_sprite(
                         &bbox,
                         vertices,
@@ -307,6 +319,13 @@ impl Entity<Type, Event> for Button {
                         sprite_sheet,
                         sprite_position,
                         None,
+                    );
+                    render_ui_box_border(
+                        &bbox,
+                        vertices,
+                        indices,
+                        BORDER_THICKNESS,
+                        border_color.expect("No border color"),
                     );
                 }
             }
@@ -319,10 +338,21 @@ impl Entity<Type, Event> for Button {
     }
     fn bounding_box(&self) -> BoundingBox {
         let mut bbox = self.text.bounding_box();
-        if let ButtonStyle::BorderBox(_) = self.style {
+        let mut resize_bbox = || {
             bbox.size.height += 2.0 * BORDER_THICKNESS;
             bbox.size.width += 2.0 * BORDER_THICKNESS;
-            bbox.anchor -= Vector::new(2.0 * BORDER_THICKNESS, BORDER_THICKNESS, 0.0);
+            bbox.anchor -= Vector::new(BORDER_THICKNESS, BORDER_THICKNESS, 0.0);
+        };
+        match self.style {
+            ButtonStyle::BorderBox(_) => {
+                resize_bbox();
+            }
+            ButtonStyle::BackgroundImage(BackgroundImageStyle { with_border, .. })
+                if with_border =>
+            {
+                resize_bbox();
+            }
+            _ => {}
         }
         bbox
     }

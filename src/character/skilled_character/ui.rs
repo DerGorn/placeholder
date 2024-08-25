@@ -9,6 +9,7 @@ use crate::{
     Type,
 };
 
+
 #[derive(Debug)]
 pub struct CharacterGui {
     button: Box<Button>,
@@ -23,7 +24,7 @@ impl CharacterGui {
                 crate::ui::FlexOrigin::End,
                 crate::ui::Alignment::End,
                 None,
-                10.0,
+                0.0,
                 false,
                 PhysicalSize::new(bbox.size.width as u16, bbox.size.height as u16),
                 bbox.anchor,
@@ -40,7 +41,22 @@ impl CharacterGui {
     }
 
     pub fn set_content(&mut self, character: &Character) {
-        self.button.set_content(character.to_string())
+        for bar in &mut self.bars.children {
+            match bar.name().as_str() {
+                "health" => {
+                    bar.set_value(character.health)
+                },
+                "stamina" => {
+                    bar.set_value(character.stamina)
+                }
+                "exhaustion" => {
+                    bar.set_value(character.exhaustion)
+                }
+                x => {
+                    unimplemented!("no stat '{}' on character, but a bar for it exists on '{}'", x, character.name)
+                }
+            }
+        }
     }
 }
 impl Entity<Type, Event> for CharacterGui {

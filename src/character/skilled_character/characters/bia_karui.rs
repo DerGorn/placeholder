@@ -3,17 +3,15 @@ use winit::dpi::PhysicalSize;
 
 use crate::{
     character::{
-        skilled_character::ui::CharacterGui,
+        skilled_character::{ui::CharacterGui, BAR_LOW_COLOR, CHARACTER_PORTRAIT_SIZE},
         skills::{AttackSkill, HealSkill},
         Character, CharacterAlignment, NoKI, SkilledCharacter,
-    },
-    ui::{button_styles::BackgroundImageStyle, Button, ButtonStyle, FontSize},
+    }, color::Color, ui::{button_styles::{BackgroundImageStyle, ColorPair}, Button, ButtonStyle, FontSize, ProgressBar}
 };
 
 use crate::character::CharacterBuilder;
 use crate::character::CharacterGuiManager;
 use crate::character::CHARACTER_FONT_SIZE;
-use crate::character::CHARACTER_TEXT_HEIGHT;
 
 const MAX_HEALTH: u16 = 100;
 const MAX_STAMINA: u16 = 100;
@@ -65,18 +63,46 @@ impl CharacterGuiManager for BiaKaruiGui {
     fn create_gui(&self, character: &SkilledCharacter) -> Box<CharacterGui> {
         Box::new(CharacterGui::new(
             Box::new(Button::new(
-                character.character.to_string(),
+                String::new(),
                 character.character.name.into(),
-                PhysicalSize::new(400, CHARACTER_TEXT_HEIGHT as u16),
+                PhysicalSize::new(203, 360),
                 Vector::scalar(0.0),
                 FontSize::new(CHARACTER_FONT_SIZE),
                 false,
-                ButtonStyle::BackgroundImage(BackgroundImageStyle::default()), // ButtonStyle::default(),
+                ButtonStyle::BackgroundImage(BackgroundImageStyle {
+                    sprite_sheet: "characters\\bia_karui".into(),
+                    ..Default::default()
+                }), // ButtonStyle::default(),
             )),
-            vec![],
+            vec![
+                Box::new(ProgressBar::new(
+                    "health".into(),
+                    PhysicalSize::new((CHARACTER_PORTRAIT_SIZE.width as f32 * 0.8) as u16, 20),
+                    Vector::scalar(0.0),
+                    character.character.health,
+                    character.character.max_health,
+                    ColorPair::new(Color::new_rgba(255, 0, 0, 255), BAR_LOW_COLOR),
+                    10,
+                )),
+                Box::new(ProgressBar::new(
+                    "stamina".into(),
+                    PhysicalSize::new((CHARACTER_PORTRAIT_SIZE.width as f32 * 0.8) as u16, 20),
+                    Vector::scalar(0.0),
+                    character.character.stamina,
+                    character.character.max_stamina,
+                    ColorPair::new(Color::new_rgba(255, 255, 0, 255), BAR_LOW_COLOR),
+                    10,
+                )),
+                Box::new(ProgressBar::new(
+                    "exhaustion".into(),
+                    PhysicalSize::new((CHARACTER_PORTRAIT_SIZE.width as f32 * 0.8) as u16, 20),
+                    Vector::scalar(0.0),
+                    character.character.exhaustion,
+                    character.character.exhaustion_threshold,
+                    ColorPair::new(Color::new_rgba(0, 255, 255, 255), BAR_LOW_COLOR),
+                    10,
+                )),
+            ],
         ))
-    }
-    fn update_gui(&self, character: &SkilledCharacter) {
-        println!("Update Bia");
     }
 }

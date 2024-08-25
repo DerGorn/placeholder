@@ -3,7 +3,6 @@ use crate::character::characters::BiaKarui;
 use crate::character::skills::AttackSkill;
 use crate::character::CharacterAlignment;
 use crate::character::SimpleKI;
-use crate::character::CHARACTER_DISPLAY_LINES;
 use placeholder::game_engine::{Scene, SpritePosition};
 use threed::Vector;
 use winit::dpi::PhysicalSize;

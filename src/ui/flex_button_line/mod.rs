@@ -14,7 +14,7 @@ pub use button::{Button, ButtonStyle};
 use super::ProgressBar;
 pub mod button_styles {
     pub use super::button::{
-        BackgroundImageStyle, BorderBoxStyle, ColorPair, ImageStyle, PlainStyle, UnderLineStyle,
+        BackgroundImageStyle, BorderBoxStyle, ColorPair, ImageStyle, PlainStyle, UnderLineStyle, UNFOCUS_LOW_COLOR,
     };
 }
 
@@ -236,10 +236,10 @@ impl<T: FlexItem> Entity<Type, Event> for FlexInputManager<T> {
 }
 impl<T: FlexItem> FlexItem for FlexInputManager<T> {
     fn set_position(&mut self, position: &Vector<f32>) {
-        if self.position != *position {
-            self.is_dirty = true
-        }
-        self.position = position.clone();
+        // if self.position != *position {
+        //     self.is_dirty = true
+        // }
+        self.flex_set_position(position);
     }
 
     fn is_dirty(&mut self) -> bool {
