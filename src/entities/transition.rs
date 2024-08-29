@@ -43,7 +43,6 @@ impl Transition {
         let frame_time = (transition_time.as_nanos() / (steps as u128)) as u64;
         let animation = match transition_type {
             TransitionTypes::BattleTransition => Animation::new(
-                name.into(),
                 lerp(
                     vec![
                         Vector::new(-0.05, 0.05, 0.0),

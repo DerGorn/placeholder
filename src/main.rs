@@ -86,9 +86,10 @@ const START_GAME_BUTTON: &str = "StartGameButton";
 const RESOLUTION: PhysicalSize<u16> = PhysicalSize::new(1920, 1080);
 const FLOAT_RESOULTION: PhysicalSize<f32> =
     PhysicalSize::new(RESOLUTION.width as f32, RESOLUTION.height as f32);
+
+const TARGET_FPS: u8 = 60;
 fn main() {
     env_logger::Builder::from_env(Env::default().default_filter_or("warn")).init();
-    let target_fps = 60;
 
     let cursor_path = "res/images/cursor/Cursor_Goth_Cursor.png";
     let main_window = WindowAttributes::default()
@@ -241,6 +242,6 @@ fn main() {
     // let source = Decoder::new(file).unwrap().amplify(0.1);
     // sink.append(source);
 
-    let mut app = ManagerApplication::new(Game::new(ressources, target_fps, GameLogic::new()));
+    let mut app = ManagerApplication::new(Game::new(ressources, TARGET_FPS, GameLogic::new()));
     app.run();
 }

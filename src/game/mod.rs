@@ -324,7 +324,7 @@ impl<E: ExternalEvent + 'static, S: State<E>> EventManager<GameEvent<E>> for Gam
                 }
             }
             GameEvent::Timer(delta_t) => {
-                for scene in self.active_scenes.iter_mut() {
+                for scene in self.active_scenes.iter_mut().chain(self.suspended_scenes.iter_mut()) {
                     let mut vertices = VertexBuffer::new();
                     let mut indices = IndexBuffer::new();
                     let entities = &mut scene.entities;

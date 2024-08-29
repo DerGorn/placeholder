@@ -17,6 +17,7 @@ pub struct Enemy {
     pub position: Vector<f32>,
     pub animation: Animation<SpritePosition>,
     pub enemy_type: EnemyType,
+    pub sprite_sheet: SpriteSheetName,
 }
 impl Debug for Enemy {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -71,7 +72,7 @@ impl Entity<Type, Event> for Enemy {
         }
     }
     fn sprite_sheets(&self) -> Vec<&SpriteSheetName> {
-        vec![&self.animation.sprite_sheet()]
+        vec![&self.sprite_sheet]
     }
     fn name(&self) -> &EntityName {
         &self.name

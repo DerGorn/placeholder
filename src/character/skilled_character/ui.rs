@@ -1,4 +1,4 @@
-use placeholder::game_engine::Entity;
+use placeholder::game_engine::{Entity, EntityName};
 use threed::Vector;
 use winit::dpi::PhysicalSize;
 
@@ -40,9 +40,10 @@ impl CharacterGui {
         self.button.set_highlighted(highlighted);
     }
 
-    pub fn set_content(&mut self, character: &Character) {
+    pub fn set_content(&mut self, character: &Character) -> Vec<EntityName> {
+        let mut pending_animations = vec![];
         for bar in &mut self.bars.children {
-            match bar.name().as_str() {
+            if match bar.name().as_str() {
                 "health" => {
                     bar.set_value(character.health)
                 },
@@ -55,18 +56,21 @@ impl CharacterGui {
                 x => {
                     unimplemented!("no stat '{}' on character, but a bar for it exists on '{}'", x, character.name)
                 }
+            } {
+                pending_animations.push(bar.name().clone());
             }
         }
+        pending_animations
     }
 }
 impl Entity<Type, Event> for CharacterGui {
     fn update(
         &mut self,
-        _entities: &Vec<&Box<dyn Entity<Type, Event>>>,
-        _delta_t: &std::time::Duration,
-        _scene: &placeholder::game_engine::SceneName,
+        entities: &Vec<&Box<dyn Entity<Type, Event>>>,
+        delta_t: &std::time::Duration,
+        scene: &placeholder::game_engine::SceneName,
     ) -> Vec<Event> {
-        vec![]
+        self.bars.update(entities, delta_t, scene)
     }
 
     fn render(

@@ -8,9 +8,7 @@ use crate::{
     character::{CharacterAlignment, CHARACTER_TEXT_HEIGHT},
     event::{BattleEvent, EntityEvent, Event},
     game_state::BattleState,
-    ui::{
-        Alignment, FlexCharacterGuiLine, FlexCharacterGuiLineManager, FlexDirection, FlexOrigin
-    },
+    ui::{Alignment, FlexCharacterGuiLine, FlexCharacterGuiLineManager, FlexDirection, FlexOrigin},
     Type, RESOLUTION,
 };
 
@@ -18,6 +16,7 @@ pub const BATTLE_MANAGER: &str = "Battle Manager";
 
 pub struct BattleManager {
     gui: Box<FlexCharacterGuiLineManager>,
+    pending_attack_animations: Vec<EntityName>,
 }
 impl BattleManager {
     pub fn new(battle_state: &BattleState) -> Self {
@@ -76,6 +75,7 @@ impl BattleManager {
                 true,
                 vec![Box::new(enemies), Box::new(friends)],
             )),
+            pending_attack_animations: vec![],
         }
     }
 }
@@ -138,9 +138,14 @@ impl Entity<Type, Event> for BattleManager {
                             "Character {:?} not found in gui",
                             character.name()
                         ));
-                    chatacter_gui.set_content(&character);
+                    self.pending_attack_animations
+                        .append(&mut chatacter_gui.set_content(&character));
                 }
-                return vec![Event::BattleEvent(BattleEvent::ActionConsequences)];
+                return if self.pending_attack_animations.is_empty() {
+                    vec![Event::BattleEvent(BattleEvent::ActionConsequences)]
+                } else {
+                    vec![]
+                };
             }
             EntityEvent::CharacterDeath(character) => {
                 self.gui.delete_child_entity(&character);
@@ -174,7 +179,22 @@ impl Entity<Type, Event> for BattleManager {
         delta_t: &std::time::Duration,
         scene: &placeholder::game_engine::SceneName,
     ) -> Vec<Event> {
-        self.gui.update(entities, delta_t, scene)
+        let mut events = self.gui.update(entities, delta_t, scene);
+        if self.pending_attack_animations.is_empty() {
+            return events;
+        }
+        for event in &events {
+            match event {
+                Event::AnimationEnded(bar) => {
+                    self.pending_attack_animations.retain(|b| b != bar);
+                }
+                _ => {}
+            }
+        }
+        if self.pending_attack_animations.is_empty() {
+            events.push(Event::BattleEvent(BattleEvent::ActionConsequences));
+        }
+        events
     }
     fn handle_key_input(&mut self, input: &winit::event::KeyEvent) -> Vec<Event> {
         self.gui.handle_key_input(input)

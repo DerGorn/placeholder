@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use placeholder::{
     app::{IndexBuffer, VertexBuffer},
     game_engine::{BoundingBox, Entity, EntityName, SpritePosition, SpriteSheet, SpriteSheetName},
@@ -6,13 +8,24 @@ use placeholder::{
 use threed::Vector;
 use winit::dpi::PhysicalSize;
 
-use crate::{event::Event, vertex::render_ui_sprite, Type};
+use crate::{
+    animation::Animation,
+    color::Color,
+    event::Event,
+    vertex::{render_ui_box_border, render_ui_sprite},
+    Type, TARGET_FPS,
+};
 
 use super::{button_styles::ColorPair, FlexItem};
 
+const PROGRESS_BAR_ANIMATION_COLOR: Color = Color::new_rgba(255, 255, 255, 255);
+const ANIMATION_STEPS: u16 = 30;
+const ANIMATION_DURATION: Duration =
+    Duration::from_millis(1000 / TARGET_FPS as u64 * ANIMATION_STEPS as u64);
+
 pub struct ProgressBar {
-    max_value: u16,
-    current_value: u16,
+    max_value: f32,
+    current_value: f32,
     dimensions: PhysicalSize<u16>,
     position: Vector<f32>,
     name: EntityName,
@@ -20,6 +33,7 @@ pub struct ProgressBar {
     is_dirty: bool,
     sprite: SpriteSheetName,
     padding: u8,
+    animation: Animation<f32>,
 }
 impl ProgressBar {
     pub fn new(
@@ -32,8 +46,8 @@ impl ProgressBar {
         padding: u8,
     ) -> Self {
         Self {
-            max_value,
-            current_value,
+            max_value: max_value as f32,
+            current_value: current_value as f32,
             dimensions,
             position,
             name,
@@ -41,11 +55,25 @@ impl ProgressBar {
             padding,
             is_dirty: true,
             sprite: DEFAULT_TEXTURE.into(),
+            animation: Animation::new(vec![(Duration::from_millis(0), current_value as f32)], true),
         }
     }
 
-    pub fn set_value(&mut self, value: u16) {
-        self.current_value = value;
+    /// returns whether the value has changed
+    pub fn set_value(&mut self, value: u16) -> bool {
+        if value as f32 == self.current_value {
+            return false;
+        }
+        self.animation = Animation::lerp(
+            *self.animation.keyframe(),
+            value as f32,
+            ANIMATION_STEPS,
+            ANIMATION_DURATION,
+            &|a| a,
+            true,
+        );
+        self.current_value = value as f32;
+        true
     }
 }
 impl std::fmt::Debug for ProgressBar {
@@ -57,14 +85,50 @@ impl std::fmt::Debug for ProgressBar {
             .finish()
     }
 }
+fn render_bar_part(
+    max_value: f32,
+    current_value: f32,
+    vertices: &mut VertexBuffer,
+    indices: &mut IndexBuffer,
+    sprite_sheet: &SpriteSheet,
+    sprite_position: &SpritePosition,
+    bounding_box: &BoundingBox,
+    color: &Color,
+) {
+    let mut bounding_box = BoundingBox {
+        anchor: bounding_box.anchor.clone(),
+        size: bounding_box.size,
+    };
+    let width_scale = if max_value == 0.0 {
+        0.0
+    } else {
+        (current_value / max_value).abs().min(1.0)
+    };
+    let offset = bounding_box.size.width * (1.0 - width_scale) / 2.0;
+    bounding_box.size.width *= width_scale;
+    bounding_box.anchor.x += offset;
+    render_ui_sprite(
+        &bounding_box,
+        vertices,
+        indices,
+        sprite_sheet,
+        &sprite_position,
+        Some(color),
+    );
+}
+
 impl Entity<Type, Event> for ProgressBar {
     fn update(
         &mut self,
         _entities: &Vec<&Box<dyn Entity<Type, Event>>>,
-        _delta_t: &std::time::Duration,
+        delta_t: &std::time::Duration,
         _scene: &placeholder::game_engine::SceneName,
     ) -> Vec<Event> {
-        vec![]
+        if self.animation.update(delta_t) {
+            vec![Event::AnimationEnded(self.name.clone())]
+        } else {
+            vec![]
+        }
     }
 
     fn render(
@@ -74,12 +138,17 @@ impl Entity<Type, Event> for ProgressBar {
         sprite_sheet: Vec<Option<&SpriteSheet>>,
     ) {
         if let Some(sprite_sheet) = sprite_sheet[0] {
+            let animation_value = *self.animation.keyframe();
             let mut bounding_box = self.bounding_box();
             bounding_box.size.width -= 2.0 * self.padding as f32;
             bounding_box.size.height -= 2.0 * self.padding as f32;
             bounding_box.anchor.x += self.padding as f32;
             bounding_box.anchor.y += self.padding as f32;
             let sprite_position = SpritePosition::new(0, 0);
+            let border_thickness = bounding_box.size.width.min(bounding_box.size.height) / 10.0;
+            bounding_box.anchor += Vector::new(border_thickness, border_thickness, 0.0);
+            bounding_box.size.height -= 2.0 * border_thickness;
+            bounding_box.size.width -= 2.0 * border_thickness;
             render_ui_sprite(
                 &bounding_box,
                 vertices,
@@ -88,23 +157,34 @@ impl Entity<Type, Event> for ProgressBar {
                 &sprite_position,
                 Some(&self.colors.low),
             );
-            let width_scale = if self.max_value == 0 {
-                0.0
-            } else {
-                (self.current_value as f32 / self.max_value as f32)
-                    .abs()
-                    .min(1.0)
-            };
-            let offset = bounding_box.size.width * (1.0 - width_scale) / 2.0;
-            bounding_box.size.width *= width_scale;
-            bounding_box.anchor.x += offset;
-            render_ui_sprite(
+            render_ui_box_border(
                 &bounding_box,
+                vertices,
+                indices,
+                border_thickness,
+                &self.colors.high,
+            );
+            if animation_value - self.current_value >= 1e-4 {
+                render_bar_part(
+                    self.max_value,
+                    animation_value,
+                    vertices,
+                    indices,
+                    sprite_sheet,
+                    &sprite_position,
+                    &bounding_box,
+                    &PROGRESS_BAR_ANIMATION_COLOR,
+                );
+            }
+            render_bar_part(
+                self.max_value,
+                self.current_value,
                 vertices,
                 indices,
                 sprite_sheet,
                 &sprite_position,
-                Some(&self.colors.high),
+                &bounding_box,
+                &self.colors.high,
             );
         }
     }

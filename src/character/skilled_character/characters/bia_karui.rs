@@ -61,6 +61,7 @@ impl CharacterBuilder for BiaKarui {
 pub struct BiaKaruiGui;
 impl CharacterGuiManager for BiaKaruiGui {
     fn create_gui(&self, character: &SkilledCharacter) -> Box<CharacterGui> {
+        let bar_size = PhysicalSize::new((CHARACTER_PORTRAIT_SIZE.width as f32 * 0.8) as u16, 20);
         Box::new(CharacterGui::new(
             Box::new(Button::new(
                 String::new(),
@@ -72,12 +73,12 @@ impl CharacterGuiManager for BiaKaruiGui {
                 ButtonStyle::BackgroundImage(BackgroundImageStyle {
                     sprite_sheet: "characters\\bia_karui".into(),
                     ..Default::default()
-                }), // ButtonStyle::default(),
+                }),
             )),
             vec![
                 Box::new(ProgressBar::new(
                     "health".into(),
-                    PhysicalSize::new((CHARACTER_PORTRAIT_SIZE.width as f32 * 0.8) as u16, 20),
+                    bar_size,
                     Vector::scalar(0.0),
                     character.character.health,
                     character.character.max_health,
@@ -86,7 +87,7 @@ impl CharacterGuiManager for BiaKaruiGui {
                 )),
                 Box::new(ProgressBar::new(
                     "stamina".into(),
-                    PhysicalSize::new((CHARACTER_PORTRAIT_SIZE.width as f32 * 0.8) as u16, 20),
+                    bar_size,
                     Vector::scalar(0.0),
                     character.character.stamina,
                     character.character.max_stamina,
@@ -95,7 +96,7 @@ impl CharacterGuiManager for BiaKaruiGui {
                 )),
                 Box::new(ProgressBar::new(
                     "exhaustion".into(),
-                    PhysicalSize::new((CHARACTER_PORTRAIT_SIZE.width as f32 * 0.8) as u16, 20),
+                    bar_size,
                     Vector::scalar(0.0),
                     character.character.exhaustion,
                     character.character.exhaustion_threshold,

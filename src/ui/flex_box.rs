@@ -202,13 +202,14 @@ macro_rules! impl_flex_struct {
             delta_t: &std::time::Duration,
             scene: &placeholder::game_engine::SceneName,
         ) -> Vec<Event> {
+        let mut events = vec![];
             for child in &mut self.children {
-                child.update(entities, delta_t, scene);
+                events.append(&mut child.update(entities, delta_t, scene));
             }
             if self.children.iter_mut().any(|c| c.is_dirty()) || self.is_dirty {
-                self.flex();
+               self.flex();
             }
-            vec![]
+            events
         }
         fn flex_render(
             &mut self,

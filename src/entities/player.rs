@@ -22,6 +22,7 @@ pub struct Player {
     pub position: Vector<f32>,
     pub velocity: VelocityController,
     pub animation: Animation<SpritePosition>,
+    pub sprite_sheet: SpriteSheetName,
 }
 impl Debug for Player {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -82,7 +83,7 @@ impl Entity<Type, Event> for Player {
     }
 
     fn sprite_sheets(&self) -> Vec<&SpriteSheetName> {
-        vec![&self.animation.sprite_sheet()]
+        vec![&self.sprite_sheet]
     }
 
     fn z(&self) -> f32 {
