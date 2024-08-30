@@ -1,3 +1,4 @@
+workspace = { members = ["ferride_core"] }
 [package]
 name = "placeholder"
 version = "0.1.0"
