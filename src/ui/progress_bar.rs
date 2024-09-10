@@ -1,12 +1,12 @@
 use std::time::Duration;
 
-use placeholder::{
+use ferride_core::{
     app::{IndexBuffer, VertexBuffer},
     game_engine::{BoundingBox, Entity, EntityName, SpritePosition, SpriteSheet, SpriteSheetName},
     graphics::DEFAULT_TEXTURE,
+    reexports::winit::PhysicalSize,
 };
 use threed::Vector;
-use winit::dpi::PhysicalSize;
 
 use crate::{
     animation::Animation,
@@ -122,7 +122,7 @@ impl Entity<Type, Event> for ProgressBar {
         &mut self,
         _entities: &Vec<&Box<dyn Entity<Type, Event>>>,
         delta_t: &std::time::Duration,
-        _scene: &placeholder::game_engine::SceneName,
+        _scene: &ferride_core::game_engine::SceneName,
     ) -> Vec<Event> {
         if self.animation.update(delta_t) {
             vec![Event::AnimationEnded(self.name.clone())]

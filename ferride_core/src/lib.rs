@@ -17,10 +17,23 @@ pub mod app {
 mod game;
 pub mod game_engine {
     pub use super::game::{
-        static_camera, BoundingBox, CameraDescriptor, Direction, Entity, EntityName, EntityType,
-        ExternalEvent, Game, RessourceDescriptor, Scene, SceneName, SpritePosition, SpriteSheet,
-        SpriteSheetDimensions, SpriteSheetName, State, TextureCoordinates, VelocityController,
+        example, static_camera, BoundingBox, CameraDescriptor, Direction, Entity, EntityName,
+        EntityType, ExternalEvent, Game, RessourceDescriptor, RessourceDescriptorBuilder, Scene,
+        SceneName, SpritePosition, SpriteSheet, SpriteSheetDimensions, SpriteSheetName, State,
+        TextureCoordinates, VelocityController,
     };
+}
+
+pub mod reexports {
+    pub mod winit {
+        pub use super::super::manager_application::winit_reexports::*;
+        pub use winit::dpi::PhysicalSize;
+    }
+    pub mod wgpu {
+        pub use wgpu::{vertex_attr_array, ShaderStages, VertexAttribute};
+    }
+    // pub use wgpu;
+    // pub use threed;
 }
 
 #[macro_export]

@@ -1,13 +1,13 @@
 use std::{fmt::Debug, time::Duration};
 
-use placeholder::{
+use ferride_core::{
     app::{IndexBuffer, VertexBuffer},
     game_engine::{
         BoundingBox, Entity, EntityName, SceneName, SpritePosition, SpriteSheet, SpriteSheetName,
     },
 };
 use threed::Vector;
-use winit::dpi::PhysicalSize;
+use ferride_core::reexports::winit::PhysicalSize;
 
 use crate::{animation::Animation, vertex::render_sprite, EnemyType, Event, Type};
 

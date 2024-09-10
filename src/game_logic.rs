@@ -7,13 +7,13 @@ use crate::{
     BATTLE_ACTION_SELECTION_OVERLAY_SCENE, BATTLE_DETAIL_OVERLAY, BATTLE_DETAIL_OVERLAY_SCENE,
     BATTLE_SCENE, END_GAME_BUTTON, RESOLUTION, START_GAME_BUTTON,
 };
-use log::debug;
-use placeholder::{
+use ferride_core::{
     game_engine::{EntityName, Scene, SceneName, State},
     graphics::Visibility,
+    reexports::winit::{keyboard::KeyCode, PhysicalSize},
 };
+use log::debug;
 use threed::Vector;
-use winit::{dpi::PhysicalSize, keyboard::KeyCode};
 
 use crate::{battle_action::BattleAction, event::Event, game_state::GameState, EnemyType};
 
@@ -577,8 +577,8 @@ impl GameLogic {
 }
 
 impl State<Event> for GameLogic {
-    fn start_scenes(&self) -> Vec<Scene<Event>> {
-        self.game_state.get_start_scenes()
+    fn start_scenes(self) -> (Vec<Scene<Event>>, Self) {
+        (self.game_state.get_start_scenes(), self)
     }
     fn handle_event(&mut self, event: Event) -> Vec<Event> {
         match self.game_state {

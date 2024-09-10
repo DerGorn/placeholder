@@ -1,4 +1,4 @@
-workspace = { members = ["ferride_core"] }
+workspace = { members = ["ferride_core", "polygon"] }
 [package]
 name = "placeholder"
 version = "0.1.0"
@@ -8,15 +8,12 @@ edition = "2021"
 
 [dependencies]
 threed = { git = "https://github.com/DerGorn/threed.git" }
-image = "0.25.1"
-winit = { version = "0.30", features = ["rwh_05"] }
 env_logger = "0.10"
 log = "0.4"
-wgpu = "0.19.4"
-futures = "0.3.30"
 bytemuck = { version = "1.16.0", features = ["derive"] }
 repr-trait = "1.0.0"
 rodio = "0.18.1"
+ferride_core = { path = "./ferride_core" }
 
 [build-dependencies]
 fs_extra = "1.2"

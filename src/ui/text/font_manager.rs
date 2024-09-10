@@ -1,4 +1,4 @@
-use placeholder::{
+use ferride_core::{
     app::{IndexBuffer, VertexBuffer},
     game_engine::{BoundingBox, SpriteSheet, TextureCoordinates},
 };

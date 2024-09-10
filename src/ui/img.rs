@@ -1,10 +1,10 @@
-use placeholder::{
+use ferride_core::{
     app::{IndexBuffer, VertexBuffer},
     game_engine::{BoundingBox, Entity, EntityName, SpritePosition, SpriteSheet, SpriteSheetName},
 };
 use std::fmt::Debug;
 use threed::Vector;
-use winit::dpi::PhysicalSize;
+use ferride_core::reexports::winit::PhysicalSize;
 
 use crate::{color::Color, vertex::render_ui_sprite, Event, Type};
 
@@ -71,7 +71,7 @@ impl Entity<Type, Event> for Image {
     fn name(&self) -> &EntityName {
         &self.name
     }
-    fn bounding_box(&self) -> placeholder::game_engine::BoundingBox {
+    fn bounding_box(&self) -> ferride_core::game_engine::BoundingBox {
         BoundingBox {
             anchor: self.position.clone(),
             size: PhysicalSize::new(self.dimensions.width as f32, self.dimensions.height as f32),

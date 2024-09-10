@@ -3,9 +3,9 @@ use crate::character::characters::BiaKarui;
 use crate::character::skills::AttackSkill;
 use crate::character::CharacterAlignment;
 use crate::character::SimpleKI;
-use placeholder::game_engine::{Scene, SpritePosition};
+use ferride_core::game_engine::{Scene, SpritePosition};
 use threed::Vector;
-use winit::dpi::PhysicalSize;
+use ferride_core::reexports::winit::PhysicalSize;
 
 use crate::{
     color::Color,

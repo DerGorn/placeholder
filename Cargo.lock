@@ -732,6 +732,17 @@ dependencies = [
 [[package]]
 name = "ferride_core"
 version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "env_logger",
+ "futures",
+ "image",
+ "log",
+ "repr-trait",
+ "threed",
+ "wgpu",
+ "winit",
+]
 
 [[package]]
 name = "flate2"
@@ -1806,15 +1817,12 @@ version = "0.1.0"
 dependencies = [
  "bytemuck",
  "env_logger",
+ "ferride_core",
  "fs_extra",
- "futures",
- "image",
  "log",
  "repr-trait",
  "rodio",
  "threed",
- "wgpu",
- "winit",
 ]
 
 [[package]]
@@ -1843,6 +1851,16 @@ dependencies = [
  "rustix",
  "tracing",
  "windows-sys 0.52.0",
+]
+
+[[package]]
+name = "polygon"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "ferride_core",
+ "repr-trait",
+ "threed",
 ]
 
 [[package]]

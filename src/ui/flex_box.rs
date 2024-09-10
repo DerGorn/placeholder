@@ -1,7 +1,7 @@
-use placeholder::game_engine::{BoundingBox, Entity, EntityName, SpritePosition, SpriteSheetName};
+use ferride_core::game_engine::{BoundingBox, Entity, EntityName, SpritePosition, SpriteSheetName};
 use std::fmt::{self, Debug};
 use threed::Vector;
-use winit::dpi::PhysicalSize;
+use ferride_core::reexports::winit::PhysicalSize;
 
 use crate::{vertex::render_ui_sprite, Event, Type};
 
@@ -177,11 +177,11 @@ macro_rules! impl_flex_struct {
             }
             if self.shrink_to_content {
                 let new_dimensions = match self.flex_direction {
-                    FlexDirection::X => winit::dpi::PhysicalSize::new(
+                    FlexDirection::X => ferride_core::reexports::winit::PhysicalSize::new(
                         total_width as u16 + gap_size as u16,
                         total_height as u16,
                     ),
-                    FlexDirection::Y => winit::dpi::PhysicalSize::new(
+                    FlexDirection::Y => ferride_core::reexports::winit::PhysicalSize::new(
                         total_width as u16,
                         total_height as u16 + gap_size as u16,
                     ),
@@ -200,7 +200,7 @@ macro_rules! impl_flex_struct {
             &mut self,
             entities: &Vec<&Box<dyn Entity<Type, Event>>>,
             delta_t: &std::time::Duration,
-            scene: &placeholder::game_engine::SceneName,
+            scene: &ferride_core::game_engine::SceneName,
         ) -> Vec<Event> {
         let mut events = vec![];
             for child in &mut self.children {
@@ -213,9 +213,9 @@ macro_rules! impl_flex_struct {
         }
         fn flex_render(
             &mut self,
-            vertices: &mut placeholder::app::VertexBuffer,
-            indices: &mut placeholder::app::IndexBuffer,
-            sprite_sheets: Vec<Option<&placeholder::game_engine::SpriteSheet>>,
+            vertices: &mut ferride_core::app::VertexBuffer,
+            indices: &mut ferride_core::app::IndexBuffer,
+            sprite_sheets: Vec<Option<&ferride_core::game_engine::SpriteSheet>>,
         ) {
             let mut index = 0;
             self.render_background(vertices, indices, &sprite_sheets, &mut index);
@@ -242,7 +242,7 @@ macro_rules! impl_flex_struct {
             );
             sprite_sheets
         }
-        fn flex_handle_key_input(&mut self, input: &winit::event::KeyEvent) -> Vec<Event> {
+        fn flex_handle_key_input(&mut self, input: &ferride_core::reexports::winit::event::KeyEvent) -> Vec<Event> {
             let mut events = vec![];
             for item in self.children.iter_mut() {
                 events.append(&mut item.handle_key_input(input));
@@ -304,9 +304,9 @@ impl FlexBox {
 
     fn render_background(
         &self,
-        vertices: &mut placeholder::app::VertexBuffer,
-        indices: &mut placeholder::app::IndexBuffer,
-        sprite_sheet: &[Option<&placeholder::game_engine::SpriteSheet>],
+        vertices: &mut ferride_core::app::VertexBuffer,
+        indices: &mut ferride_core::app::IndexBuffer,
+        sprite_sheet: &[Option<&ferride_core::game_engine::SpriteSheet>],
         index: &mut usize,
     ) {
         if let Some((background, sprite_position)) = &self.background_image {
@@ -345,19 +345,19 @@ impl Entity<Type, Event> for FlexBox {
         &mut self,
         entities: &Vec<&Box<dyn Entity<Type, Event>>>,
         delta_t: &std::time::Duration,
-        scene: &placeholder::game_engine::SceneName,
+        scene: &ferride_core::game_engine::SceneName,
     ) -> Vec<Event> {
         self.flex_update(entities, delta_t, scene)
     }
     fn render(
         &mut self,
-        vertices: &mut placeholder::app::VertexBuffer,
-        indices: &mut placeholder::app::IndexBuffer,
-        sprite_sheet: Vec<Option<&placeholder::game_engine::SpriteSheet>>,
+        vertices: &mut ferride_core::app::VertexBuffer,
+        indices: &mut ferride_core::app::IndexBuffer,
+        sprite_sheet: Vec<Option<&ferride_core::game_engine::SpriteSheet>>,
     ) {
         self.flex_render(vertices, indices, sprite_sheet)
     }
-    fn handle_key_input(&mut self, input: &winit::event::KeyEvent) -> Vec<Event> {
+    fn handle_key_input(&mut self, input: &ferride_core::reexports::winit::event::KeyEvent) -> Vec<Event> {
         self.flex_handle_key_input(input)
     }
     fn sprite_sheets(&self) -> Vec<&SpriteSheetName> {

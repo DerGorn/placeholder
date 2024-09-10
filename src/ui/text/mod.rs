@@ -1,9 +1,9 @@
 use log::warn;
-use placeholder::game_engine::{BoundingBox, Entity, EntityName, SpriteSheet, SpriteSheetName};
+use ferride_core::game_engine::{BoundingBox, Entity, EntityName, SpriteSheet, SpriteSheetName};
 use std::fmt::Debug;
 // use std::cell::RefCell;
 use threed::Vector;
-use winit::dpi::PhysicalSize;
+use ferride_core::reexports::winit::PhysicalSize;
 
 use crate::{color::Color, ui::FlexItem, Event, Type, FONT};
 
@@ -79,14 +79,14 @@ impl Entity<Type, Event> for Text {
         &mut self,
         _entities: &Vec<&Box<dyn Entity<Type, Event>>>,
         _delta_t: &std::time::Duration,
-        _scene: &placeholder::game_engine::SceneName,
+        _scene: &ferride_core::game_engine::SceneName,
     ) -> Vec<Event> {
         vec![]
     }
     fn render(
         &mut self,
-        vertices: &mut placeholder::app::VertexBuffer,
-        indices: &mut placeholder::app::IndexBuffer,
+        vertices: &mut ferride_core::app::VertexBuffer,
+        indices: &mut ferride_core::app::IndexBuffer,
         sprite_sheet: Vec<Option<&SpriteSheet>>,
     ) {
         let color = &self.color;

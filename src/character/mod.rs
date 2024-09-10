@@ -1,7 +1,7 @@
 use std::fmt::{Debug, Display};
 
 mod skilled_character;
-pub use skilled_character::{CharacterBuilder, CharacterGuiManager, SkilledCharacter, CHARACTER_FONT_SIZE, CHARACTER_TEXT_HEIGHT};
+pub use skilled_character::{CharacterBuilder, CharacterGuiManager, SkilledCharacter, CHARACTER_FONT_SIZE};
 
 mod ki;
 pub use ki::{KIBehavior, NoKI, SimpleKI};

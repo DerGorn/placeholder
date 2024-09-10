@@ -1,8 +1,8 @@
 use log::warn;
-use placeholder::game_engine::{BoundingBox, Entity, EntityName, SpritePosition, SpriteSheetName};
+use ferride_core::game_engine::{BoundingBox, Entity, EntityName, SpritePosition, SpriteSheetName};
 use std::fmt::Debug;
 use threed::Vector;
-use winit::{dpi::PhysicalSize, keyboard::PhysicalKey};
+use ferride_core::reexports::winit::{PhysicalSize, keyboard::PhysicalKey};
 
 use crate::{
     character::ui::CharacterGui, event::Event, impl_flex_struct, ui::{Alignment, FlexDirection, FlexItem, FlexOrigin}, vertex::render_ui_sprite, Type
@@ -13,9 +13,8 @@ pub use button::{Button, ButtonStyle};
 
 use super::ProgressBar;
 pub mod button_styles {
-    pub use super::button::{
-        BackgroundImageStyle, BorderBoxStyle, ColorPair, ImageStyle, PlainStyle, UnderLineStyle, UNFOCUS_LOW_COLOR,
-    };
+    #[allow(unused_imports)]
+    pub use super::button::{ColorPair, UNFOCUS_LOW_COLOR, ImageStyle, PlainStyle, BorderBoxStyle, UnderLineStyle, BackgroundImageStyle};
 }
 
 macro_rules! impl_flex_button_manager {
@@ -61,12 +60,12 @@ macro_rules! impl_flex_button_manager {
                     has_focus,
                     down_keys: vec![
                         $(
-                            winit::keyboard::PhysicalKey::Code(winit::keyboard::KeyCode::$down_key),
+                            ferride_core::reexports::winit::keyboard::PhysicalKey::Code(ferride_core::reexports::winit::keyboard::KeyCode::$down_key),
                         )*
                     ],
                     up_keys: vec![
                         $(
-                            winit::keyboard::PhysicalKey::Code(winit::keyboard::KeyCode::$up_key),
+                            ferride_core::reexports::winit::keyboard::PhysicalKey::Code(ferride_core::reexports::winit::keyboard::KeyCode::$up_key),
                         )*
                     ],
                 }
@@ -118,9 +117,9 @@ impl<T: FlexItem> FlexInputManager<T> {
 
     fn render_background(
         &self,
-        vertices: &mut placeholder::app::VertexBuffer,
-        indices: &mut placeholder::app::IndexBuffer,
-        sprite_sheet: &[Option<&placeholder::game_engine::SpriteSheet>],
+        vertices: &mut ferride_core::app::VertexBuffer,
+        indices: &mut ferride_core::app::IndexBuffer,
+        sprite_sheet: &[Option<&ferride_core::game_engine::SpriteSheet>],
         index: &mut usize,
     ) {
         if let Some((background, sprite_position)) = &self.background_image {
@@ -180,12 +179,12 @@ impl<T: FlexItem> Entity<Type, Event> for FlexInputManager<T> {
             None => {}
         }
     }
-    fn handle_key_input(&mut self, input: &winit::event::KeyEvent) -> Vec<Event> {
+    fn handle_key_input(&mut self, input: &ferride_core::reexports::winit::event::KeyEvent) -> Vec<Event> {
         if !self.has_focus {
             return vec![];
         }
 
-        if input.state == winit::event::ElementState::Pressed {
+        if input.state == ferride_core::reexports::winit::event::ElementState::Pressed {
             let selection_change = match input.physical_key {
                 x if self.up_keys.contains(&x) => -1,
                 x if self.down_keys.contains(&x) => 1,
@@ -206,19 +205,19 @@ impl<T: FlexItem> Entity<Type, Event> for FlexInputManager<T> {
         &mut self,
         entities: &Vec<&Box<dyn Entity<Type, Event>>>,
         delta_t: &std::time::Duration,
-        scene: &placeholder::game_engine::SceneName,
+        scene: &ferride_core::game_engine::SceneName,
     ) -> Vec<Event> {
         self.flex_update(entities, delta_t, scene)
     }
     fn render(
         &mut self,
-        vertices: &mut placeholder::app::VertexBuffer,
-        indices: &mut placeholder::app::IndexBuffer,
-        sprite_sheet: Vec<Option<&placeholder::game_engine::SpriteSheet>>,
+        vertices: &mut ferride_core::app::VertexBuffer,
+        indices: &mut ferride_core::app::IndexBuffer,
+        sprite_sheet: Vec<Option<&ferride_core::game_engine::SpriteSheet>>,
     ) {
         self.flex_render(vertices, indices, sprite_sheet)
     }
-    fn sprite_sheets(&self) -> Vec<&placeholder::game_engine::SpriteSheetName> {
+    fn sprite_sheets(&self) -> Vec<&ferride_core::game_engine::SpriteSheetName> {
         self.flex_sprite_sheets()
     }
     fn entity_type(&self) -> Type {

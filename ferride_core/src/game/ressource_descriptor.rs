@@ -10,6 +10,64 @@ use crate::graphics_provider::{RenderSceneDescriptor, RenderSceneName, UniformBu
 
 use super::sprite_sheet::SpriteSheetDimensions;
 
+pub struct RessourceDescriptorBuilder {
+    pub ressources: RessourceDescriptor,
+}
+impl RessourceDescriptorBuilder {
+    pub fn new(default_render_scene: RenderSceneDescriptor) -> Self {
+        Self {
+            ressources: RessourceDescriptor {
+                windows: vec![],
+                image_directory: PathBuf::from(""),
+                sprite_sheets: vec![],
+                uniforms: vec![],
+                default_render_scene: (None, default_render_scene),
+                render_scenes: vec![],
+            },
+        }
+    }
+
+    pub fn build(self) -> RessourceDescriptor {
+        self.ressources
+    }
+
+    pub fn with_windows(mut self, windows: Vec<(WindowName, WindowDescriptor)>) -> Self {
+        self.ressources.windows = windows;
+        self
+    }
+
+    pub fn with_image_directory(mut self, image_directory: PathBuf) -> Self {
+        self.ressources.image_directory = image_directory;
+        self
+    }
+    pub fn with_sprite_sheets(
+        mut self,
+        sprite_sheets: Vec<(SpriteSheetName, PathBuf, SpriteSheetDimensions)>,
+    ) -> Self {
+        self.ressources.sprite_sheets = sprite_sheets;
+        self
+    }
+    pub fn with_uniforms(
+        mut self,
+        uniforms: Vec<(UniformBufferName, Vec<u8>, wgpu::ShaderStages)>,
+    ) -> Self {
+        self.ressources.uniforms = uniforms;
+        self
+    }
+    pub fn with_default_render_scene(
+        mut self,
+        camera: Option<CameraDescriptor>,
+        render_scene: RenderSceneDescriptor,
+    ) -> Self {
+        self.ressources.default_render_scene = (camera, render_scene);
+        self
+    }
+    pub fn with_default_render_scene_camera(mut self, camera: CameraDescriptor) -> Self {
+        self.ressources.default_render_scene.0 = Some(camera);
+        self
+    }
+}
+
 pub struct RessourceDescriptor {
     pub windows: Vec<(WindowName, WindowDescriptor)>,
     /// Per default, a SpriteSheetName n not found in the list will be interpreted as (n,

@@ -1,10 +1,10 @@
-use placeholder::{
+use ferride_core::reexports::winit::PhysicalSize;
+use ferride_core::{
     app::{IndexBuffer, VertexBuffer},
     game_engine::{BoundingBox, Entity, EntityName, SceneName, SpriteSheet},
 };
 use std::{fmt::Debug, time::Duration};
 use threed::Vector;
-use winit::dpi::PhysicalSize;
 
 use crate::{animation::Animation, vertex::SimpleVertex, Event, Index, Type, UTIME};
 
@@ -110,7 +110,7 @@ impl Entity<Type, Event> for Transition {
         );
     }
 
-    fn sprite_sheets(&self) -> Vec<&placeholder::game_engine::SpriteSheetName> {
+    fn sprite_sheets(&self) -> Vec<&ferride_core::game_engine::SpriteSheetName> {
         vec![]
     }
 

@@ -1,11 +1,11 @@
 use std::fmt::Debug;
 
-use placeholder::game_engine::{Entity, EntityName};
+use ferride_core::game_engine::{Entity, EntityName};
 use threed::Vector;
-use winit::dpi::PhysicalSize;
+use ferride_core::reexports::winit::PhysicalSize;
 
 use crate::{
-    character::{CharacterAlignment, CHARACTER_TEXT_HEIGHT},
+    character::CharacterAlignment,
     event::{BattleEvent, EntityEvent, Event},
     game_state::BattleState,
     ui::{Alignment, FlexCharacterGuiLine, FlexCharacterGuiLineManager, FlexDirection, FlexOrigin},
@@ -87,7 +87,7 @@ impl Debug for BattleManager {
 impl Entity<Type, Event> for BattleManager {
     fn handle_event(
         &mut self,
-        event: <Event as placeholder::game_engine::ExternalEvent>::EntityEvent,
+        event: <Event as ferride_core::game_engine::ExternalEvent>::EntityEvent,
     ) -> Vec<Event> {
         match event {
             EntityEvent::BattleHighlightValidSkillTargets(valid_targets) => {
@@ -156,20 +156,20 @@ impl Entity<Type, Event> for BattleManager {
     fn entity_type(&self) -> Type {
         Type::Controller
     }
-    fn bounding_box(&self) -> placeholder::game_engine::BoundingBox {
+    fn bounding_box(&self) -> ferride_core::game_engine::BoundingBox {
         self.gui.bounding_box()
     }
-    fn name(&self) -> &placeholder::game_engine::EntityName {
+    fn name(&self) -> &ferride_core::game_engine::EntityName {
         self.gui.name()
     }
-    fn sprite_sheets(&self) -> Vec<&placeholder::game_engine::SpriteSheetName> {
+    fn sprite_sheets(&self) -> Vec<&ferride_core::game_engine::SpriteSheetName> {
         self.gui.sprite_sheets()
     }
     fn render(
         &mut self,
-        vertices: &mut placeholder::app::VertexBuffer,
-        indices: &mut placeholder::app::IndexBuffer,
-        sprite_sheet: Vec<Option<&placeholder::game_engine::SpriteSheet>>,
+        vertices: &mut ferride_core::app::VertexBuffer,
+        indices: &mut ferride_core::app::IndexBuffer,
+        sprite_sheet: Vec<Option<&ferride_core::game_engine::SpriteSheet>>,
     ) {
         self.gui.render(vertices, indices, sprite_sheet);
     }
@@ -177,7 +177,7 @@ impl Entity<Type, Event> for BattleManager {
         &mut self,
         entities: &Vec<&Box<dyn Entity<Type, Event>>>,
         delta_t: &std::time::Duration,
-        scene: &placeholder::game_engine::SceneName,
+        scene: &ferride_core::game_engine::SceneName,
     ) -> Vec<Event> {
         let mut events = self.gui.update(entities, delta_t, scene);
         if self.pending_attack_animations.is_empty() {
@@ -196,7 +196,7 @@ impl Entity<Type, Event> for BattleManager {
         }
         events
     }
-    fn handle_key_input(&mut self, input: &winit::event::KeyEvent) -> Vec<Event> {
+    fn handle_key_input(&mut self, input: &ferride_core::reexports::winit::event::KeyEvent) -> Vec<Event> {
         self.gui.handle_key_input(input)
     }
     fn delete_child_entity(&mut self, name: &EntityName) {

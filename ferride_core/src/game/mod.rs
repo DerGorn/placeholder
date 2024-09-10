@@ -22,11 +22,75 @@ pub use self::{
     camera::CameraDescriptor,
     entity::{Entity, EntityName, EntityType},
     game_event::{ExternalEvent, GameEvent},
-    ressource_descriptor::{RessourceDescriptor, SpriteSheetName, WindowName},
+    ressource_descriptor::{
+        RessourceDescriptor, RessourceDescriptorBuilder, SpriteSheetName, WindowName,
+    },
     scene::{Scene, SceneName},
     sprite_sheet::{SpritePosition, SpriteSheet, SpriteSheetDimensions, TextureCoordinates},
     velocity_controller::{Direction, VelocityController},
 };
+
+pub mod example {
+    pub use super::game_event::example::*;
+    pub use vertex::SimpleVertex;
+    pub use game_state::SimpleGameState;
+
+    mod vertex {
+        use crate::graphics::Vertex;
+        use repr_trait::C;
+        use threed::Vector;
+
+        #[repr(C)]
+        #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable, repr_trait::C)]
+        pub struct SimpleVertex {
+            position: [f32; 2],
+        }
+        impl SimpleVertex {
+            pub fn new(position: Vector<f32>) -> Self {
+                Self {
+                    position: [position.x, position.y],
+                }
+            }
+        }
+        const UI_VERTEX_ATTRIBUTES: [wgpu::VertexAttribute; 1] =
+            wgpu::vertex_attr_array![0 => Float32x2];
+        impl Vertex for SimpleVertex {
+            fn attributes() -> &'static [wgpu::VertexAttribute] {
+                &UI_VERTEX_ATTRIBUTES
+            }
+        }
+    }
+
+    mod game_state {
+        use crate::game_engine::Scene;
+
+        use super::super::State;
+        use super::EmptyExternalEvent;
+
+        pub struct SimpleGameState {
+            scene: Option<Scene<EmptyExternalEvent>>,
+        }
+        impl SimpleGameState {
+            pub fn new(scene: Scene<EmptyExternalEvent>) -> Self {
+                Self { scene: Some(scene) }
+            }
+        }
+        impl State<EmptyExternalEvent> for SimpleGameState {
+            fn handle_event(&mut self, _event: EmptyExternalEvent) -> Vec<EmptyExternalEvent> {
+                Vec::new()
+            }
+            fn start_scenes(mut self) -> (Vec<Scene<EmptyExternalEvent>>, Self) {
+                let scenes = if let Some(scene) = self.scene {
+                    vec![scene]
+                } else {
+                    vec![]
+                };
+                self.scene = None;
+                (scenes, self)
+            }
+        }
+    }
+}
 
 mod bounding_box;
 mod camera;
@@ -39,7 +103,7 @@ mod velocity_controller;
 
 pub trait State<E: ExternalEvent> {
     fn handle_event(&mut self, event: E) -> Vec<E>;
-    fn start_scenes(&self) -> Vec<Scene<E>>;
+    fn start_scenes(self) -> (Vec<Scene<E>>, Self);
 }
 
 pub struct Game<E: ExternalEvent, S: State<E>> {
@@ -56,7 +120,7 @@ pub struct Game<E: ExternalEvent, S: State<E>> {
 }
 impl<E: ExternalEvent, S: State<E>> Game<E, S> {
     pub fn new(ressources: RessourceDescriptor, target_fps: u8, state: S) -> Self {
-        let initial_scenes = state.start_scenes();
+        let (initial_scenes, state) = state.start_scenes();
         Self {
             ressources,
             pending_scenes: initial_scenes,
@@ -180,20 +244,6 @@ impl<E: ExternalEvent, S: State<E>> Game<E, S> {
             .find(|(_, i)| i == id)
             .map(|(name, _)| name)
     }
-
-    // fn get_scenes(&self, window_name: &WindowName) -> Vec<&Scene<T>> {
-    //     self.active_scenes
-    //         .iter()
-    //         .filter(|scene| scene.target_window == *window_name)
-    //         .collect()
-    // }
-
-    // fn get_scenes_mut(&mut self, window_name: &WindowName) -> Vec<&mut Scene<E>> {
-    //     self.active_scenes
-    //         .iter_mut()
-    //         .filter(|scene| scene.target_window == *window_name)
-    //         .collect()
-    // }
 }
 impl<E: ExternalEvent + 'static, S: State<E>> EventManager<GameEvent<E>> for Game<E, S> {
     fn window_event(
@@ -324,7 +374,11 @@ impl<E: ExternalEvent + 'static, S: State<E>> EventManager<GameEvent<E>> for Gam
                 }
             }
             GameEvent::Timer(delta_t) => {
-                for scene in self.active_scenes.iter_mut().chain(self.suspended_scenes.iter_mut()) {
+                for scene in self
+                    .active_scenes
+                    .iter_mut()
+                    .chain(self.suspended_scenes.iter_mut())
+                {
                     let mut vertices = VertexBuffer::new();
                     let mut indices = IndexBuffer::new();
                     let entities = &mut scene.entities;

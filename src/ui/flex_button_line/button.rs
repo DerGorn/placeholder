@@ -1,12 +1,12 @@
 use std::fmt::Debug;
 
-use placeholder::{
+use ferride_core::{
     app::{IndexBuffer, VertexBuffer},
     game_engine::{BoundingBox, Entity, EntityName, SpritePosition, SpriteSheet, SpriteSheetName},
     graphics::DEFAULT_TEXTURE,
+    reexports::winit::{keyboard::PhysicalKey, PhysicalSize},
 };
 use threed::Vector;
-use winit::{dpi::PhysicalSize, keyboard::PhysicalKey};
 
 use crate::{
     color::Color,
@@ -200,8 +200,8 @@ impl Debug for Button {
     }
 }
 impl Entity<Type, Event> for Button {
-    fn handle_key_input(&mut self, input: &winit::event::KeyEvent) -> Vec<Event> {
-        if self.is_focused && input.state == winit::event::ElementState::Pressed {
+    fn handle_key_input(&mut self, input: &ferride_core::reexports::winit::event::KeyEvent) -> Vec<Event> {
+        if self.is_focused && input.state == ferride_core::reexports::winit::event::ElementState::Pressed {
             match input.physical_key {
                 PhysicalKey::Code(key_code) => {
                     vec![Event::ButtonPressed(self.name.clone(), key_code)]
@@ -216,7 +216,7 @@ impl Entity<Type, Event> for Button {
         &mut self,
         entities: &Vec<&Box<dyn Entity<Type, Event>>>,
         delta_t: &std::time::Duration,
-        scene: &placeholder::game_engine::SceneName,
+        scene: &ferride_core::game_engine::SceneName,
     ) -> Vec<Event> {
         if self.is_dirty {
             self.position = self.text.position().clone();
@@ -359,7 +359,7 @@ impl Entity<Type, Event> for Button {
     fn name(&self) -> &EntityName {
         &self.name
     }
-    fn sprite_sheets(&self) -> Vec<&placeholder::game_engine::SpriteSheetName> {
+    fn sprite_sheets(&self) -> Vec<&ferride_core::game_engine::SpriteSheetName> {
         let mut sprite_sheets = self.text.sprite_sheets();
         match &self.style {
             ButtonStyle::Image(ImageStyle { sprite_sheet, .. })

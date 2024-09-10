@@ -1,8 +1,8 @@
-use placeholder::{
+use ferride_core::{
     game_engine::{Entity, EntityName, ExternalEvent, Scene, SceneName},
     graphics::{UniformBufferName, Visibility},
+    reexports::winit::keyboard::KeyCode,
 };
-use winit::keyboard::KeyCode;
 
 use crate::{Character, EnemyType, Type};
 
@@ -97,7 +97,7 @@ impl ExternalEvent for Event {
 
     fn is_update_uniform_buffer<'a>(
         &'a self,
-    ) -> Option<(&'a placeholder::graphics::UniformBufferName, &'a [u8])> {
+    ) -> Option<(&'a ferride_core::graphics::UniformBufferName, &'a [u8])> {
         match self {
             Event::UpdateUniformBuffer(name, contents) => Some((name, contents)),
             _ => None,

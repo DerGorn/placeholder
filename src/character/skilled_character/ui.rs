@@ -1,6 +1,6 @@
-use placeholder::game_engine::{Entity, EntityName};
+use ferride_core::game_engine::{Entity, EntityName};
 use threed::Vector;
-use winit::dpi::PhysicalSize;
+use ferride_core::reexports::winit::PhysicalSize;
 
 use crate::{
     character::Character,
@@ -68,16 +68,16 @@ impl Entity<Type, Event> for CharacterGui {
         &mut self,
         entities: &Vec<&Box<dyn Entity<Type, Event>>>,
         delta_t: &std::time::Duration,
-        scene: &placeholder::game_engine::SceneName,
+        scene: &ferride_core::game_engine::SceneName,
     ) -> Vec<Event> {
         self.bars.update(entities, delta_t, scene)
     }
 
     fn render(
         &mut self,
-        vertices: &mut placeholder::app::VertexBuffer,
-        indices: &mut placeholder::app::IndexBuffer,
-        sprite_sheets: Vec<Option<&placeholder::game_engine::SpriteSheet>>,
+        vertices: &mut ferride_core::app::VertexBuffer,
+        indices: &mut ferride_core::app::IndexBuffer,
+        sprite_sheets: Vec<Option<&ferride_core::game_engine::SpriteSheet>>,
     ) {
         let mut index = 0;
         let amount_sprites = self.button.sprite_sheets().len();
@@ -96,21 +96,21 @@ impl Entity<Type, Event> for CharacterGui {
         );
     }
 
-    fn sprite_sheets(&self) -> Vec<&placeholder::game_engine::SpriteSheetName> {
+    fn sprite_sheets(&self) -> Vec<&ferride_core::game_engine::SpriteSheetName> {
         let mut sprites = self.button.sprite_sheets();
         sprites.append(&mut self.bars.sprite_sheets());
         sprites
     }
 
-    fn handle_key_input(&mut self, input: &winit::event::KeyEvent) -> Vec<Event> {
+    fn handle_key_input(&mut self, input: &ferride_core::reexports::winit::event::KeyEvent) -> Vec<Event> {
         self.button.handle_key_input(input)
     }
 
-    fn name(&self) -> &placeholder::game_engine::EntityName {
+    fn name(&self) -> &ferride_core::game_engine::EntityName {
         self.button.name()
     }
 
-    fn bounding_box(&self) -> placeholder::game_engine::BoundingBox {
+    fn bounding_box(&self) -> ferride_core::game_engine::BoundingBox {
         self.button.bounding_box()
     }
 

@@ -7,8 +7,15 @@ use winit::{
     window::{Fullscreen, WindowId},
 };
 
+pub mod winit_reexports {
+    pub use super::window_descriptor::winit_reexports::*;
+    pub use winit::event;
+    pub use winit::keyboard;
+}
+
 mod window_descriptor;
 pub use window_descriptor::WindowDescriptor;
+
 
 mod event_manager;
 pub use event_manager::EventManager;
@@ -20,7 +27,8 @@ mod buffer;
 pub use buffer::{IndexBuffer, VertexBuffer};
 
 use crate::graphics_provider::{
-    GraphicsProvider, RenderSceneDescriptor, RenderSceneName, ShaderDescriptor, UniformBufferName, Visibility,
+    GraphicsProvider, RenderSceneDescriptor, RenderSceneName, ShaderDescriptor, UniformBufferName,
+    Visibility,
 };
 
 pub struct ManagerApplication<E: ApplicationEvent + 'static, M: EventManager<E>> {
@@ -130,7 +138,8 @@ impl<'a, E: ApplicationEvent + 'static, M: EventManager<E>> ApplicationHandler<E
         }
         match event.is_request_set_visibility_render_scene() {
             Some((render_scene, visibility)) => {
-                self.graphics_provider.set_visibility_render_scene(&render_scene, visibility);
+                self.graphics_provider
+                    .set_visibility_render_scene(&render_scene, visibility);
             }
             None => {}
         }

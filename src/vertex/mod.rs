@@ -1,7 +1,7 @@
-use placeholder::{
+use ferride_core::{
     app::{IndexBuffer, VertexBuffer},
     game_engine::{BoundingBox, SpritePosition, SpriteSheet, TextureCoordinates},
-    graphics::Vertex as Vert,
+    graphics::Vertex as Vert, reexports::wgpu::vertex_attr_array,
 };
 use repr_trait::C;
 use threed::Vector;
@@ -32,29 +32,11 @@ impl Vertex {
         }
     }
 }
+const UI_VERTEX_ATTRIBUTES: [ferride_core::reexports::wgpu::VertexAttribute; 3] =
+    vertex_attr_array![0 => Float32x2, 1 => Float32x2, 2 => Uint32];
 impl Vert for Vertex {
-    fn describe_buffer_layout() -> wgpu::VertexBufferLayout<'static> {
-        wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<Vertex>() as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &[
-                wgpu::VertexAttribute {
-                    offset: 0,
-                    format: wgpu::VertexFormat::Float32x2,
-                    shader_location: 0,
-                },
-                wgpu::VertexAttribute {
-                    offset: std::mem::size_of::<[f32; 2]>() as wgpu::BufferAddress,
-                    format: wgpu::VertexFormat::Float32x2,
-                    shader_location: 1,
-                },
-                wgpu::VertexAttribute {
-                    offset: std::mem::size_of::<[f32; 4]>() as wgpu::BufferAddress,
-                    format: wgpu::VertexFormat::Uint32,
-                    shader_location: 2,
-                },
-            ],
-        }
+    fn attributes() -> &'static [ferride_core::reexports::wgpu::VertexAttribute] {
+        &UI_VERTEX_ATTRIBUTES
     }
 }
 

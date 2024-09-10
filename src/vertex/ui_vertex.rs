@@ -1,11 +1,11 @@
-use placeholder::{
+use ferride_core::{
     app::{IndexBuffer, VertexBuffer},
     game_engine::{BoundingBox, SpritePosition, SpriteSheet, TextureCoordinates},
     graphics::Vertex,
 };
 use repr_trait::C;
 use threed::Vector;
-use wgpu::vertex_attr_array;
+use ferride_core::reexports::wgpu::vertex_attr_array;
 
 use crate::color::Color;
 
@@ -34,15 +34,11 @@ impl UiVertex {
         }
     }
 }
-const UI_VERTEX_ATTRIBUTES: [wgpu::VertexAttribute; 4] =
+const UI_VERTEX_ATTRIBUTES: [ferride_core::reexports::wgpu::VertexAttribute; 4] =
     vertex_attr_array![0 => Float32x2, 1 => Float32x2, 2 => Uint32, 3 => Uint32];
 impl Vertex for UiVertex {
-    fn describe_buffer_layout() -> wgpu::VertexBufferLayout<'static> {
-        wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<Self>() as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &UI_VERTEX_ATTRIBUTES,
-        }
+    fn attributes() -> &'static [ferride_core::reexports::wgpu::VertexAttribute] {
+        &UI_VERTEX_ATTRIBUTES
     }
 }
 

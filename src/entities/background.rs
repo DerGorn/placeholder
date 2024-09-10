@@ -1,10 +1,10 @@
-use placeholder::{
+use ferride_core::{
     app::{IndexBuffer, VertexBuffer},
     game_engine::{BoundingBox, Entity, EntityName, SpritePosition, SpriteSheet, SpriteSheetName},
+    reexports::winit::PhysicalSize,
 };
 use std::fmt::Debug;
 use threed::Vector;
-use winit::dpi::PhysicalSize;
 
 use crate::{vertex::render_sprite, Event, Type};
 

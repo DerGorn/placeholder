@@ -1,4 +1,4 @@
-use placeholder::create_name_struct;
+use ferride_core::create_name_struct;
 
 use crate::Character;
 

@@ -1,4 +1,4 @@
-use placeholder::graphics::Vertex;
+use ferride_core::{graphics::Vertex, reexports::wgpu::vertex_attr_array};
 use repr_trait::C;
 use threed::Vector;
 
@@ -14,16 +14,10 @@ impl SimpleVertex {
         }
     }
 }
+const UI_VERTEX_ATTRIBUTES: [ferride_core::reexports::wgpu::VertexAttribute; 1] =
+    vertex_attr_array![0 => Float32x2];
 impl Vertex for SimpleVertex {
-    fn describe_buffer_layout() -> wgpu::VertexBufferLayout<'static> {
-        wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<Self>() as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &[wgpu::VertexAttribute {
-                offset: 0,
-                format: wgpu::VertexFormat::Float32x2,
-                shader_location: 0,
-            }],
-        }
+    fn attributes() -> &'static [ferride_core::reexports::wgpu::VertexAttribute] {
+        &UI_VERTEX_ATTRIBUTES
     }
 }

@@ -1,5 +1,5 @@
 use threed::Vector;
-use winit::dpi::PhysicalSize;
+use ferride_core::reexports::winit::PhysicalSize;
 
 use crate::battle_action::BattleActionManager;
 use crate::color::Color;

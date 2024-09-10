@@ -1,16 +1,16 @@
 use env_logger::Env;
-use placeholder::app::{ManagerApplication, WindowDescriptor};
-use placeholder::graphics::{RenderSceneDescriptor, ShaderDescriptor};
+use ferride_core::app::{ManagerApplication, WindowDescriptor};
+use ferride_core::graphics::{RenderSceneDescriptor, ShaderDescriptor};
 // use rodio::{Decoder, OutputStream, Sink, Source};
 use std::fmt::Debug;
 // use std::fs::File;
 // use std::io::BufReader;
+use ferride_core::reexports::winit::PhysicalSize;
 use std::path::PathBuf;
-use winit::{dpi::PhysicalSize, window::WindowAttributes};
 
-use placeholder::graphics::{Index as I, Vertex as V};
+use ferride_core::graphics::{Index as I, Vertex as V};
 
-use placeholder::game_engine::{
+use ferride_core::game_engine::{
     static_camera, CameraDescriptor, EntityType, Game, RessourceDescriptor, SpriteSheetDimensions,
 };
 
@@ -92,10 +92,10 @@ fn main() {
     env_logger::Builder::from_env(Env::default().default_filter_or("warn")).init();
 
     let cursor_path = "res/images/cursor/Cursor_Goth_Cursor.png";
-    let main_window = WindowAttributes::default()
+    let main_window_descriptor = WindowDescriptor::new()
+        .with_cursor(cursor_path)
         .with_title("Wispers in the Void - Dark Dynasty")
         .with_inner_size(RESOLUTION.clone());
-    let main_window_descriptor = WindowDescriptor::new(main_window).with_cursor(cursor_path);
     let protaginist_name = "Protagonist";
     let player_sprite_sheet = "PlayerSpriteSheet";
     let background = "Background";
@@ -113,12 +113,12 @@ fn main() {
             (
                 UTIME.into(),
                 bytemuck::cast_slice(&[0.0_f32]).to_vec(),
-                wgpu::ShaderStages::FRAGMENT,
+                ferride_core::reexports::wgpu::ShaderStages::FRAGMENT,
             ),
             (
                 UUI_CAMERA.into(),
                 bytemuck::cast_slice(&static_camera(FLOAT_RESOULTION.clone())).to_vec(),
-                wgpu::ShaderStages::VERTEX,
+                ferride_core::reexports::wgpu::ShaderStages::VERTEX,
             ),
         ],
         default_render_scene: (

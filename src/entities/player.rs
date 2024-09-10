@@ -1,18 +1,18 @@
 use std::{fmt::Debug, time::Duration};
 
-use placeholder::{
+use ferride_core::{
     app::{IndexBuffer, VertexBuffer},
     game_engine::{
         BoundingBox, Direction, Entity, EntityName, SceneName, SpritePosition, SpriteSheet,
         SpriteSheetName, VelocityController,
     },
-};
-use threed::Vector;
-use winit::{
-    dpi::PhysicalSize,
+reexports::winit::{
+    PhysicalSize,
     event::KeyEvent,
     keyboard::{KeyCode, PhysicalKey},
+}
 };
+use threed::Vector;
 
 use crate::{animation::Animation, vertex::render_sprite, Event, Type};
 
@@ -108,7 +108,7 @@ impl Entity<Type, Event> for Player {
     }
 
     fn handle_key_input(&mut self, input: &KeyEvent) -> Vec<Event> {
-        if input.state == winit::event::ElementState::Released {
+        if input.state == ferride_core::reexports::winit::event::ElementState::Released {
             match input.physical_key {
                 PhysicalKey::Code(KeyCode::KeyW) => {
                     self.velocity.set_direction(Direction::Up, false);
@@ -128,7 +128,7 @@ impl Entity<Type, Event> for Player {
                 }
                 _ => {}
             }
-        } else if input.state == winit::event::ElementState::Pressed {
+        } else if input.state == ferride_core::reexports::winit::event::ElementState::Pressed {
             match input.physical_key {
                 PhysicalKey::Code(KeyCode::KeyW) => {
                     self.velocity.set_direction(Direction::Up, true);

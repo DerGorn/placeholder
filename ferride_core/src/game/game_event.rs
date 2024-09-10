@@ -74,13 +74,14 @@ impl<E: ExternalEvent> ApplicationEvent for GameEvent<E> {
         }
     }
 
-    fn is_request_set_visibility_render_scene<'a>(&'a self) -> Option<(&'a RenderSceneName, &'a Visibility)> {
+    fn is_request_set_visibility_render_scene<'a>(
+        &'a self,
+    ) -> Option<(&'a RenderSceneName, &'a Visibility)> {
         if let Self::RequestSetVisibilityRenderScene(render_scene, visibility) = self {
             Some((render_scene, visibility))
         } else {
             None
         }
-            
     }
 
     fn is_request_new_render_scene<'a>(
@@ -151,14 +152,110 @@ pub trait ExternalEvent: Debug + Send {
     fn new_scene(scene: &Scene<Self>) -> Self
     where
         Self: Sized;
-    fn is_update_uniform_buffer<'a>(
-        &'a self,
-    ) -> Option<(&'a UniformBufferName, &'a [u8])>;
+    fn is_update_uniform_buffer<'a>(&'a self) -> Option<(&'a UniformBufferName, &'a [u8])>;
     fn is_delete_entity<'a>(&'a self) -> Option<(&'a EntityName, &'a SceneName)>;
     fn is_add_entities<'a>(&'a self) -> bool;
     /// Should only be called if is_add_entities returns true
-    fn consume_add_entities_request(self) -> Option<(Vec<Box<dyn Entity<Self::EntityType, Self>>>, SceneName)>
+    fn consume_add_entities_request(
+        self,
+    ) -> Option<(Vec<Box<dyn Entity<Self::EntityType, Self>>>, SceneName)>
     where
         Self: Sized;
     fn is_end_game(&self) -> bool;
+}
+
+
+pub mod example {
+    use super::*;
+
+    #[derive(Debug, PartialEq, Eq)]
+    pub enum EmptyEntityType {
+        Entity,
+    }
+    impl EntityType for EmptyEntityType {}
+    #[derive(Debug)]
+    pub enum EmptyEntityEvent {}
+    #[derive(Debug)]
+    pub enum EmptyExternalEvent {
+        Empty,
+    }
+    impl ExternalEvent for EmptyExternalEvent {
+        type EntityType = EmptyEntityType;
+        type EntityEvent = EmptyEntityEvent;
+        fn is_end_game(&self) -> bool {
+            false
+        }
+        fn is_request_new_scenes<'a>(&'a self) -> bool {
+            false
+        }
+        fn is_request_render_scene<'a>(&'a self) -> Option<&'a crate::game_engine::SceneName> {
+            None
+        }
+        fn is_entity_event<'a>(&'a self) -> bool {
+            false
+        }
+        fn consume_entity_event(
+            self,
+        ) -> Option<(crate::game_engine::EntityName, Self::EntityEvent)> {
+            None
+        }
+        fn is_request_delete_scene<'a>(&'a self) -> Option<&'a crate::game_engine::SceneName> {
+            None
+        }
+        fn is_request_suspend_scene<'a>(&'a self) -> Option<&'a crate::game_engine::SceneName> {
+            None
+        }
+        fn is_add_entities<'a>(&'a self) -> bool {
+            false
+        }
+        fn is_request_set_visibility_scene<'a>(
+            &'a self,
+        ) -> Option<(
+            &'a crate::game_engine::SceneName,
+            &'a crate::graphics::Visibility,
+        )> {
+            None
+        }
+        fn is_request_activate_suspended_scene<'a>(
+            &'a self,
+        ) -> Option<&'a crate::game_engine::SceneName> {
+            None
+        }
+        fn consume_scenes_request(self) -> Option<Vec<Scene<Self>>>
+        where
+            Self: Sized,
+        {
+            None
+        }
+        fn new_scene(_scene: &Scene<Self>) -> Self
+        where
+            Self: Sized,
+        {
+            Self::Empty
+        }
+        fn consume_add_entities_request(
+            self,
+        ) -> Option<(
+            Vec<Box<dyn crate::game_engine::Entity<Self::EntityType, Self>>>,
+            crate::game_engine::SceneName,
+        )>
+        where
+            Self: Sized,
+        {
+            None
+        }
+        fn is_delete_entity<'a>(
+            &'a self,
+        ) -> Option<(
+            &'a crate::game_engine::EntityName,
+            &'a crate::game_engine::SceneName,
+        )> {
+            None
+        }
+        fn is_update_uniform_buffer<'a>(
+            &'a self,
+        ) -> Option<(&'a crate::graphics::UniformBufferName, &'a [u8])> {
+            None
+        }
+    }
 }
