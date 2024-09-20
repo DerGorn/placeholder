@@ -16,7 +16,7 @@ use crate::{
     Type, TARGET_FPS,
 };
 
-use super::{button_styles::ColorPair, FlexItem};
+use super::{button_styles::ColorPair, FlexItem, Padding};
 
 const PROGRESS_BAR_ANIMATION_COLOR: Color = Color::new_rgba(255, 255, 255, 255);
 const ANIMATION_STEPS: u16 = 30;
@@ -32,7 +32,7 @@ pub struct ProgressBar {
     colors: ColorPair,
     is_dirty: bool,
     sprite: SpriteSheetName,
-    padding: u8,
+    padding: Padding,
     animation: Animation<f32>,
 }
 impl ProgressBar {
@@ -43,7 +43,7 @@ impl ProgressBar {
         max_value: u16,
         current_value: u16,
         colors: ColorPair,
-        padding: u8,
+        padding: Padding,
     ) -> Self {
         Self {
             max_value: max_value as f32,
@@ -140,13 +140,12 @@ impl Entity<Type, Event> for ProgressBar {
         if let Some(sprite_sheet) = sprite_sheet[0] {
             let animation_value = *self.animation.keyframe();
             let mut bounding_box = self.bounding_box();
-            bounding_box.size.width -= 2.0 * self.padding as f32;
-            bounding_box.size.height -= 2.0 * self.padding as f32;
-            bounding_box.anchor.x += self.padding as f32;
-            bounding_box.anchor.y += self.padding as f32;
+            bounding_box.size.width -= self.padding.left as f32 + self.padding.right as f32;
+            bounding_box.size.height -= self.padding.up as f32 + self.padding.down as f32;
+            bounding_box.anchor.x -= (self.padding.right as f32 - self.padding.left as f32) / 2.0;
+            bounding_box.anchor.y -= (self.padding.up as f32 - self.padding.down as f32) / 2.0;
             let sprite_position = SpritePosition::new(0, 0);
             let border_thickness = bounding_box.size.width.min(bounding_box.size.height) / 10.0;
-            bounding_box.anchor += Vector::new(border_thickness, border_thickness, 0.0);
             bounding_box.size.height -= 2.0 * border_thickness;
             bounding_box.size.width -= 2.0 * border_thickness;
             render_ui_sprite(
@@ -164,7 +163,13 @@ impl Entity<Type, Event> for ProgressBar {
                 border_thickness,
                 &self.colors.high,
             );
-            if animation_value - self.current_value >= 1e-4 {
+            let animation_differential = animation_value - self.current_value;
+            let (value_color, animation_color) = if animation_differential <= 0.0 {
+                (&PROGRESS_BAR_ANIMATION_COLOR, &self.colors.high)
+            } else {
+                (&self.colors.high, &PROGRESS_BAR_ANIMATION_COLOR)
+            };
+            if animation_differential >= 1e-4 {
                 render_bar_part(
                     self.max_value,
                     animation_value,
@@ -173,7 +178,7 @@ impl Entity<Type, Event> for ProgressBar {
                     sprite_sheet,
                     &sprite_position,
                     &bounding_box,
-                    &PROGRESS_BAR_ANIMATION_COLOR,
+                    animation_color,
                 );
             }
             render_bar_part(
@@ -184,8 +189,20 @@ impl Entity<Type, Event> for ProgressBar {
                 sprite_sheet,
                 &sprite_position,
                 &bounding_box,
-                &self.colors.high,
+                value_color,
             );
+            if animation_differential <= 1e-4 {
+                render_bar_part(
+                    self.max_value,
+                    animation_value,
+                    vertices,
+                    indices,
+                    sprite_sheet,
+                    &sprite_position,
+                    &bounding_box,
+                    animation_color,
+                );
+            }
         }
     }
 
@@ -198,11 +215,13 @@ impl Entity<Type, Event> for ProgressBar {
     }
 
     fn bounding_box(&self) -> BoundingBox {
+        let width: f32 = self.padding.left as f32 + self.padding.right as f32;
+        let height: f32 = self.padding.up as f32 + self.padding.down as f32;
         BoundingBox {
-            anchor: &self.position - Vector::new(self.padding as f32, self.padding as f32, 0.0),
+            anchor: self.position.clone(),
             size: PhysicalSize::new(
-                self.dimensions.width as f32 + 2.0 * self.padding as f32,
-                self.dimensions.height as f32 + 2.0 * self.padding as f32,
+                self.dimensions.width as f32 + width,
+                self.dimensions.height as f32 + height,
             ),
         }
     }

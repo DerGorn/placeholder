@@ -1,14 +1,17 @@
 use ferride_core::game_engine::{Entity, EntityName};
-use threed::Vector;
 use ferride_core::reexports::winit::PhysicalSize;
+use threed::Vector;
 
+use crate::ui::button_styles::ColorPair;
+use crate::ui::FontSize;
 use crate::{
     character::Character,
     event::Event,
-    ui::{Button, FlexItem, FlexProgressBarLine, ProgressBar},
+    ui::{Button, ButtonStyle, FlexItem, FlexProgressBarLine, ProgressBar},
     Type,
 };
 
+use super::{BAR_LOW_COLOR, BAR_PADDING, BAR_SIZE, CHARACTER_FONT_SIZE, CHARACTER_PORTRAIT_SIZE, EXHAUSTION_BAR_COLOR, HEALTH_BAR_COLOR, STAMINA_BAR_COLOR};
 
 #[derive(Debug)]
 pub struct CharacterGui {
@@ -16,6 +19,49 @@ pub struct CharacterGui {
     bars: FlexProgressBarLine,
 }
 impl CharacterGui {
+    pub fn with_button_style_and_character(style: ButtonStyle, character: &Character) -> Self {
+        Self::new(
+            Box::new(Button::new(
+                String::new(),
+                character.name.into(),
+                CHARACTER_PORTRAIT_SIZE,
+                Vector::scalar(0.0),
+                FontSize::new(CHARACTER_FONT_SIZE),
+                false,
+                style,
+            )),
+            vec![
+                Box::new(ProgressBar::new(
+                    "health".into(),
+                    BAR_SIZE,
+                    Vector::scalar(0.0),
+                    character.health,
+                    character.max_health,
+                    ColorPair::new(HEALTH_BAR_COLOR, BAR_LOW_COLOR),
+                    BAR_PADDING,
+                )),
+                Box::new(ProgressBar::new(
+                    "stamina".into(),
+                    BAR_SIZE,
+                    Vector::scalar(0.0),
+                    character.stamina,
+                    character.max_stamina,
+                    ColorPair::new(STAMINA_BAR_COLOR, BAR_LOW_COLOR),
+                    BAR_PADDING,
+                )),
+                Box::new(ProgressBar::new(
+                    "exhaustion".into(),
+                    BAR_SIZE,
+                    Vector::scalar(0.0),
+                    character.exhaustion,
+                    character.exhaustion_threshold,
+                    ColorPair::new(EXHAUSTION_BAR_COLOR, BAR_LOW_COLOR),
+                    BAR_PADDING,
+                )),
+            ],
+        )
+    }
+
     pub fn new(button: Box<Button>, bars: Vec<Box<ProgressBar>>) -> Self {
         let bbox = button.bounding_box();
         Self {
@@ -44,17 +90,15 @@ impl CharacterGui {
         let mut pending_animations = vec![];
         for bar in &mut self.bars.children {
             if match bar.name().as_str() {
-                "health" => {
-                    bar.set_value(character.health)
-                },
-                "stamina" => {
-                    bar.set_value(character.stamina)
-                }
-                "exhaustion" => {
-                    bar.set_value(character.exhaustion)
-                }
+                "health" => bar.set_value(character.health),
+                "stamina" => bar.set_value(character.stamina),
+                "exhaustion" => bar.set_value(character.exhaustion),
                 x => {
-                    unimplemented!("no stat '{}' on character, but a bar for it exists on '{}'", x, character.name)
+                    unimplemented!(
+                        "no stat '{}' on character, but a bar for it exists on '{}'",
+                        x,
+                        character.name
+                    )
                 }
             } {
                 pending_animations.push(bar.name().clone());
@@ -102,7 +146,10 @@ impl Entity<Type, Event> for CharacterGui {
         sprites
     }
 
-    fn handle_key_input(&mut self, input: &ferride_core::reexports::winit::event::KeyEvent) -> Vec<Event> {
+    fn handle_key_input(
+        &mut self,
+        input: &ferride_core::reexports::winit::event::KeyEvent,
+    ) -> Vec<Event> {
         self.button.handle_key_input(input)
     }
 

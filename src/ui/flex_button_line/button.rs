@@ -249,7 +249,6 @@ impl Entity<Type, Event> for Button {
                 if !sprite_sheet[0].is_none() {
                     let sprite_sheet = SpriteSheet::default();
                     let mut bbox = self.bounding_box();
-                    bbox.anchor += Vector::new(BORDER_THICKNESS, BORDER_THICKNESS, 0.0);
                     bbox.size.height -= 2.0 * BORDER_THICKNESS;
                     bbox.size.width -= 2.0 * BORDER_THICKNESS;
                     render_ui_sprite(
@@ -309,7 +308,6 @@ impl Entity<Type, Event> for Button {
                         &style.unfocus
                     });
                     let mut bbox = self.bounding_box();
-                    bbox.anchor += Vector::new(BORDER_THICKNESS, BORDER_THICKNESS, 0.0);
                     bbox.size.height -= 2.0 * BORDER_THICKNESS;
                     bbox.size.width -= 2.0 * BORDER_THICKNESS;
                     render_ui_sprite(
@@ -341,7 +339,7 @@ impl Entity<Type, Event> for Button {
         let mut resize_bbox = || {
             bbox.size.height += 2.0 * BORDER_THICKNESS;
             bbox.size.width += 2.0 * BORDER_THICKNESS;
-            bbox.anchor -= Vector::new(BORDER_THICKNESS, BORDER_THICKNESS, 0.0);
+            bbox.anchor += Vector::new(BORDER_THICKNESS, BORDER_THICKNESS, 0.0);
         };
         match self.style {
             ButtonStyle::BorderBox(_) => {

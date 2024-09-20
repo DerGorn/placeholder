@@ -1,17 +1,23 @@
 use threed::Vector;
-use ferride_core::reexports::winit::PhysicalSize;
 
 use crate::{
     character::{
-        skilled_character::{ui::CharacterGui, BAR_LOW_COLOR, CHARACTER_PORTRAIT_SIZE},
+        skilled_character::{
+            ui::CharacterGui, BAR_LOW_COLOR, BAR_PADDING, BAR_SIZE, EXHAUSTION_BAR_COLOR,
+            HEALTH_BAR_COLOR, STAMINA_BAR_COLOR,
+        },
         skills::{AttackSkill, HealSkill},
-        Character, CharacterAlignment, NoKI, SkilledCharacter,
-    }, color::Color, ui::{button_styles::{BackgroundImageStyle, ColorPair}, Button, ButtonStyle, FontSize, ProgressBar}
+        Character, CharacterAlignment, NoKI, SkilledCharacter, CHARACTER_FONT_SIZE,
+    },
+    ui::{
+        button_styles::{BackgroundImageStyle, ColorPair},
+        Button, ButtonStyle, FlexItem, FontSize, ProgressBar,
+    },
+    BATTLE_DETAIL_OVERLAY, RESOLUTION,
 };
 
 use crate::character::CharacterBuilder;
 use crate::character::CharacterGuiManager;
-use crate::character::CHARACTER_FONT_SIZE;
 
 const MAX_HEALTH: u16 = 100;
 const MAX_STAMINA: u16 = 100;
@@ -60,50 +66,60 @@ impl CharacterBuilder for BiaKarui {
 
 pub struct BiaKaruiGui;
 impl CharacterGuiManager for BiaKaruiGui {
-    fn create_gui(&self, character: &SkilledCharacter) -> Box<CharacterGui> {
-        let bar_size = PhysicalSize::new((CHARACTER_PORTRAIT_SIZE.width as f32 * 0.8) as u16, 20);
+    fn create_detail_gui(&self, character: &SkilledCharacter) -> Box<CharacterGui> {
+        let mut button = Button::new(
+            String::new(),
+            BATTLE_DETAIL_OVERLAY.into(),
+            RESOLUTION,
+            Vector::scalar(0.0),
+            FontSize::new(CHARACTER_FONT_SIZE),
+            false,
+            ButtonStyle::BackgroundImage(BackgroundImageStyle {
+                sprite_sheet: "characters\\bia_karui".into(),
+                ..Default::default()
+            }),
+        );
+        button.set_focus(true);
         Box::new(CharacterGui::new(
-            Box::new(Button::new(
-                String::new(),
-                character.character.name.into(),
-                PhysicalSize::new(203, 360),
-                Vector::scalar(0.0),
-                FontSize::new(CHARACTER_FONT_SIZE),
-                false,
-                ButtonStyle::BackgroundImage(BackgroundImageStyle {
-                    sprite_sheet: "characters\\bia_karui".into(),
-                    ..Default::default()
-                }),
-            )),
+            Box::new(button),
             vec![
                 Box::new(ProgressBar::new(
                     "health".into(),
-                    bar_size,
+                    BAR_SIZE,
                     Vector::scalar(0.0),
                     character.character.health,
                     character.character.max_health,
-                    ColorPair::new(Color::new_rgba(255, 0, 0, 255), BAR_LOW_COLOR),
-                    10,
+                    ColorPair::new(HEALTH_BAR_COLOR, BAR_LOW_COLOR),
+                    BAR_PADDING,
                 )),
                 Box::new(ProgressBar::new(
                     "stamina".into(),
-                    bar_size,
+                    BAR_SIZE,
                     Vector::scalar(0.0),
                     character.character.stamina,
                     character.character.max_stamina,
-                    ColorPair::new(Color::new_rgba(255, 255, 0, 255), BAR_LOW_COLOR),
-                    10,
+                    ColorPair::new(STAMINA_BAR_COLOR, BAR_LOW_COLOR),
+                    BAR_PADDING,
                 )),
                 Box::new(ProgressBar::new(
                     "exhaustion".into(),
-                    bar_size,
+                    BAR_SIZE,
                     Vector::scalar(0.0),
                     character.character.exhaustion,
                     character.character.exhaustion_threshold,
-                    ColorPair::new(Color::new_rgba(0, 255, 255, 255), BAR_LOW_COLOR),
-                    10,
+                    ColorPair::new(EXHAUSTION_BAR_COLOR, BAR_LOW_COLOR),
+                    BAR_PADDING,
                 )),
             ],
+        ))
+    }
+    fn create_gui(&self, character: &SkilledCharacter) -> Box<CharacterGui> {
+        Box::new(CharacterGui::with_button_style_and_character(
+            ButtonStyle::BackgroundImage(BackgroundImageStyle {
+                sprite_sheet: "characters\\bia_karui".into(),
+                ..Default::default()
+            }),
+            &character.character,
         ))
     }
 }

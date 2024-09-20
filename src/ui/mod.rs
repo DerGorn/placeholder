@@ -17,3 +17,20 @@ pub use {
 
 mod progress_bar;
 pub use progress_bar::ProgressBar;
+
+pub struct Padding {
+    pub up: u8,
+    pub down: u8,
+    pub left: u8,
+    pub right: u8,
+}
+impl Default for Padding {
+    fn default() -> Self {
+        Self {
+            up: 0,
+            down: 0,
+            left: 0,
+            right: 0,
+        }
+    }
+}

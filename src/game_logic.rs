@@ -504,6 +504,7 @@ impl GameLogic {
                                 };
                             *ui_state =
                                 UIState::CharacterDetail(Box::new((**source_state).clone()));
+                            todo!("CharacterGuiManager.create_detail_gui needs a better implementation with some flex boxes and more stats and explenations");
                             events.extend([
                                 Event::RequestSuspendScene(BATTLE_SCENE.into()),
                                 Event::RequestSetVisibilityScene(
@@ -518,27 +519,28 @@ impl GameLogic {
                                     BATTLE_DETAIL_OVERLAY_SCENE.into(),
                                 ),
                                 Event::RequestAddEntities(
-                                    vec![Box::new(FlexButtonLine::new(
-                                        FlexDirection::Y,
-                                        FlexOrigin::Center,
-                                        Alignment::Center,
-                                        None,
-                                        0.0,
-                                        true,
-                                        PhysicalSize::new(100, 100),
-                                        Vector::scalar(0.0),
-                                        "CharacterDetailLine".into(),
-                                        true,
-                                        vec![Box::new(Button::new(
-                                            format!("{:#?}", character.character),
-                                            BATTLE_DETAIL_OVERLAY.into(),
-                                            RESOLUTION,
-                                            Vector::scalar(0.0),
-                                            FontSize::new(32),
-                                            false,
-                                            ButtonStyle::default(),
-                                        ))],
-                                    ))],
+                                    vec![character.gui.create_detail_gui(character)],
+                                    // vec![Box::new(FlexButtonLine::new(
+                                    //     FlexDirection::Y,
+                                    //     FlexOrigin::Center,
+                                    //     Alignment::Center,
+                                    //     None,
+                                    //     0.0,
+                                    //     true,
+                                    //     PhysicalSize::new(100, 100),
+                                    //     Vector::scalar(0.0),
+                                    //     "CharacterDetailLine".into(),
+                                    //     true,
+                                    //     vec![Box::new(Button::new(
+                                    //         format!("{:#?}", character.character),
+                                    //         BATTLE_DETAIL_OVERLAY.into(),
+                                    //         RESOLUTION,
+                                    //         Vector::scalar(0.0),
+                                    //         FontSize::new(32),
+                                    //         false,
+                                    //         ButtonStyle::default(),
+                                    //     ))],
+                                    // ))],
                                     BATTLE_DETAIL_OVERLAY_SCENE.into(),
                                 ),
                             ]);
@@ -547,28 +549,6 @@ impl GameLogic {
                     }
                     _ => {}
                 };
-                if matches!(key_code, KeyCode::Enter | KeyCode::Space) {
-                    // let name = entity.as_str();
-                    // match name {
-                    //     BATTLE_ATTACK_BUTTON => {
-                    //         let remaining_actions = battle_state
-                    //             .character_order
-                    //             .iter()
-                    //             .enumerate()
-                    //             .filter(|(i, ci)| {
-                    //                 ci == &&player_index
-                    //                     && battle_state.actions.iter().find(|a| a.0 == *i).is_none()
-                    //             })
-                    //             .collect::<Vec<_>>();
-                    //         let action = remaining_actions[0];
-                    //         battle_state.actions.push((action.0, 0, enemy_index));
-                    //         if remaining_actions.len() == 1 {
-                    //             return vec![Event::BattleEvent(BattleEvent::FinishedPlanning)];
-                    //         }
-                    //     }
-                    //     _ => {}
-                    // }
-                }
             }
             _ => {}
         }

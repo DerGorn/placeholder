@@ -1,11 +1,11 @@
-use threed::Vector;
 use ferride_core::reexports::winit::PhysicalSize;
+use threed::Vector;
 
 use crate::battle_action::BattleActionManager;
 use crate::color::Color;
 use crate::ui::button_styles::{ColorPair, UNFOCUS_LOW_COLOR};
-use crate::ui::{Button, ButtonStyle, FontSize, ProgressBar};
-use crate::RESOLUTION;
+use crate::ui::{Button, ButtonStyle, FlexItem, FontSize, Padding, ProgressBar};
+use crate::{BATTLE_DETAIL_OVERLAY, RESOLUTION};
 use std::fmt::Debug;
 
 use self::ui::CharacterGui;
@@ -24,6 +24,7 @@ pub trait CharacterBuilder: Default + Debug {
 
 pub trait CharacterGuiManager {
     fn create_gui(&self, character: &SkilledCharacter) -> Box<CharacterGui>;
+    fn create_detail_gui(&self, character: &SkilledCharacter) -> Box<CharacterGui>;
 }
 
 pub const CHARACTER_FONT_SIZE: u8 = 32;
@@ -37,48 +38,67 @@ pub const CHARACTER_PORTRAIT_SIZE: PhysicalSize<u16> = PhysicalSize::new(
     (ORIGINAL_CHARACTER_PORTRAIT_SIZE.height as f32 * HEIGHT_SCALE_CHARACTER_PORTRAIT) as u16,
 );
 const BAR_LOW_COLOR: Color = UNFOCUS_LOW_COLOR;
+const BAR_SIZE: PhysicalSize<u16> =
+    PhysicalSize::new((CHARACTER_PORTRAIT_SIZE.width as f32 * 0.8) as u16, 20);
+const HEALTH_BAR_COLOR: Color = Color::new_rgba(255, 0, 0, 255);
+const STAMINA_BAR_COLOR: Color = Color::new_rgba(255, 255, 0, 255);
+const EXHAUSTION_BAR_COLOR: Color = Color::new_rgba(0, 255, 255, 255);
+const BAR_PADDING: Padding = Padding {
+    right: 10,
+    down: 10,
+    up: 0,
+    left: 0,
+};
 pub struct DefaultGui {}
 impl CharacterGuiManager for DefaultGui {
-    fn create_gui(&self, character: &SkilledCharacter) -> Box<CharacterGui> {
+    fn create_detail_gui(&self, character: &SkilledCharacter) -> Box<CharacterGui> {
+        let mut button = Button::new(
+            String::new(),
+            BATTLE_DETAIL_OVERLAY.into(),
+            RESOLUTION,
+            Vector::scalar(0.0),
+            FontSize::new(CHARACTER_FONT_SIZE),
+            false,
+            ButtonStyle::default(),
+        );
+        button.set_focus(true);
         Box::new(CharacterGui::new(
-            Box::new(Button::new(
-                character.character.name.into(),
-                character.character.name.into(),
-                CHARACTER_PORTRAIT_SIZE,
-                Vector::scalar(0.0),
-                FontSize::new(CHARACTER_FONT_SIZE),
-                false,
-                ButtonStyle::default(),
-            )),
+            Box::new(button),
             vec![
                 Box::new(ProgressBar::new(
                     "health".into(),
-                    PhysicalSize::new((CHARACTER_PORTRAIT_SIZE.width as f32 * 0.8) as u16, 20),
+                    BAR_SIZE,
                     Vector::scalar(0.0),
                     character.character.health,
                     character.character.max_health,
-                    ColorPair::new(Color::new_rgba(255, 0, 0, 255), BAR_LOW_COLOR),
-                    10,
+                    ColorPair::new(HEALTH_BAR_COLOR, BAR_LOW_COLOR),
+                    BAR_PADDING,
                 )),
                 Box::new(ProgressBar::new(
                     "stamina".into(),
-                    PhysicalSize::new((CHARACTER_PORTRAIT_SIZE.width as f32 * 0.8) as u16, 20),
+                    BAR_SIZE,
                     Vector::scalar(0.0),
                     character.character.stamina,
                     character.character.max_stamina,
-                    ColorPair::new(Color::new_rgba(255, 255, 0, 255), BAR_LOW_COLOR),
-                    10,
+                    ColorPair::new(STAMINA_BAR_COLOR, BAR_LOW_COLOR),
+                    BAR_PADDING,
                 )),
                 Box::new(ProgressBar::new(
                     "exhaustion".into(),
-                    PhysicalSize::new((CHARACTER_PORTRAIT_SIZE.width as f32 * 0.8) as u16, 20),
+                    BAR_SIZE,
                     Vector::scalar(0.0),
                     character.character.exhaustion,
                     character.character.exhaustion_threshold,
-                    ColorPair::new(Color::new_rgba(0, 255, 255, 255), BAR_LOW_COLOR),
-                    10,
+                    ColorPair::new(EXHAUSTION_BAR_COLOR, BAR_LOW_COLOR),
+                    BAR_PADDING,
                 )),
             ],
+        ))
+    }
+    fn create_gui(&self, character: &SkilledCharacter) -> Box<CharacterGui> {
+        Box::new(CharacterGui::with_button_style_and_character(
+            ButtonStyle::default(),
+            &character.character,
         ))
     }
 }
