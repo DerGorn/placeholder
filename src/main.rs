@@ -38,6 +38,9 @@ use game_logic::GameLogic;
 mod character;
 use character::{Character, SkilledCharacter};
 
+mod dungeon;
+
+
 type Index = u16;
 
 #[derive(Debug, PartialEq)]
