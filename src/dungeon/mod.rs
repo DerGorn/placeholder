@@ -1,24 +1,45 @@
 use std::fmt::{Debug, Display};
 
-trait Edge {
+pub trait Edge {
     fn as_char(&self, direction: Direction) -> char;
+    fn from_char(c: char, direction: Direction) -> Option<Self>
+    where
+        Self: Sized;
 }
 
-trait Center {
+pub trait Center {
     fn as_char(&self) -> char;
+    fn from_char(c: char) -> Option<Self>
+    where
+        Self: Sized;
 }
 
-trait Occupance {
+pub trait Occupance {
     fn as_char(&self, direction: Option<Direction>) -> char;
+    fn from_char(c: char, direction: Option<Direction>) -> Option<Self>
+    where
+        Self: Sized;
 }
 impl<O: Occupance> Edge for O {
     fn as_char(&self, direction: Direction) -> char {
         Occupance::as_char(self, Some(direction))
     }
+    fn from_char(c: char, direction: Direction) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        <Self as Occupance>::from_char(c, Some(direction))
+    }
 }
 impl<O: Occupance> Center for O {
     fn as_char(&self) -> char {
         Occupance::as_char(self, None)
+    }
+    fn from_char(c: char) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        <Self as Occupance>::from_char(c, None)
     }
 }
 
@@ -30,16 +51,37 @@ impl Edge for Wall {
             Direction::Up | Direction::Down => '-',
         }
     }
+    fn from_char(c: char, direction: Direction) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        match (c, direction) {
+            ('|', Direction::Left) | ('|', Direction::Right) => Some(Wall),
+            ('-', Direction::Up) | ('-', Direction::Down) => Some(Wall),
+            _ => None,
+        }
+    }
 }
 
 struct Trap;
 impl Occupance for Trap {
-    fn as_char(&self, direction: Option<Direction>) -> char {
+    fn as_char(&self, _direction: Option<Direction>) -> char {
         'T'
+    }
+    fn from_char(c: char, _direction: Option<Direction>) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if c == 'T' {
+            Some(Trap)
+        } else {
+            None
+        }
     }
 }
 
-enum Direction {
+#[derive(Clone, Copy)]
+pub enum Direction {
     Left,
     Up,
     Right,
@@ -54,32 +96,33 @@ struct Tile {
 }
 macro_rules! tile {
     [$($direction:literal: $obstacle:expr),*$(; $occupier:expr)?] => {{
-        let _left: Option<Box<dyn Edge>> = None;
-        let _up: Option<Box<dyn Edge>> = None;
-        let _right: Option<Box<dyn Edge>> = None;
-        let _down: Option<Box<dyn Edge>> = None;
-        let _occupier: Option<Box<dyn Center>> = None;
+        let mut tile = Tile {left: None, up: None, right: None, down: None, occupier: None};
         $(
             match $direction {
                 "l" | "left" | "L" | "Left" | "LEFT" => {
-                    let _left: Option<Box<dyn Edge>> = Some(Box::new($obstacle));
+                    let left: Option<Box<dyn Edge>> = Some(Box::new($obstacle));
+                    tile.left = left;
                 },
                 "u" | "up" | "U" | "Up" | "UP" => {
-                    let _up: Option<Box<dyn Edge>> = Some(Box::new($obstacle));
+                    let up: Option<Box<dyn Edge>> = Some(Box::new($obstacle));
+                    tile.up = up;
                 },
                 "r" | "right" | "R" | "Right" | "RIGHT" => {
-                    let _right: Option<Box<dyn Edge>> = Some(Box::new($obstacle));
+                    let right: Option<Box<dyn Edge>> = Some(Box::new($obstacle));
+                    tile.right = right;
                 },
                 "d" | "down" | "D" | "Down" | "DOWN" => {
-                    let _down: Option<Box<dyn Edge>> = Some(Box::new($obstacle));
+                    let down: Option<Box<dyn Edge>> = Some(Box::new($obstacle));
+                    tile.down = down;
                 },
-                _ => {},
+                x => {panic!("unknown direction for tile {}", x)},
             }
         )*
         $(
-            let _occupier: Option<Box<dyn Center>> = Some(Box::new($occupier));
+            let occupier: Option<Box<dyn Center>> = Some(Box::new($occupier));
+            tile.occupier = occupier;
         )?
-        Tile{left: _left, up: _up, right: _right, down: _down, occupier: _occupier}
+        tile
     }}
 }
 const TILESIZE: usize = 3;
@@ -172,6 +215,43 @@ impl Debug for DungeonLayoutBuilderErr {
 type BuilderRes<T> = Result<T, DungeonLayoutBuilderErr>;
 type EdgeFactory = Box<dyn Fn(char, Direction) -> BuilderRes<Option<Box<dyn Edge>>>>;
 type CenterFactory = Box<dyn Fn(char) -> BuilderRes<Option<Box<dyn Center>>>>;
+macro_rules! dungeon_layout_factory {
+    (Edge: $name:ident; $($object:ty),+) => {
+        fn $name(
+            symbol: char,
+            direction: $crate::dungeon::Direction,
+        ) -> $crate::dungeon::BuilderRes<Option<Box<dyn $crate::dungeon::Edge>>> {
+            if symbol == ' ' {
+                return Ok(None);
+            }
+            $(
+                match <$object as $crate::dungeon::Edge>::from_char(symbol, direction) {
+                    Some(w) => return Ok(Some(Box::new(w))),
+                    None => {}
+                }
+            )+
+            Err(DungeonLayoutBuilderErr::UnhandledSymbol(symbol))
+        }
+    };
+    (Center: $name:ident; $($object:ty),+) => {
+        fn $name(
+            symbol: char,
+        ) -> $crate::dungeon::BuilderRes<Option<Box<dyn $crate::dungeon::Center>>> {
+            if symbol == ' ' {
+                return Ok(None);
+            }
+            $(
+                match <$object as $crate::dungeon::Center>::from_char(symbol) {
+                    Some(w) => return Ok(Some(Box::new(w))),
+                    None => {}
+                }
+            )+
+            Err(DungeonLayoutBuilderErr::UnhandledSymbol(symbol))
+        }
+    };
+}
+dungeon_layout_factory!(Edge: default_edge_factory; Wall, Trap);
+dungeon_layout_factory!(Center: default_center_factory; Trap);
 #[derive(Default)]
 /// If a factory returns `DungeonLayoutBuilderErr::UnhandledSymbol` the default factory will handle the
 /// symbol.
@@ -193,18 +273,24 @@ impl DungeonLayoutBuilder {
         symbol: char,
         direction: Direction,
     ) -> BuilderRes<Option<Box<dyn Edge>>> {
-        match symbol {
-            ' ' => Ok(None),
-            'T' => Ok(Some(Box::new(Trap))),
-            x => Err(DungeonLayoutBuilderErr::UnhandledSymbol(x)),
+        if let Some(factory) = &self.edge_factory {
+            match factory(symbol, direction) {
+                Ok(e) => return Ok(e),
+                Err(DungeonLayoutBuilderErr::UnhandledSymbol(_)) => {}
+                Err(e) => return Err(e),
+            }
         }
+        default_edge_factory(symbol, direction)
     }
     fn default_center_factory(&self, symbol: char) -> BuilderRes<Option<Box<dyn Center>>> {
-        match symbol {
-            ' ' => Ok(None),
-            'T' => Ok(Some(Box::new(Trap))),
-            x => Err(DungeonLayoutBuilderErr::UnhandledSymbol(x)),
+        if let Some(factory) = &self.center_factory {
+            match factory(symbol) {
+                Ok(e) => return Ok(e),
+                Err(DungeonLayoutBuilderErr::UnhandledSymbol(_)) => {}
+                Err(e) => return Err(e),
+            }
         }
+        default_center_factory(symbol)
     }
     pub fn build(&self, text: &str) -> Result<DungeonLayout, DungeonLayoutBuilderErr> {
         let lines = text.lines().collect::<Vec<_>>();
@@ -282,6 +368,7 @@ impl Debug for DungeonLayout {
                 down = String::with_capacity((TILESIZE as u8 * self.width).into());
             }
             let tile = tile.to_string();
+            // print!("{}", tile);
             let (tile_up, tile) = tile.split_once("\n").expect(&format!(
                 "Expected Tile to have at least 2 lines, but got '{:?}'",
                 tile
@@ -314,7 +401,7 @@ mod tests {
             width: 2,
         };
         let example_string = format!("{:?}", example);
-        println!("{}", example_string);
+        println!("example:\n{}", example_string);
         assert!(
             example_string
                 == "\
@@ -328,6 +415,8 @@ mod tests {
         let reverse: DungeonLayout = DungeonLayoutBuilder::default()
             .build(&example_string)
             .unwrap();
-        assert!(format!("{:?}", reverse) == example_string);
+        let reverse_string = format!("{:?}", reverse);
+        println!("reverse:\n{}", reverse_string);
+        assert!(reverse_string == example_string);
     }
 }
