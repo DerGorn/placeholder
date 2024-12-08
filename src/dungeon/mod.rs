@@ -1,5 +1,4 @@
 use std::fmt::{Debug, Display};
-use std::str::FromStr;
 
 trait Edge {
     fn as_char(&self, direction: Direction) -> char;
@@ -55,32 +54,32 @@ struct Tile {
 }
 macro_rules! tile {
     [$($direction:literal: $obstacle:expr),*$(; $occupier:expr)?] => {{
-        let mut left: Option<Box<dyn Edge>> = None;
-        let mut up: Option<Box<dyn Edge>> = None;
-        let mut right: Option<Box<dyn Edge>> = None;
-        let mut down: Option<Box<dyn Edge>> = None;
-        let mut occupier: Option<Box<dyn Center>> = None;
+        let _left: Option<Box<dyn Edge>> = None;
+        let _up: Option<Box<dyn Edge>> = None;
+        let _right: Option<Box<dyn Edge>> = None;
+        let _down: Option<Box<dyn Edge>> = None;
+        let _occupier: Option<Box<dyn Center>> = None;
         $(
             match $direction {
                 "l" | "left" | "L" | "Left" | "LEFT" => {
-                    left = Some(Box::new($obstacle));
+                    let _left: Option<Box<dyn Edge>> = Some(Box::new($obstacle));
                 },
                 "u" | "up" | "U" | "Up" | "UP" => {
-                    up = Some(Box::new($obstacle));
+                    let _up: Option<Box<dyn Edge>> = Some(Box::new($obstacle));
                 },
                 "r" | "right" | "R" | "Right" | "RIGHT" => {
-                    right = Some(Box::new($obstacle));
+                    let _right: Option<Box<dyn Edge>> = Some(Box::new($obstacle));
                 },
                 "d" | "down" | "D" | "Down" | "DOWN" => {
-                    down = Some(Box::new($obstacle));
+                    let _down: Option<Box<dyn Edge>> = Some(Box::new($obstacle));
                 },
                 _ => {},
             }
         )*
         $(
-            occupier = Some(Box::new($occupier));
+            let _occupier: Option<Box<dyn Center>> = Some(Box::new($occupier));
         )?
-        Tile{left, up, right, down, occupier}
+        Tile{left: _left, up: _up, right: _right, down: _down, occupier: _occupier}
     }}
 }
 const TILESIZE: usize = 3;
@@ -95,16 +94,12 @@ impl Display for Tile {
             middle.push(left);
             down.push(left);
             true
-        } else { 
+        } else {
             middle += " ";
             false
         };
         let up_edge = if let Some(upstacle) = &self.up {
-            let length = if left_edge {
-                1
-            } else {
-                2
-            };
+            let length = if left_edge { 1 } else { 2 };
             let upstacle = upstacle.as_char(Direction::Up);
             for _ in 0..length {
                 up.push(upstacle);
@@ -112,14 +107,10 @@ impl Display for Tile {
             upstacle
         } else {
             up += if left_edge { " " } else { "  " };
-            ' ' 
+            ' '
         };
         let down_edge = if let Some(downstacle) = &self.down {
-            let length = if left_edge {
-                1
-            } else {
-                2
-            };
+            let length = if left_edge { 1 } else { 2 };
             let downstacle = downstacle.as_char(Direction::Down);
             for _ in 0..length {
                 down.push(downstacle);
@@ -129,9 +120,9 @@ impl Display for Tile {
             down += if left_edge { " " } else { "  " };
             ' '
         };
-        let occupier = if let Some(occupier) = &self.occupier {
+        if let Some(occupier) = &self.occupier {
             middle.push(occupier.as_char());
-        }   else {
+        } else {
             middle += " ";
         };
         if let Some(right) = &self.right {
@@ -163,11 +154,118 @@ struct DungeonLayout {
     tiles: Vec<Tile>,
     width: u8,
 }
-impl FromStr for DungeonLayout {
-    type Err = Box<dyn std::error::Error>;
-    fn from_str(layout: &str) -> Result<Self, <Self as FromStr>::Err> { 
-        let lines = layout.split("\n");
-        todo!("Builder with Factory(occupanceFactory) to keep moddability the traits garant");
+enum DungeonLayoutBuilderErr {
+    UnhandledSymbol(char),
+    MalformedLayout(String),
+    EmptyDungeon,
+}
+impl Debug for DungeonLayoutBuilderErr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            DungeonLayoutBuilderErr::UnhandledSymbol(x) => format!("Unhandled Symbol: {}", x),
+            DungeonLayoutBuilderErr::MalformedLayout(x) => format!("Malformed Layout: {}", x),
+            DungeonLayoutBuilderErr::EmptyDungeon => "Provided dungeon is empty".to_string(),
+        };
+        write!(f, "{}", s)
+    }
+}
+type BuilderRes<T> = Result<T, DungeonLayoutBuilderErr>;
+type EdgeFactory = Box<dyn Fn(char, Direction) -> BuilderRes<Option<Box<dyn Edge>>>>;
+type CenterFactory = Box<dyn Fn(char) -> BuilderRes<Option<Box<dyn Center>>>>;
+#[derive(Default)]
+/// If a factory returns `DungeonLayoutBuilderErr::UnhandledSymbol` the default factory will handle the
+/// symbol.
+pub struct DungeonLayoutBuilder {
+    edge_factory: Option<EdgeFactory>,
+    center_factory: Option<CenterFactory>,
+}
+impl DungeonLayoutBuilder {
+    pub fn with_edge_factory(mut self, factory: Box<EdgeFactory>) -> Self {
+        self.edge_factory = Some(factory);
+        self
+    }
+    pub fn with_center_factory(mut self, factory: Box<CenterFactory>) -> Self {
+        self.center_factory = Some(factory);
+        self
+    }
+    fn default_edge_factory(
+        &self,
+        symbol: char,
+        direction: Direction,
+    ) -> BuilderRes<Option<Box<dyn Edge>>> {
+        match symbol {
+            ' ' => Ok(None),
+            'T' => Ok(Some(Box::new(Trap))),
+            x => Err(DungeonLayoutBuilderErr::UnhandledSymbol(x)),
+        }
+    }
+    fn default_center_factory(&self, symbol: char) -> BuilderRes<Option<Box<dyn Center>>> {
+        match symbol {
+            ' ' => Ok(None),
+            'T' => Ok(Some(Box::new(Trap))),
+            x => Err(DungeonLayoutBuilderErr::UnhandledSymbol(x)),
+        }
+    }
+    pub fn build(&self, text: &str) -> Result<DungeonLayout, DungeonLayoutBuilderErr> {
+        let lines = text.lines().collect::<Vec<_>>();
+        let width = match lines.first() {
+            None => return Err(DungeonLayoutBuilderErr::EmptyDungeon),
+            Some(l) => l.len(),
+        };
+        if width % TILESIZE != 0 {
+            return Err(DungeonLayoutBuilderErr::MalformedLayout(format!(
+                "Expected tiles to be {} chars wide, but encountered {} chars in the first line",
+                TILESIZE, width
+            )));
+        }
+        let tile_lines = lines.chunks_exact(TILESIZE);
+        let remainder = tile_lines.remainder();
+        if !remainder.is_empty() {
+            return Err(DungeonLayoutBuilderErr::MalformedLayout(format!(
+                "Expected tiles to be {} lines high, but the last one is only {}:\n{:#?}",
+                TILESIZE,
+                remainder.len(),
+                remainder
+            )));
+        }
+        let mut tiles = vec![];
+        for (y, tile_parts) in tile_lines.enumerate() {
+            let up = tile_parts[0];
+            let middle = tile_parts[1];
+            let down = tile_parts[2];
+            if up.len() != middle.len() || up.len() != down.len() {
+                return Err(DungeonLayoutBuilderErr::MalformedLayout(format!("Expected tiles to be {} lines of the same length, but encountered different lengths in {}th tile-line", TILESIZE, y)));
+            }
+            if up.len() != width {
+                return Err(DungeonLayoutBuilderErr::MalformedLayout(format!("Expected all tile-lines to have the same width of {} chars but encountered only {} chars in {}th tile-line", width, up.len(), y)));
+            }
+            let up = up.chars().skip(1).step_by(3);
+            let left = middle.chars().step_by(3);
+            let center = middle.chars().skip(1).step_by(3);
+            let right = middle.chars().skip(2).step_by(3);
+            let down = down.chars().skip(1).step_by(3);
+            for (up, (left, (center, (right, down)))) in
+                up.zip(left.zip(center.zip(right.zip(down))))
+            {
+                let up = self.default_edge_factory(up, Direction::Up)?;
+                let left = self.default_edge_factory(left, Direction::Left)?;
+                let right = self.default_edge_factory(right, Direction::Right)?;
+                let down = self.default_edge_factory(down, Direction::Down)?;
+
+                let center = self.default_center_factory(center)?;
+                tiles.push(Tile {
+                    up,
+                    left,
+                    right,
+                    down,
+                    occupier: center,
+                });
+            }
+        }
+        Ok(DungeonLayout {
+            tiles,
+            width: (width / TILESIZE) as u8,
+        })
     }
 }
 impl Debug for DungeonLayout {
@@ -175,23 +273,23 @@ impl Debug for DungeonLayout {
         let mut up = String::with_capacity((TILESIZE as u8 * self.width).into());
         let mut middle = String::with_capacity((TILESIZE as u8 * self.width).into());
         let mut down = String::with_capacity((TILESIZE as u8 * self.width).into());
-        let mut y = 0;
         let mut x = 0;
         for tile in &self.tiles {
             if x >= self.width {
-                y += 1;
                 x = 0;
                 up = format!("{up}\n{middle}\n{down}\n");
                 middle = String::with_capacity((TILESIZE as u8 * self.width).into());
                 down = String::with_capacity((TILESIZE as u8 * self.width).into());
             }
             let tile = tile.to_string();
-            let (tile_up, tile) = tile
-                .split_once("\n")
-                .expect(&format!("Expected Tile to have at least 2 lines, but got '{:?}'", tile));
-            let (tile_middle, tile_down) = tile
-                .split_once("\n")
-                .expect(&format!("Expected Tile to have {} lines, but got '{:?}\n{:?}'", TILESIZE, tile_up, tile));
+            let (tile_up, tile) = tile.split_once("\n").expect(&format!(
+                "Expected Tile to have at least 2 lines, but got '{:?}'",
+                tile
+            ));
+            let (tile_middle, tile_down) = tile.split_once("\n").expect(&format!(
+                "Expected Tile to have {} lines, but got '{:?}\n{:?}'",
+                TILESIZE, tile_up, tile
+            ));
             up += tile_up;
             middle += tile_middle;
             down += tile_down;
@@ -200,7 +298,6 @@ impl Debug for DungeonLayout {
         write!(w, "{up}\n{middle}\n{down}")
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -218,14 +315,19 @@ mod tests {
         };
         let example_string = format!("{:?}", example);
         println!("{}", example_string);
-        assert!(example_string == "\
+        assert!(
+            example_string
+                == "\
 |--|-|
 |  |T|
 |  |T|
 --|  |
   | T|
-  |--|");
-        let reverse: DungeonLayout = example_string.parse().unwrap();
+  |--|"
+        );
+        let reverse: DungeonLayout = DungeonLayoutBuilder::default()
+            .build(&example_string)
+            .unwrap();
         assert!(format!("{:?}", reverse) == example_string);
     }
 }
